@@ -80,9 +80,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Send verification email
-      const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
-        ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` 
-        : 'https://localhost:5000';
+      // Get the correct base URL for the current environment
+      const baseUrl = process.env.RENDER_EXTERNAL_URL || 
+                      process.env.FRONTEND_URL || 
+                      (process.env.REPLIT_DOMAINS?.split(',')[0] 
+                        ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` 
+                        : 'http://localhost:5000');
       
       const emailSent = await sendVerificationEmail(email, verificationToken, baseUrl);
       

@@ -157,11 +157,13 @@ DATABASE_URL=mongodb+srv://username:password@cluster.mongodb.net/subzero-md
 
 2. **Configure Environment Variables**
    - Set all required environment variables in Render dashboard
-   - Update URLs for production:
+   - **Important:** Set the following URLs for production:
      ```env
+     RENDER_EXTERNAL_URL=https://your-app.onrender.com
      FRONTEND_URL=https://your-app.onrender.com
      BACKEND_URL=https://your-app.onrender.com
      ```
+   - The `RENDER_EXTERNAL_URL` is crucial for correct email verification links
 
 3. **Deploy**
    - Render will automatically build and deploy your application
