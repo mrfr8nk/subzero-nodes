@@ -70,7 +70,7 @@ export async function setupAuth(app: Express) {
         coinBalance: 100,
       };
 
-      // Upsert user in database
+      // Upsert user in database (referral handling is done inside upsertUser)
       const user = await storage.upsertUser(userData);
       return done(null, user);
     } catch (error) {

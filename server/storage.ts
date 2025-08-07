@@ -141,11 +141,16 @@ export class MongoStorage implements IStorage {
 
   async createLocalUser(userData: any): Promise<any> {
     const now = new Date();
+    
+    // Generate unique referral code for new user
+    const referralCode = await this.generateReferralCode();
+    
     const newUser = {
       ...userData,
       coinBalance: 100,
       emailVerified: false,
       authProvider: 'local',
+      referralCode: referralCode,
       createdAt: now,
       updatedAt: now,
     };

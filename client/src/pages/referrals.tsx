@@ -39,8 +39,9 @@ export default function Referrals() {
 
   useEffect(() => {
     if (referralStats?.referralCode) {
-      const domains = process.env.REPLIT_DOMAINS?.split(',')[0] || window.location.origin;
-      setReferralLink(`${window.location.protocol}//${domains}?ref=${referralStats.referralCode}`);
+      // Use current domain for referral links
+      const currentDomain = window.location.origin;
+      setReferralLink(`${currentDomain}/signup?ref=${referralStats.referralCode}`);
     }
   }, [referralStats]);
 

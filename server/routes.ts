@@ -30,13 +30,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
 
   // Google OAuth routes
-  app.get('/api/auth/google', passport.authenticate('google', { 
-    scope: ['profile', 'email'] 
-  }));
+  app.get('/api/auth/google', (req, res, next) => {
+    // Store referral code in session if provided
+    if (req.query.ref) {
+      req.session.referralCode = req.query.ref;
+    }
+    passport.authenticate('google', { 
+      scope: ['profile', 'email'] 
+    })(req, res, next);
+  });
 
   app.get('/api/auth/google/callback', 
     passport.authenticate('google', { failureRedirect: '/login?error=auth_failed' }),
-    (req, res) => {
+    async (req: any, res) => {
+      try {
+        // Handle referral code if stored in session
+        if (req.session.referralCode && req.user) {
+          const referrer = await storage.getUserByReferralCode(req.session.referralCode);
+          if (referrer && req.user._id.toString() !== referrer._id.toString()) {
+            // Check if referral already exists to avoid duplicates
+            const existingReferrals = await storage.getUserReferrals(referrer._id.toString());
+            const alreadyReferred = existingReferrals.some(ref => 
+              ref.referredId.toString() === req.user._id.toString()
+            );
+            
+            if (!alreadyReferred) {
+              await storage.createReferral({
+                referrerId: referrer._id.toString(),
+                referredId: req.user._id.toString(),
+                rewardClaimed: false,
+                rewardAmount: 50,
+              });
+              
+              // Award referral bonus
+              await storage.updateUserBalance(referrer._id.toString(), 50);
+              await storage.createTransaction({
+                userId: referrer._id.toString(),
+                type: "referral",
+                amount: 50,
+                description: "Referral bonus for new user signup",
+              });
+            }
+          }
+          // Clear referral code from session
+          delete req.session.referralCode;
+        }
+      } catch (error) {
+        console.error('Error processing Google OAuth referral:', error);
+      }
+      
       // Successful authentication, redirect to dashboard
       res.redirect('/dashboard');
     }

@@ -48,7 +48,12 @@ export default function Signup() {
   });
 
   const handleGoogleLogin = () => {
-    window.location.href = "/api/auth/google";
+    // Include referral code in Google OAuth state if available
+    if (referralCode) {
+      window.location.href = `/api/auth/google?ref=${referralCode}`;
+    } else {
+      window.location.href = "/api/auth/google";
+    }
   };
 
   const onSubmit = async (data: SignupFormData) => {
