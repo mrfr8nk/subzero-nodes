@@ -4,7 +4,7 @@ import { ObjectId } from "mongodb";
 // Define MongoDB document interfaces
 export interface User {
   _id: ObjectId;
-  googleId: string;
+  googleId?: string;
   email: string;
   firstName?: string;
   lastName?: string;
@@ -14,6 +14,10 @@ export interface User {
   coinBalance: number;
   referralCode?: string;
   referredById?: string;
+  password?: string;
+  verificationToken?: string;
+  verificationTokenExpiry?: Date;
+  isVerified?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -57,7 +61,7 @@ export interface Session {
 
 // Zod schemas for validation
 export const insertUserSchema = z.object({
-  googleId: z.string(),
+  googleId: z.string().optional(),
   email: z.string().email(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
@@ -67,6 +71,10 @@ export const insertUserSchema = z.object({
   coinBalance: z.number().default(100),
   referralCode: z.string().optional(),
   referredById: z.string().optional(),
+  password: z.string().optional(),
+  verificationToken: z.string().optional(),
+  verificationTokenExpiry: z.date().optional(),
+  isVerified: z.boolean().optional(),
 });
 
 export const insertDeploymentSchema = z.object({

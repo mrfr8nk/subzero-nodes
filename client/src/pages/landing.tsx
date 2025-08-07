@@ -3,10 +3,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SiWhatsapp, SiGoogle } from "react-icons/si";
 import { Rocket, Coins, Users, ChartLine, Smartphone, Shield, Clock, CheckCircle, Star, ArrowRight, Play, Zap, Globe, Award } from "lucide-react";
+import { useLocation } from "wouter";
 
 export default function Landing() {
+  const [, setLocation] = useLocation();
+  
   const handleGoogleLogin = () => {
     window.location.href = "/api/auth/google";
+  };
+
+  const handleGetStarted = () => {
+    setLocation("/signup");
   };
 
   const features = [
@@ -61,29 +68,7 @@ export default function Landing() {
     }
   ];
 
-  const testimonials = [
-    {
-      name: "Alex Chen",
-      role: "Bot Developer",
-      image: "AC",
-      content: "SUBZERO-MD made bot deployment so simple. What used to take hours now takes minutes!",
-      rating: 5
-    },
-    {
-      name: "Maria Santos",
-      role: "Business Owner",
-      image: "MS", 
-      content: "The referral system helped me earn enough coins to run my bots for free. Amazing platform!",
-      rating: 5
-    },
-    {
-      name: "David Kim",
-      role: "Tech Entrepreneur",
-      image: "DK",
-      content: "Professional, reliable, and incredibly easy to use. Highly recommend for any WhatsApp bot needs.",
-      rating: 5
-    }
-  ];
+
 
   const stats = [
     { label: "Bots Deployed", value: "15,000+", icon: Rocket },
@@ -102,9 +87,9 @@ export default function Landing() {
               <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
                 <SiWhatsapp className="w-6 h-6 text-white" />
               </div>
-              <div>
-                <span className="text-xl font-bold text-gray-900 dark:text-white">SUBZERO-MD</span>
-                <div className="text-xs text-gray-500 dark:text-gray-400">Bot Deployment Platform</div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xl font-bold text-gray-900 dark:text-white tracking-wide">SUBZERO-MD</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Bot Platform</span>
               </div>
             </div>
             
@@ -119,7 +104,7 @@ export default function Landing() {
                 Sign In
               </Button>
               <Button 
-                onClick={handleGoogleLogin}
+                onClick={handleGetStarted}
                 className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg"
                 data-testid="button-getstarted-nav"
               >
@@ -148,7 +133,7 @@ export default function Landing() {
               </p>
               <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
                 <Button 
-                  onClick={handleGoogleLogin}
+                  onClick={handleGetStarted}
                   className="bg-white text-blue-600 hover:bg-blue-50 px-8 py-4 rounded-xl font-semibold text-lg h-auto"
                 >
                   Start Deploying
@@ -158,7 +143,7 @@ export default function Landing() {
                   onClick={handleGoogleLogin}
                   className="border-2 border-white text-white hover:bg-white hover:text-blue-600 px-8 py-4 rounded-xl font-semibold text-lg h-auto"
                 >
-                  View Demo
+                  Sign In with Google
                 </Button>
               </div>
             </div>
@@ -224,49 +209,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      <section className="py-20 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/50 dark:to-purple-950/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <Badge className="mb-6 bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 border-0">
-              <Star className="w-3 h-3 mr-1" />
-              Loved by thousands
-            </Badge>
-            <h2 className="text-3xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-6">
-              What Our Users Say
-            </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Join thousands of developers and businesses who trust SUBZERO-MD for their WhatsApp bot deployments.
-            </p>
-          </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <Card key={index} className="bg-white dark:bg-slate-800 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group">
-                <CardContent className="p-8">
-                  <div className="flex items-center mb-6">
-                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold mr-4">
-                      {testimonial.image}
-                    </div>
-                    <div>
-                      <div className="font-semibold text-gray-900 dark:text-white">{testimonial.name}</div>
-                      <div className="text-gray-600 dark:text-gray-400 text-sm">{testimonial.role}</div>
-                    </div>
-                  </div>
-                  <div className="flex mb-4">
-                    {[...Array(testimonial.rating)].map((_, i) => (
-                      <Star key={i} className="w-4 h-4 text-yellow-400 fill-current" />
-                    ))}
-                  </div>
-                  <p className="text-gray-600 dark:text-gray-300 italic leading-relaxed">
-                    "{testimonial.content}"
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* CTA Section */}
       <section className="py-20 bg-gradient-to-r from-blue-600 to-purple-600 text-white relative overflow-hidden">
@@ -281,12 +224,12 @@ export default function Landing() {
           
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
             <Button 
-              onClick={handleGoogleLogin}
+              onClick={handleGetStarted}
               size="lg"
               className="bg-white text-blue-600 hover:bg-blue-50 px-8 py-6 rounded-2xl font-bold text-lg shadow-xl group"
               data-testid="button-start-free"
             >
-              <SiGoogle className="w-5 h-5 mr-3" />
+              <Rocket className="w-5 h-5 mr-3" />
               Start Free Today
               <ArrowRight className="w-5 h-5 ml-3 group-hover:translate-x-1 transition-transform" />
             </Button>
@@ -308,9 +251,9 @@ export default function Landing() {
               <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
                 <SiWhatsapp className="w-6 h-6 text-white" />
               </div>
-              <div>
-                <span className="text-xl font-bold">SUBZERO-MD</span>
-                <div className="text-sm text-gray-400">Bot Deployment Platform</div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xl font-bold tracking-wide">SUBZERO-MD</span>
+                <span className="text-xs text-gray-400 font-medium">Bot Platform</span>
               </div>
             </div>
             <div className="text-center md:text-right">

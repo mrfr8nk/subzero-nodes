@@ -4,6 +4,9 @@ import passport from "passport";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./googleAuth";
 import { insertDeploymentSchema, insertTransactionSchema } from "@shared/schema";
+import { sendVerificationEmail, sendWelcomeEmail } from "./emailService";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -39,6 +42,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ message: 'Logged out successfully' });
     });
+  });
+
+  // Local email signup route
+  app.post('/api/auth/local/signup', async (req, res) => {
+    try {
+      const { firstName, lastName, email, password, referralCode } = req.body;
+
+      // Validate required fields
+      if (!firstName || !lastName || !email || !password) {
+        return res.status(400).json({ message: 'All fields are required' });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: 'User with this email already exists' });
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Generate verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      // Create user with unverified status
+      const newUser = await storage.createLocalUser({
+        firstName,
+        lastName,
+        email,
+        password: hashedPassword,
+        verificationToken,
+        verificationTokenExpiry,
+        isVerified: false,
+        referralCode: referralCode || undefined,
+      });
+
+      // Send verification email
+      const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
+        ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` 
+        : 'https://localhost:5000';
+      
+      const emailSent = await sendVerificationEmail(email, verificationToken, baseUrl);
+      
+      if (!emailSent) {
+        console.error('Failed to send verification email');
+        // Continue anyway, user can request resend
+      }
+
+      res.status(201).json({ 
+        message: 'Account created successfully. Please check your email to verify your account.',
+        userId: newUser.insertedId,
+      });
+    } catch (error) {
+      console.error('Signup error:', error);
+      res.status(500).json({ message: 'Failed to create account' });
+    }
+  });
+
+  // Email verification route
+  app.get('/api/auth/verify-email', async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token) {
+        return res.status(400).json({ message: 'Verification token is required' });
+      }
+
+      const user = await storage.getUserByVerificationToken(token as string);
+      
+      if (!user) {
+        return res.status(400).json({ message: 'Invalid or expired verification token' });
+      }
+
+      if (user.verificationTokenExpiry && new Date() > user.verificationTokenExpiry) {
+        return res.status(400).json({ message: 'Verification token has expired' });
+      }
+
+      // Verify the user
+      await storage.verifyUser(user._id.toString());
+
+      // Send welcome email
+      await sendWelcomeEmail(user.email, user.firstName);
+
+      res.json({ message: 'Email verified successfully. You can now sign in.' });
+    } catch (error) {
+      console.error('Email verification error:', error);
+      res.status(500).json({ message: 'Email verification failed' });
+    }
+  });
+
+  // Local email login route
+  app.post('/api/auth/local/login', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ message: 'Email and password are required' });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      
+      if (!user || !user.password) {
+        return res.status(401).json({ message: 'Invalid email or password' });
+      }
+
+      if (!user.isVerified) {
+        return res.status(401).json({ message: 'Please verify your email before signing in' });
+      }
+
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      
+      if (!isValidPassword) {
+        return res.status(401).json({ message: 'Invalid email or password' });
+      }
+
+      // Log the user in using passport session
+      req.login(user, (err) => {
+        if (err) {
+          console.error('Login error:', err);
+          return res.status(500).json({ message: 'Login failed' });
+        }
+        res.json({ message: 'Login successful', user: { _id: user._id, email: user.email, firstName: user.firstName, lastName: user.lastName } });
+      });
+    } catch (error) {
+      console.error('Login error:', error);
+      res.status(500).json({ message: 'Login failed' });
+    }
   });
 
   // Dashboard stats

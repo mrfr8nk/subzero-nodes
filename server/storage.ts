@@ -17,6 +17,9 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByGoogleId(googleId: string): Promise<User | undefined>;
+  getUserByVerificationToken(token: string): Promise<User | undefined>;
+  createLocalUser(userData: any): Promise<any>;
+  verifyUser(userId: string): Promise<void>;
   upsertUser(user: InsertUser): Promise<User>;
   
   // Deployment operations
@@ -78,6 +81,70 @@ export class MongoStorage implements IStorage {
   async getUserByGoogleId(googleId: string): Promise<User | undefined> {
     const user = await this.usersCollection.findOne({ googleId });
     return user || undefined;
+  }
+
+  async getUserByVerificationToken(token: string): Promise<User | undefined> {
+    const user = await this.usersCollection.findOne({ verificationToken: token });
+    return user || undefined;
+  }
+
+  async createLocalUser(userData: any): Promise<any> {
+    const now = new Date();
+    const newUser = {
+      ...userData,
+      coinBalance: 100,
+      emailVerified: false,
+      authProvider: 'local',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const result = await this.usersCollection.insertOne(newUser);
+    
+    // Handle referral if provided
+    if (userData.referralCode && result.insertedId) {
+      try {
+        const referrer = await this.getUserByReferralCode(userData.referralCode);
+        if (referrer && result.insertedId.toString() !== referrer._id.toString()) {
+          await this.createReferral({
+            referrerId: referrer._id.toString(),
+            referredId: result.insertedId.toString(),
+            rewardClaimed: false,
+            rewardAmount: 50,
+          });
+          
+          // Award referral bonus
+          await this.updateUserBalance(referrer._id.toString(), 50);
+          await this.createTransaction({
+            userId: referrer._id.toString(),
+            type: "referral",
+            amount: 50,
+            description: "Referral bonus for new user signup",
+          });
+        }
+      } catch (error) {
+        console.error('Error processing referral:', error);
+      }
+    }
+
+    return result;
+  }
+
+  async verifyUser(userId: string): Promise<void> {
+    await this.usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $set: { 
+          isVerified: true,
+          emailVerified: true,
+          updatedAt: new Date() 
+        },
+        $unset: { 
+          verificationToken: "", 
+          verificationTokenExpiry: "" 
+        }
+      }
+    );
   }
 
   async upsertUser(userData: InsertUser): Promise<User> {
