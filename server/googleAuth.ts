@@ -22,8 +22,9 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.NODE_ENV === 'production' || !!process.env.KOYEB_PUBLIC_DOMAIN,
       maxAge: sessionTtl,
+      sameSite: (process.env.NODE_ENV === 'production' || !!process.env.KOYEB_PUBLIC_DOMAIN) ? 'none' : 'lax',
     },
   });
 }
@@ -38,9 +39,16 @@ export async function setupAuth(app: Express) {
   app.use(passport.session());
 
   // Dynamic callback URL based on environment
-  const callbackURL = process.env.REPLIT_DEV_DOMAIN 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}/api/auth/google/callback`
-    : 'http://localhost:5000/api/auth/google/callback';
+  let callbackURL = 'http://localhost:5000/api/auth/google/callback';
+  
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    callbackURL = `https://${process.env.REPLIT_DEV_DOMAIN}/api/auth/google/callback`;
+  } else if (process.env.KOYEB_PUBLIC_DOMAIN) {
+    callbackURL = `https://${process.env.KOYEB_PUBLIC_DOMAIN}/api/auth/google/callback`;
+  } else if (process.env.NODE_ENV === 'production') {
+    // For production deployments, try to detect the domain
+    callbackURL = `https://subzero-deploy.koyeb.app/api/auth/google/callback`;
+  }
 
   console.log('Google OAuth callback URL:', callbackURL);
 

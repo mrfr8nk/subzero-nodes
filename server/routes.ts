@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import passport from "passport";
+import cors from "cors";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./googleAuth";
 import { insertDeploymentSchema, insertTransactionSchema } from "@shared/schema";
@@ -9,6 +10,22 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // CORS configuration for production domains
+  const allowedOrigins = [
+    'http://localhost:5000',
+    'http://localhost:3000',
+    'https://subzero-deploy.koyeb.app',
+    process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null,
+  ].filter((origin): origin is string => origin !== null);
+  
+  const corsOptions = {
+    origin: allowedOrigins,
+    credentials: true,
+    optionsSuccessStatus: 200,
+  };
+  
+  app.use(cors(corsOptions));
+  
   // Auth middleware
   await setupAuth(app);
 

@@ -33,10 +33,13 @@ Preferred communication style: Simple, everyday language.
 - **Sessions Collection**: Express session storage for authentication persistence
 
 ### Authentication & Authorization
-- **Google OAuth Integration**: Uses Google's OAuth 2.0 for user authentication
-- **Session-Based Auth**: Server-side sessions with secure cookie management
-- **Protected Routes**: Middleware-based route protection for authenticated endpoints
+- **Dual Authentication**: Google OAuth 2.0 and email/password authentication with verification
+- **Session-Based Auth**: Server-side sessions with secure cookie management and MongoDB storage
+- **Email Services**: Automated verification emails, welcome emails, and password reset functionality
+- **Protected Routes**: Middleware-based route protection for authenticated endpoints  
 - **User Context**: React context for client-side authentication state
+- **Security Features**: Password hashing with bcrypt, secure token generation, email verification with expiry
+- **Cross-Domain Support**: CORS configuration for development and production deployments
 
 ### Key Features
 - **Bot Deployment**: One-click deployment system with configuration options and cost management
