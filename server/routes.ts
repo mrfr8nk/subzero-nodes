@@ -79,13 +79,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         referralCode: referralCode || undefined,
       });
 
-      // Send verification email
-      // Get the correct base URL for the current environment
-      const baseUrl = process.env.RENDER_EXTERNAL_URL || 
-                      process.env.FRONTEND_URL || 
-                      (process.env.REPLIT_DOMAINS?.split(',')[0] 
-                        ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` 
-                        : 'http://localhost:5000');
+      // Send verification email with dynamic URL from request
+      const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+      const host = req.get('host') || req.headers['x-forwarded-host'] || 'localhost:5000';
+      const baseUrl = `${protocol}://${host}`;
       
       const emailSent = await sendVerificationEmail(email, verificationToken, baseUrl);
       
@@ -126,8 +123,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify the user
       await storage.verifyUser(user._id.toString());
 
-      // Send welcome email
-      await sendWelcomeEmail(user.email, user.firstName);
+      // Send welcome email with dynamic URL
+      const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+      const host = req.get('host') || req.headers['x-forwarded-host'] || 'localhost:5000';
+      const baseUrl = `${protocol}://${host}`;
+      
+      await sendWelcomeEmail(user.email, user.firstName, baseUrl);
 
       res.json({ message: 'Email verified successfully. You can now sign in.' });
     } catch (error) {

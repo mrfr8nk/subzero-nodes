@@ -127,7 +127,7 @@ What's next?
   });
 }
 
-export async function sendWelcomeEmail(email: string, firstName?: string): Promise<boolean> {
+export async function sendWelcomeEmail(email: string, firstName?: string, baseUrl?: string): Promise<boolean> {
   const name = firstName || 'there';
   
   const htmlContent = `
@@ -158,7 +158,7 @@ export async function sendWelcomeEmail(email: string, firstName?: string): Promi
           <p>Welcome to SUBZERO-MD! Your email has been verified and your account is now active.</p>
           
           <div style="text-align: center;">
-            <a href="${process.env.REPLIT_DOMAINS?.split(',')[0] ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}/dashboard` : '#'}" class="button">Go to Dashboard</a>
+            <a href="${baseUrl ? `${baseUrl}/dashboard` : '#'}" class="button">Go to Dashboard</a>
           </div>
           
           <h3>🚀 Get Started:</h3>
