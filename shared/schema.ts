@@ -20,6 +20,14 @@ export interface User {
   isVerified?: boolean;
   resetPasswordToken?: string;
   resetPasswordExpiry?: Date;
+  // Admin fields
+  isAdmin?: boolean;
+  role?: string; // 'user', 'admin', 'super_admin'
+  status?: string; // 'active', 'banned', 'restricted'
+  restrictions?: string[]; // Array of restriction types
+  registrationIp?: string;
+  lastLoginIp?: string;
+  ipHistory?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -61,6 +69,26 @@ export interface Session {
   expire: Date;
 }
 
+export interface AdminNotification {
+  _id: ObjectId;
+  type: string; // 'duplicate_ip', 'suspicious_activity', etc.
+  title: string;
+  message: string;
+  data?: any; // Additional data related to the notification
+  read: boolean;
+  createdAt: Date;
+}
+
+export interface AppSettings {
+  _id: ObjectId;
+  key: string;
+  value: any;
+  description?: string;
+  updatedBy?: ObjectId; // Admin who updated this setting
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Zod schemas for validation
 export const insertUserSchema = z.object({
   googleId: z.string().optional(),
@@ -79,6 +107,14 @@ export const insertUserSchema = z.object({
   isVerified: z.boolean().optional(),
   resetPasswordToken: z.string().optional(),
   resetPasswordExpiry: z.date().optional(),
+  // Admin fields
+  isAdmin: z.boolean().default(false),
+  role: z.string().default("user"),
+  status: z.string().default("active"),
+  restrictions: z.string().array().default([]),
+  registrationIp: z.string().optional(),
+  lastLoginIp: z.string().optional(),
+  ipHistory: z.string().array().default([]),
 });
 
 export const insertDeploymentSchema = z.object({
@@ -110,12 +146,29 @@ export const insertSessionSchema = z.object({
   expire: z.date(),
 });
 
+export const insertAdminNotificationSchema = z.object({
+  type: z.string(),
+  title: z.string(),
+  message: z.string(),
+  data: z.any().optional(),
+  read: z.boolean().optional().default(false),
+});
+
+export const insertAppSettingsSchema = z.object({
+  key: z.string(),
+  value: z.any(),
+  description: z.string().optional(),
+  updatedBy: z.string().optional(),
+});
+
 // Insert types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertDeployment = z.infer<typeof insertDeploymentSchema>;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type InsertReferral = z.infer<typeof insertReferralSchema>;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
+export type InsertAdminNotification = z.infer<typeof insertAdminNotificationSchema>;
+export type InsertAppSettings = z.infer<typeof insertAppSettingsSchema>;
 
 // For backward compatibility
 export type UpsertUser = InsertUser;

@@ -49,5 +49,6 @@ export function useAuth() {
     logout: logout.mutate,
     isLoggingOut: logout.isPending,
     isAuthenticated: !!user,
+    isAdmin: !!(user?.isAdmin || user?.role === 'admin' || user?.role === 'super_admin'),
   };
 }

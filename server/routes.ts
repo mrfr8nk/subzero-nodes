@@ -4,7 +4,8 @@ import passport from "passport";
 import cors from "cors";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./googleAuth";
-import { insertDeploymentSchema, insertTransactionSchema } from "@shared/schema";
+import { adminLogin, requireAdmin, requireSuperAdmin } from "./adminAuth";
+import { insertDeploymentSchema, insertTransactionSchema, insertAppSettingsSchema } from "@shared/schema";
 import { sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail } from "./emailService";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -79,6 +80,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('Error processing Google OAuth referral:', error);
       }
       
+      // Track user IP for login/registration
+      try {
+        const userIp = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
+        if (userIp && req.user) {
+          await storage.updateUserIp(req.user._id.toString(), userIp);
+        }
+      } catch (error) {
+        console.error('Error tracking user IP:', error);
+      }
+      
       // Successful authentication, redirect to dashboard
       res.redirect('/dashboard');
     }
@@ -126,6 +137,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const verificationToken = crypto.randomBytes(32).toString('hex');
       const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
+      // Get user IP for registration tracking
+      const registrationIp = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
+      
       // Create user with unverified status
       const newUser = await storage.createLocalUser({
         firstName,
@@ -136,6 +150,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         verificationTokenExpiry,
         isVerified: false,
         referralCode: referralCode || undefined,
+        registrationIp,
+        lastLoginIp: registrationIp,
+        ipHistory: registrationIp ? [registrationIp] : [],
       });
 
       // Send verification email with dynamic URL from request
@@ -222,11 +239,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Log the user in using passport session
-      req.login(user, (err) => {
+      req.login(user, async (err) => {
         if (err) {
           console.error('Login error:', err);
           return res.status(500).json({ message: 'Login failed' });
         }
+        
+        // Track user IP for login
+        try {
+          const userIp = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
+          if (userIp) {
+            await storage.updateUserIp(user._id.toString(), userIp);
+          }
+        } catch (error) {
+          console.error('Error tracking user IP:', error);
+        }
+        
         res.json({ message: 'Login successful', user: { _id: user._id, email: user.email, firstName: user.firstName, lastName: user.lastName } });
       });
     } catch (error) {
@@ -531,6 +559,185 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error validating referral code:", error);
       res.status(500).json({ message: "Failed to validate referral code" });
+    }
+  });
+
+  // Admin authentication routes
+  app.post('/api/admin/login', adminLogin);
+
+  // Admin dashboard stats
+  app.get('/api/admin/stats', requireAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getAdminStats();
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching admin stats:', error);
+      res.status(500).json({ message: 'Failed to fetch admin stats' });
+    }
+  });
+
+  // User management routes
+  app.get('/api/admin/users', requireAdmin, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const users = await storage.getAllUsers(limit, offset);
+      res.json(users);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      res.status(500).json({ message: 'Failed to fetch users' });
+    }
+  });
+
+  // Update user status (ban/unban/restrict)
+  app.patch('/api/admin/users/:userId/status', requireAdmin, async (req, res) => {
+    const { userId } = req.params;
+    const { status, restrictions } = req.body;
+    
+    if (!status || !['active', 'banned', 'restricted'].includes(status)) {
+      return res.status(400).json({ message: 'Valid status required: active, banned, or restricted' });
+    }
+
+    try {
+      await storage.updateUserStatus(userId, status, restrictions);
+      
+      // Create notification
+      await storage.createAdminNotification({
+        type: 'user_status_change',
+        title: 'User Status Changed',
+        message: `User status changed to ${status}`,
+        data: { userId, status, restrictions },
+        read: false
+      });
+      
+      res.json({ message: 'User status updated successfully' });
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      res.status(500).json({ message: 'Failed to update user status' });
+    }
+  });
+
+  // Update user coins
+  app.patch('/api/admin/users/:userId/coins', requireAdmin, async (req, res) => {
+    const { userId } = req.params;
+    const { amount, reason } = req.body;
+    const adminId = (req.user as any)?._id?.toString();
+    
+    if (typeof amount !== 'number') {
+      return res.status(400).json({ message: 'Amount must be a number' });
+    }
+    
+    if (!reason) {
+      return res.status(400).json({ message: 'Reason is required' });
+    }
+
+    try {
+      await storage.updateUserCoins(userId, amount, reason, adminId);
+      res.json({ message: 'User coins updated successfully' });
+    } catch (error) {
+      console.error('Error updating user coins:', error);
+      res.status(500).json({ message: 'Failed to update user coins' });
+    }
+  });
+
+  // Promote user to admin (super admin only)
+  app.patch('/api/admin/users/:userId/promote', requireSuperAdmin, async (req, res) => {
+    const { userId } = req.params;
+    const adminId = (req.user as any)?._id?.toString();
+
+    try {
+      await storage.promoteToAdmin(userId, adminId);
+      res.json({ message: 'User promoted to admin successfully' });
+    } catch (error) {
+      console.error('Error promoting user:', error);
+      res.status(500).json({ message: 'Failed to promote user' });
+    }
+  });
+
+  // Get users by IP
+  app.get('/api/admin/users/by-ip/:ip', requireAdmin, async (req, res) => {
+    const { ip } = req.params;
+    
+    try {
+      const users = await storage.getUsersByIp(ip);
+      res.json(users);
+    } catch (error) {
+      console.error('Error fetching users by IP:', error);
+      res.status(500).json({ message: 'Failed to fetch users by IP' });
+    }
+  });
+
+  // Admin notifications
+  app.get('/api/admin/notifications', requireAdmin, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const notifications = await storage.getAdminNotifications(limit);
+      res.json(notifications);
+    } catch (error) {
+      console.error('Error fetching admin notifications:', error);
+      res.status(500).json({ message: 'Failed to fetch notifications' });
+    }
+  });
+
+  // Mark notification as read
+  app.patch('/api/admin/notifications/:id/read', requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+      await storage.markNotificationRead(id);
+      res.json({ message: 'Notification marked as read' });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      res.status(500).json({ message: 'Failed to mark notification as read' });
+    }
+  });
+
+  // App settings management
+  app.get('/api/admin/settings', requireAdmin, async (req, res) => {
+    try {
+      const settings = await storage.getAllAppSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error('Error fetching app settings:', error);
+      res.status(500).json({ message: 'Failed to fetch app settings' });
+    }
+  });
+
+  // Get specific setting
+  app.get('/api/admin/settings/:key', requireAdmin, async (req, res) => {
+    const { key } = req.params;
+    
+    try {
+      const setting = await storage.getAppSetting(key);
+      if (!setting) {
+        return res.status(404).json({ message: 'Setting not found' });
+      }
+      res.json(setting);
+    } catch (error) {
+      console.error('Error fetching app setting:', error);
+      res.status(500).json({ message: 'Failed to fetch app setting' });
+    }
+  });
+
+  // Update app setting
+  app.put('/api/admin/settings/:key', requireAdmin, async (req, res) => {
+    const { key } = req.params;
+    const { value, description } = req.body;
+    const adminId = (req.user as any)?._id?.toString();
+    
+    try {
+      const settingData = insertAppSettingsSchema.parse({
+        key,
+        value,
+        description,
+        updatedBy: adminId
+      });
+      
+      const setting = await storage.setAppSetting(settingData);
+      res.json(setting);
+    } catch (error) {
+      console.error('Error updating app setting:', error);
+      res.status(500).json({ message: 'Failed to update app setting' });
     }
   });
 

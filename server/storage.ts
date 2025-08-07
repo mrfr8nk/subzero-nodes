@@ -3,10 +3,14 @@ import {
   Deployment,
   Transaction,
   Referral,
+  AdminNotification,
+  AppSettings,
   InsertUser,
   InsertDeployment,
   InsertTransaction,
   InsertReferral,
+  InsertAdminNotification,
+  InsertAppSettings,
 } from "@shared/schema";
 import { getDb } from "./db";
 import { ObjectId } from "mongodb";
@@ -53,6 +57,33 @@ export interface IStorage {
     monthlyReferrals: number;
   }>;
   getUserByReferralCode(code: string): Promise<User | undefined>;
+  
+  // Admin operations
+  getAdminStats(): Promise<{
+    totalUsers: number;
+    totalDeployments: number;
+    totalRevenue: number;
+    newUsersThisMonth: number;
+    activeUsers: number;
+    bannedUsers: number;
+  }>;
+  getAllUsers(limit?: number, offset?: number): Promise<User[]>;
+  updateUserStatus(userId: string, status: string, restrictions?: string[]): Promise<void>;
+  updateUserRole(userId: string, role: string): Promise<void>;
+  updateUserCoins(userId: string, amount: number, reason: string, adminId: string): Promise<void>;
+  promoteToAdmin(userId: string, adminId: string): Promise<void>;
+  getUsersByIp(ip: string): Promise<User[]>;
+  updateUserIp(userId: string, ip: string): Promise<void>;
+  
+  // Admin notification operations
+  createAdminNotification(notification: InsertAdminNotification): Promise<AdminNotification>;
+  getAdminNotifications(limit?: number): Promise<AdminNotification[]>;
+  markNotificationRead(id: string): Promise<void>;
+  
+  // App settings operations
+  getAppSetting(key: string): Promise<AppSettings | undefined>;
+  setAppSetting(setting: InsertAppSettings): Promise<AppSettings>;
+  getAllAppSettings(): Promise<AppSettings[]>;
 }
 
 export class MongoStorage implements IStorage {
@@ -70,6 +101,14 @@ export class MongoStorage implements IStorage {
 
   private get referralsCollection() {
     return getDb().collection<Referral>("referrals");
+  }
+
+  private get adminNotificationsCollection() {
+    return getDb().collection<AdminNotification>("adminNotifications");
+  }
+
+  private get appSettingsCollection() {
+    return getDb().collection<AppSettings>("appSettings");
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -239,6 +278,15 @@ export class MongoStorage implements IStorage {
         coinBalance: userData.coinBalance || 100,
         emailVerified: userData.emailVerified || true,
         authProvider: userData.authProvider || 'google',
+        // Set default admin fields
+        isAdmin: userData.isAdmin || false,
+        role: userData.role || 'user',
+        status: userData.status || 'active',
+        restrictions: userData.restrictions || [],
+        // IP tracking fields (will be updated by updateUserIp in callback)
+        registrationIp: userData.registrationIp,
+        lastLoginIp: userData.lastLoginIp,
+        ipHistory: userData.ipHistory || [],
         createdAt: now,
         updatedAt: now,
       };
@@ -434,6 +482,251 @@ export class MongoStorage implements IStorage {
   async getUserByReferralCode(code: string): Promise<User | undefined> {
     const user = await this.usersCollection.findOne({ referralCode: code });
     return user || undefined;
+  }
+
+  // Admin operations implementation
+  async getAdminStats(): Promise<{
+    totalUsers: number;
+    totalDeployments: number;
+    totalRevenue: number;
+    newUsersThisMonth: number;
+    activeUsers: number;
+    bannedUsers: number;
+  }> {
+    const now = new Date();
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [
+      totalUsers,
+      totalDeployments,
+      newUsersThisMonth,
+      activeUsers,
+      bannedUsers,
+      revenueTransactions
+    ] = await Promise.all([
+      this.usersCollection.countDocuments(),
+      this.deploymentsCollection.countDocuments(),
+      this.usersCollection.countDocuments({ createdAt: { $gte: thisMonth } }),
+      this.usersCollection.countDocuments({ status: { $ne: "banned" } }),
+      this.usersCollection.countDocuments({ status: "banned" }),
+      this.transactionsCollection.find({ 
+        type: "deployment",
+        amount: { $lt: 0 }
+      }).toArray()
+    ]);
+
+    const totalRevenue = Math.abs(revenueTransactions.reduce((sum, t) => sum + t.amount, 0));
+
+    return {
+      totalUsers,
+      totalDeployments,
+      totalRevenue,
+      newUsersThisMonth,
+      activeUsers,
+      bannedUsers,
+    };
+  }
+
+  async getAllUsers(limit: number = 50, offset: number = 0): Promise<User[]> {
+    return await this.usersCollection
+      .find({})
+      .sort({ createdAt: -1 })
+      .skip(offset)
+      .limit(limit)
+      .toArray();
+  }
+
+  async updateUserStatus(userId: string, status: string, restrictions?: string[]): Promise<void> {
+    const updateData: any = {
+      status,
+      updatedAt: new Date()
+    };
+    
+    if (restrictions) {
+      updateData.restrictions = restrictions;
+    }
+
+    await this.usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { $set: updateData }
+    );
+  }
+
+  async updateUserRole(userId: string, role: string): Promise<void> {
+    const updateData: any = {
+      role,
+      updatedAt: new Date()
+    };
+
+    if (role === "admin" || role === "super_admin") {
+      updateData.isAdmin = true;
+    } else {
+      updateData.isAdmin = false;
+    }
+
+    await this.usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { $set: updateData }
+    );
+  }
+
+  async updateUserCoins(userId: string, amount: number, reason: string, adminId: string): Promise<void> {
+    await this.updateUserBalance(userId, amount);
+    
+    await this.createTransaction({
+      userId,
+      type: "admin_adjustment",
+      amount,
+      description: `Admin adjustment: ${reason}`,
+      relatedId: adminId,
+    });
+  }
+
+  async promoteToAdmin(userId: string, adminId: string): Promise<void> {
+    await this.updateUserRole(userId, "admin");
+    
+    await this.createAdminNotification({
+      type: "user_promotion",
+      title: "User Promoted to Admin",
+      message: `User has been promoted to admin by ${adminId}`,
+      data: { userId, promotedBy: adminId },
+      read: false
+    });
+  }
+
+  async getUsersByIp(ip: string): Promise<User[]> {
+    return await this.usersCollection
+      .find({ 
+        $or: [
+          { registrationIp: ip },
+          { lastLoginIp: ip },
+          { ipHistory: { $in: [ip] } }
+        ]
+      })
+      .toArray();
+  }
+
+  async updateUserIp(userId: string, ip: string): Promise<void> {
+    const user = await this.getUser(userId);
+    if (!user) return;
+
+    const ipHistory = user.ipHistory || [];
+    if (!ipHistory.includes(ip)) {
+      ipHistory.push(ip);
+      // Keep only last 10 IPs
+      if (ipHistory.length > 10) {
+        ipHistory.shift();
+      }
+    }
+
+    await this.usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $set: { 
+          lastLoginIp: ip,
+          ipHistory,
+          updatedAt: new Date()
+        }
+      }
+    );
+
+    // Check for multiple accounts from same IP
+    const usersWithSameIp = await this.getUsersByIp(ip);
+    if (usersWithSameIp.length > 1) {
+      await this.createAdminNotification({
+        type: "duplicate_ip",
+        title: "Multiple Accounts from Same IP",
+        message: `${usersWithSameIp.length} accounts detected from IP: ${ip}`,
+        data: { 
+          ip, 
+          userIds: usersWithSameIp.map(u => u._id.toString()),
+          userEmails: usersWithSameIp.map(u => u.email)
+        },
+        read: false
+      });
+    }
+  }
+
+  // Admin notification operations
+  async createAdminNotification(notification: InsertAdminNotification): Promise<AdminNotification> {
+    const now = new Date();
+    const newNotification: Omit<AdminNotification, '_id'> = {
+      ...notification,
+      read: notification.read || false,
+      createdAt: now,
+    };
+
+    const result = await this.adminNotificationsCollection.insertOne(newNotification as AdminNotification);
+    return { ...newNotification, _id: result.insertedId } as AdminNotification;
+  }
+
+  async getAdminNotifications(limit: number = 20): Promise<AdminNotification[]> {
+    return await this.adminNotificationsCollection
+      .find({})
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+  }
+
+  async markNotificationRead(id: string): Promise<void> {
+    await this.adminNotificationsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { read: true } }
+    );
+  }
+
+  // App settings operations
+  async getAppSetting(key: string): Promise<AppSettings | undefined> {
+    const setting = await this.appSettingsCollection.findOne({ key });
+    return setting || undefined;
+  }
+
+  async setAppSetting(setting: InsertAppSettings): Promise<AppSettings> {
+    const now = new Date();
+    const existingSetting = await this.getAppSetting(setting.key);
+
+    if (existingSetting) {
+      // Update existing setting
+      await this.appSettingsCollection.updateOne(
+        { key: setting.key },
+        { 
+          $set: { 
+            value: setting.value,
+            description: setting.description,
+            updatedBy: setting.updatedBy ? new ObjectId(setting.updatedBy) : undefined,
+            updatedAt: now
+          }
+        }
+      );
+      
+      return { 
+        ...existingSetting, 
+        value: setting.value,
+        description: setting.description,
+        updatedBy: setting.updatedBy ? new ObjectId(setting.updatedBy) : undefined,
+        updatedAt: now
+      };
+    } else {
+      // Create new setting
+      const newSetting: Omit<AppSettings, '_id'> = {
+        key: setting.key,
+        value: setting.value,
+        description: setting.description,
+        updatedBy: setting.updatedBy ? new ObjectId(setting.updatedBy) : undefined,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const result = await this.appSettingsCollection.insertOne(newSetting as AppSettings);
+      return { ...newSetting, _id: result.insertedId } as AppSettings;
+    }
+  }
+
+  async getAllAppSettings(): Promise<AppSettings[]> {
+    return await this.appSettingsCollection
+      .find({})
+      .sort({ key: 1 })
+      .toArray();
   }
 }
 

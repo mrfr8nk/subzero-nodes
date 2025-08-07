@@ -2,13 +2,14 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SiWhatsapp } from "react-icons/si";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Shield } from "lucide-react";
 
 export default function Navbar() {
   const [location] = useLocation();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
@@ -29,6 +30,7 @@ export default function Navbar() {
     { path: "/deployments", label: "Deployments" },
     { path: "/wallet", label: "Wallet" },
     { path: "/referrals", label: "Referrals" },
+    ...(isAdmin ? [{ path: "/admin/dashboard", label: "Admin" }] : []),
   ];
 
   return (
@@ -66,9 +68,17 @@ export default function Navbar() {
             {user && (
               <div className="flex items-center space-x-3">
                 <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {user.firstName || user.email}
-                  </p>
+                  <div className="flex items-center space-x-2">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {user.firstName || user.email}
+                    </p>
+                    {isAdmin && (
+                      <Badge variant="default" className="text-xs">
+                        <Shield className="w-3 h-3 mr-1" />
+                        Admin
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-600 dark:text-gray-400">{user.coinBalance || 0} coins</p>
                 </div>
                 {user.profileImageUrl && (
@@ -123,9 +133,17 @@ export default function Navbar() {
             <hr className="my-2 border-gray-200 dark:border-slate-700" />
             {user && (
               <div className="py-2">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  {user.firstName || user.email}
-                </p>
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {user.firstName || user.email}
+                  </p>
+                  {isAdmin && (
+                    <Badge variant="default" className="text-xs">
+                      <Shield className="w-3 h-3 mr-1" />
+                      Admin
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-xs text-gray-600 dark:text-gray-400">{user.coinBalance || 0} coins</p>
               </div>
             )}

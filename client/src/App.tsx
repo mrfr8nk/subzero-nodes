@@ -19,10 +19,12 @@ import Dashboard from "@/pages/dashboard";
 import Wallet from "@/pages/wallet";
 import Referrals from "@/pages/referrals";
 import Deployments from "@/pages/deployments";
+import AdminLogin from "@/pages/admin-login";
+import AdminDashboard from "@/pages/admin-dashboard";
 import Navbar from "@/components/navbar";
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isAdmin } = useAuth();
 
   if (isLoading || !isAuthenticated) {
     return (
@@ -35,6 +37,7 @@ function Router() {
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/resend-verification" component={ResendVerification} />
+        <Route path="/admin/login" component={AdminLogin} />
         <Route component={Landing} />
       </Switch>
     );
@@ -49,6 +52,7 @@ function Router() {
         <Route path="/wallet" component={Wallet} />
         <Route path="/referrals" component={Referrals} />
         <Route path="/deployments" component={Deployments} />
+        {isAdmin && <Route path="/admin/dashboard" component={AdminDashboard} />}
         <Route component={NotFound} />
       </Switch>
     </>
