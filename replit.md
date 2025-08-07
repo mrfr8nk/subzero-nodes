@@ -69,3 +69,25 @@ Preferred communication style: Simple, everyday language.
 ### Production Infrastructure
 - **Replit Hosting**: Integrated hosting environment with development tooling
 - **WebSocket Support**: Real-time connection capabilities for enhanced user experience
+
+## Environment Configuration
+
+### Required Environment Variables
+The application requires several environment variables for proper operation. Reference `.env.example` for the complete list.
+
+**Critical Variables:**
+- `DATABASE_URL`: MongoDB connection string
+- `GOOGLE_CLIENT_ID`: Google OAuth client ID
+- `GOOGLE_CLIENT_SECRET`: Google OAuth client secret
+- `SESSION_SECRET`: Secure session secret key
+
+### Google OAuth Domain Configuration
+For production deployment, add the base domain URL to Google Cloud Console:
+- **Authorized domain**: `https://subzero-deploy.onrender.com`
+- **NOT the auth route**: The OAuth callback route is automatically handled by the application
+- The callback URL pattern is: `{DOMAIN}/api/auth/google/callback`
+
+### Deployment Notes
+- Update `FRONTEND_URL` and `BACKEND_URL` in production environment
+- Ensure `CORS_ORIGIN` matches your production domain
+- Use secure session secrets in production
