@@ -1,6 +1,6 @@
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -21,10 +21,23 @@ import Referrals from "@/pages/referrals";
 import Deployments from "@/pages/deployments";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
+import Maintenance from "@/pages/maintenance";
 import Navbar from "@/components/navbar";
 
 function Router() {
   const { isAuthenticated, isLoading, isAdmin } = useAuth();
+  
+  // Check maintenance mode status
+  const { data: maintenanceStatus } = useQuery<{maintenanceMode: boolean; canBypass: boolean}>({
+    queryKey: ['/api/maintenance/status'],
+    staleTime: 30000, // Check every 30 seconds
+    retry: true,
+  });
+
+  // Show maintenance page if maintenance mode is enabled and user cannot bypass
+  if (maintenanceStatus?.maintenanceMode && !maintenanceStatus?.canBypass) {
+    return <Maintenance />;
+  }
 
   if (isLoading || !isAuthenticated) {
     return (

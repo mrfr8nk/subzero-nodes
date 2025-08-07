@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { 
   Users, 
   DollarSign, 
@@ -22,7 +23,9 @@ import {
   Coins,
   Crown,
   Bell,
-  TrendingUp
+  TrendingUp,
+  Power,
+  Wrench
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -69,9 +72,16 @@ interface AppSetting {
   updatedAt: string;
 }
 
+interface MaintenanceStatus {
+  enabled: boolean;
+  message: string;
+  estimatedTime: string;
+}
+
 export default function AdminDashboard() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [coinAdjustment, setCoinAdjustment] = useState({ amount: 0, reason: "" });
+  const [maintenanceForm, setMaintenanceForm] = useState({ message: '', estimatedTime: '' });
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -97,6 +107,12 @@ export default function AdminDashboard() {
   const { data: settings = [] } = useQuery<AppSetting[]>({
     queryKey: ['/api/admin/settings'],
     staleTime: 60000,
+  });
+
+  // Fetch maintenance status
+  const { data: maintenanceStatus } = useQuery<MaintenanceStatus>({
+    queryKey: ['/api/admin/maintenance/status'],
+    staleTime: 30000,
   });
 
   // Update user status mutation
@@ -167,6 +183,28 @@ export default function AdminDashboard() {
     },
     onError: (error: any) => {
       toast({ title: "Failed to update setting", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Toggle maintenance mode mutation
+  const toggleMaintenanceMutation = useMutation({
+    mutationFn: async ({ enabled, message, estimatedTime }: { enabled: boolean; message?: string; estimatedTime?: string }) => {
+      return await apiRequest('/api/admin/maintenance/toggle', {
+        method: 'POST',
+        body: JSON.stringify({ enabled, message, estimatedTime }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/maintenance/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/notifications'] });
+      toast({ 
+        title: maintenanceStatus?.enabled ? "Maintenance mode disabled" : "Maintenance mode enabled",
+        description: maintenanceStatus?.enabled ? "Site is now operational" : "Site is now in maintenance mode"
+      });
+      setMaintenanceForm({ message: '', estimatedTime: '' });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to toggle maintenance mode", description: error.message, variant: "destructive" });
     }
   });
 
@@ -248,6 +286,11 @@ export default function AdminDashboard() {
           <TabsTrigger value="users" data-testid="tab-users">User Management</TabsTrigger>
           <TabsTrigger value="notifications" data-testid="tab-notifications">
             Notifications {unreadNotifications > 0 && <Badge className="ml-1">{unreadNotifications}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="maintenance" data-testid="tab-maintenance">
+            <Wrench className="w-4 h-4 mr-1" />
+            Maintenance
+            {maintenanceStatus?.enabled && <Badge variant="destructive" className="ml-1">ON</Badge>}
           </TabsTrigger>
           <TabsTrigger value="settings" data-testid="tab-settings">Settings</TabsTrigger>
         </TabsList>
@@ -435,6 +478,102 @@ export default function AdminDashboard() {
                   ))
                 )}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="maintenance" className="space-y-4">
+          <Card data-testid="card-maintenance">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Wrench className="h-5 w-5" />
+                <span>Site Maintenance Mode</span>
+              </CardTitle>
+              <CardDescription>
+                Enable maintenance mode to temporarily shut down the site for all users except admins
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <Power className={`h-4 w-4 ${
+                      maintenanceStatus?.enabled ? 'text-red-500' : 'text-green-500'
+                    }`} />
+                    <span className="font-medium">
+                      {maintenanceStatus?.enabled ? 'Maintenance Mode Active' : 'Site Operational'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {maintenanceStatus?.enabled 
+                      ? 'Site is currently in maintenance mode. Only admins can access the site.' 
+                      : 'Site is operational and accessible to all users.'}
+                  </p>
+                </div>
+                <Switch
+                  checked={maintenanceStatus?.enabled || false}
+                  onCheckedChange={(enabled) => {
+                    if (enabled) {
+                      // When enabling, use form data
+                      toggleMaintenanceMutation.mutate({
+                        enabled: true,
+                        message: maintenanceForm.message || 'Site is under maintenance. We\'ll be back shortly.',
+                        estimatedTime: maintenanceForm.estimatedTime
+                      });
+                    } else {
+                      // When disabling, just turn off
+                      toggleMaintenanceMutation.mutate({ enabled: false });
+                    }
+                  }}
+                  disabled={toggleMaintenanceMutation.isPending}
+                  data-testid="switch-maintenance"
+                />
+              </div>
+
+              {!maintenanceStatus?.enabled && (
+                <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
+                  <div className="space-y-2">
+                    <Label htmlFor="maintenance-message">Maintenance Message</Label>
+                    <Textarea
+                      id="maintenance-message"
+                      placeholder="We're performing maintenance to improve your experience. We'll be back shortly."
+                      value={maintenanceForm.message}
+                      onChange={(e) => setMaintenanceForm(prev => ({ ...prev, message: e.target.value }))}
+                      data-testid="textarea-maintenance-message"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      This message will be displayed to users during maintenance
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="estimated-time">Estimated Completion Time (optional)</Label>
+                    <Input
+                      id="estimated-time"
+                      placeholder="e.g., 2 hours, 30 minutes, etc."
+                      value={maintenanceForm.estimatedTime}
+                      onChange={(e) => setMaintenanceForm(prev => ({ ...prev, estimatedTime: e.target.value }))}
+                      data-testid="input-estimated-time"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Let users know how long the maintenance is expected to last
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {maintenanceStatus?.enabled && (
+                <Alert data-testid="alert-maintenance-active">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Maintenance Mode is Active</strong>
+                    <p className="mt-1">{maintenanceStatus.message || 'Site is under maintenance.'}</p>
+                    {maintenanceStatus.estimatedTime && (
+                      <p className="text-sm mt-1">Estimated completion: {maintenanceStatus.estimatedTime}</p>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

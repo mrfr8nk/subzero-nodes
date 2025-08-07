@@ -84,6 +84,10 @@ export interface IStorage {
   getAppSetting(key: string): Promise<AppSettings | undefined>;
   setAppSetting(setting: InsertAppSettings): Promise<AppSettings>;
   getAllAppSettings(): Promise<AppSettings[]>;
+  
+  // Maintenance mode operations
+  isMaintenanceModeEnabled(): Promise<boolean>;
+  setMaintenanceMode(enabled: boolean, adminId: string, message?: string): Promise<void>;
 }
 
 export class MongoStorage implements IStorage {
@@ -727,6 +731,45 @@ export class MongoStorage implements IStorage {
       .find({})
       .sort({ key: 1 })
       .toArray();
+  }
+
+  // Maintenance mode operations
+  async isMaintenanceModeEnabled(): Promise<boolean> {
+    const setting = await this.getAppSetting('maintenance_mode');
+    return setting ? setting.value === true : false;
+  }
+
+  async setMaintenanceMode(enabled: boolean, adminId: string, message?: string): Promise<void> {
+    const now = new Date();
+    
+    // Set maintenance mode status
+    await this.setAppSetting({
+      key: 'maintenance_mode',
+      value: enabled,
+      description: enabled ? 'Site is in maintenance mode' : 'Site is operational',
+      updatedBy: adminId
+    });
+
+    // Set maintenance message if provided
+    if (message) {
+      await this.setAppSetting({
+        key: 'maintenance_message',
+        value: message,
+        description: 'Message displayed during maintenance',
+        updatedBy: adminId
+      });
+    }
+
+    // Create admin notification
+    await this.createAdminNotification({
+      type: 'maintenance_mode',
+      title: enabled ? 'Maintenance Mode Enabled' : 'Maintenance Mode Disabled',
+      message: enabled 
+        ? `Site has been put into maintenance mode${message ? `: ${message}` : ''}` 
+        : 'Site maintenance mode has been disabled. Site is now operational.',
+      data: { enabled, message, adminId },
+      read: false
+    });
   }
 }
 

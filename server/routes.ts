@@ -30,11 +30,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
+  // Maintenance mode middleware - check before all routes except maintenance and admin
+  const maintenanceMiddleware = async (req: any, res: any, next: any) => {
+    const url = req.originalUrl || req.url;
+    
+    // Skip maintenance check for maintenance info, admin routes, and auth routes
+    if (url.startsWith('/api/maintenance') || 
+        url.startsWith('/api/admin') || 
+        url.startsWith('/api/auth') || 
+        url.startsWith('/favicon.ico') ||
+        url.includes('vite') ||
+        url.includes('@')) {
+      return next();
+    }
+
+    // Check if user is admin - admins can bypass maintenance mode
+    const isAdmin = req.user && (req.user.isAdmin || req.user.role === 'admin' || req.user.role === 'super_admin');
+    if (isAdmin) {
+      return next();
+    }
+
+    try {
+      const maintenanceMode = await storage.isMaintenanceModeEnabled();
+      if (maintenanceMode) {
+        // For API requests, return JSON response
+        if (url.startsWith('/api/')) {
+          return res.status(503).json({ 
+            error: 'Service Unavailable', 
+            message: 'Site is currently under maintenance. Please try again later.' 
+          });
+        }
+        // For regular requests, this will be handled by the frontend router
+        return next();
+      }
+    } catch (error) {
+      console.error('Error checking maintenance mode:', error);
+    }
+    
+    next();
+  };
+
+  app.use(maintenanceMiddleware);
+
   // Google OAuth routes
   app.get('/api/auth/google', (req, res, next) => {
     // Store referral code in session if provided
     if (req.query.ref) {
-      req.session.referralCode = req.query.ref;
+      (req.session as any).referralCode = req.query.ref;
     }
     passport.authenticate('google', { 
       scope: ['profile', 'email'] 
@@ -46,8 +88,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         // Handle referral code if stored in session
-        if (req.session.referralCode && req.user) {
-          const referrer = await storage.getUserByReferralCode(req.session.referralCode);
+        if ((req.session as any).referralCode && req.user) {
+          const referrer = await storage.getUserByReferralCode((req.session as any).referralCode);
           if (referrer && req.user._id.toString() !== referrer._id.toString()) {
             // Check if referral already exists to avoid duplicates
             const existingReferrals = await storage.getUserReferrals(referrer._id.toString());
@@ -74,7 +116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           // Clear referral code from session
-          delete req.session.referralCode;
+          delete (req.session as any).referralCode;
         }
       } catch (error) {
         console.error('Error processing Google OAuth referral:', error);
@@ -94,6 +136,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.redirect('/dashboard');
     }
   );
+
+  // Maintenance mode routes (available to all)
+  app.get('/api/maintenance/info', async (req, res) => {
+    try {
+      const [maintenanceMessage, estimatedTime] = await Promise.all([
+        storage.getAppSetting('maintenance_message'),
+        storage.getAppSetting('maintenance_estimated_time')
+      ]);
+
+      res.json({
+        message: maintenanceMessage?.value,
+        estimatedTime: estimatedTime?.value
+      });
+    } catch (error) {
+      console.error('Error getting maintenance info:', error);
+      res.status(500).json({ error: 'Failed to get maintenance info' });
+    }
+  });
+
+  // Check if site is in maintenance mode
+  app.get('/api/maintenance/status', async (req, res) => {
+    try {
+      const isMaintenanceMode = await storage.isMaintenanceModeEnabled();
+      const isAdmin = req.user && ((req.user as any).isAdmin || (req.user as any).role === 'admin' || (req.user as any).role === 'super_admin');
+      
+      res.json({ 
+        maintenanceMode: isMaintenanceMode,
+        canBypass: isAdmin 
+      });
+    } catch (error) {
+      console.error('Error checking maintenance status:', error);
+      res.status(500).json({ error: 'Failed to check maintenance status' });
+    }
+  });
 
   // Auth status route
   app.get('/api/auth/user', (req, res) => {
@@ -738,6 +814,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error updating app setting:', error);
       res.status(500).json({ message: 'Failed to update app setting' });
+    }
+  });
+
+  // Admin maintenance mode routes
+  app.get('/api/admin/maintenance/status', requireAdmin, async (req, res) => {
+    try {
+      const isEnabled = await storage.isMaintenanceModeEnabled();
+      const [message, estimatedTime] = await Promise.all([
+        storage.getAppSetting('maintenance_message'),
+        storage.getAppSetting('maintenance_estimated_time')
+      ]);
+
+      res.json({
+        enabled: isEnabled,
+        message: message?.value || '',
+        estimatedTime: estimatedTime?.value || ''
+      });
+    } catch (error) {
+      console.error('Error getting maintenance status:', error);
+      res.status(500).json({ error: 'Failed to get maintenance status' });
+    }
+  });
+
+  app.post('/api/admin/maintenance/toggle', requireAdmin, async (req, res) => {
+    try {
+      const { enabled, message, estimatedTime } = req.body;
+      const adminId = (req.user as any)?._id?.toString();
+
+      await storage.setMaintenanceMode(enabled, adminId, message);
+      
+      if (estimatedTime) {
+        await storage.setAppSetting({
+          key: 'maintenance_estimated_time',
+          value: estimatedTime,
+          description: 'Estimated maintenance completion time',
+          updatedBy: adminId
+        });
+      }
+
+      res.json({ 
+        message: enabled ? 'Maintenance mode enabled' : 'Maintenance mode disabled',
+        enabled 
+      });
+    } catch (error) {
+      console.error('Error toggling maintenance mode:', error);
+      res.status(500).json({ error: 'Failed to toggle maintenance mode' });
     }
   });
 
