@@ -3,6 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertDeploymentSchema, insertTransactionSchema } from "@shared/schema";
+import bcrypt from "bcryptjs";
+import passport from "passport";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -78,7 +80,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Check if user has enough coins
-      if (user.coinBalance < deploymentData.cost) {
+      const userBalance = user.coinBalance || 0;
+      const cost = deploymentData.cost || 25;
+      if (userBalance < cost) {
         return res.status(400).json({ message: "Insufficient coins" });
       }
 
@@ -184,6 +188,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error validating referral code:", error);
       res.status(500).json({ message: "Failed to validate referral code" });
     }
+  });
+
+  // Local authentication routes
+  app.post('/api/auth/local/signup', async (req, res) => {
+    try {
+      const { email, password, firstName, lastName, referralCode } = req.body;
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "User already exists with this email" });
+      }
+      
+      // Validate referral code if provided
+      let referrerId: string | undefined;
+      if (referralCode) {
+        const referrer = await storage.getUserByReferralCode(referralCode);
+        if (referrer) {
+          referrerId = referrer.id;
+        }
+      }
+      
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 12);
+      
+      // Create user
+      const user = await storage.createLocalUser({
+        email,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        referredById: referrerId,
+      });
+      
+      // Log them in
+      const sessionUser = {
+        claims: {
+          sub: user.id,
+          email: user.email,
+          first_name: user.firstName,
+          last_name: user.lastName,
+          profile_image_url: user.profileImageUrl,
+        },
+        expires_at: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days
+      };
+      
+      req.login(sessionUser, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Login failed" });
+        }
+        res.json({ message: "Account created successfully" });
+      });
+    } catch (error) {
+      console.error("Signup error:", error);
+      res.status(500).json({ message: "Failed to create account" });
+    }
+  });
+  
+  app.post('/api/auth/local/login', (req, res, next) => {
+    passport.authenticate('local', (err: any, user: any, info: any) => {
+      if (err) {
+        return res.status(500).json({ message: "Authentication error" });
+      }
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+      }
+      
+      req.login(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Login failed" });
+        }
+        res.json({ message: "Login successful" });
+      });
+    })(req, res, next);
   });
 
   const httpServer = createServer(app);

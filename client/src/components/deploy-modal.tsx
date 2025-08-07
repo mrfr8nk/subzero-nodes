@@ -83,10 +83,11 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
 
     const cost = getCost(configuration);
     
-    if ((user?.coinBalance || 0) < cost) {
+    const userBalance = user?.coinBalance || 0;
+    if (userBalance < cost) {
       toast({
         title: "Insufficient Coins",
-        description: `You need ${cost} coins to deploy this bot. You currently have ${user?.coinBalance || 0} coins.`,
+        description: `You need ${cost} coins to deploy this bot. You currently have ${userBalance} coins.`,
         variant: "destructive",
       });
       return;

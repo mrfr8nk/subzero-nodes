@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { MessageSquare, Rocket, Coins, Users, ChartLine, Smartphone, Shield, Clock } from "lucide-react";
+import { SiWhatsapp } from "react-icons/si";
+import { Rocket, Coins, Users, ChartLine, Smartphone, Shield, Clock } from "lucide-react";
 
 export default function Landing() {
   const handleLogin = () => {
-    window.location.href = "/api/login";
+    window.location.href = "/login";
   };
 
   const features = [
@@ -66,7 +67,7 @@ export default function Landing() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-white" />
+                <SiWhatsapp className="w-5 h-5 text-white" />
               </div>
               <span className="text-xl font-bold text-gray-900">SUBZERO-MD</span>
             </div>

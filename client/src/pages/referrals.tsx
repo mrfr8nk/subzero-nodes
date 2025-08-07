@@ -27,12 +27,12 @@ export default function Referrals() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: referralStats, isLoading: statsLoading } = useQuery({
+  const { data: referralStats, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/referrals/stats"],
     retry: false,
   });
 
-  const { data: referrals, isLoading: referralsLoading } = useQuery({
+  const { data: referrals, isLoading: referralsLoading } = useQuery<any[]>({
     queryKey: ["/api/referrals"],
     retry: false,
   });

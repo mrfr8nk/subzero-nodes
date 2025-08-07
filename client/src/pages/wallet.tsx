@@ -31,7 +31,7 @@ export default function Wallet() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: transactions, isLoading: transactionsLoading } = useQuery({
+  const { data: transactions, isLoading: transactionsLoading } = useQuery<any[]>({
     queryKey: ["/api/wallet/transactions"],
     retry: false,
   });

@@ -26,13 +26,15 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// Users table for Replit Auth
+// Users table for both Replit Auth and local auth
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
+  password: varchar("password"), // For local auth users
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  authProvider: varchar("auth_provider").default("replit"), // 'replit' or 'local'
   coinBalance: integer("coin_balance").default(100), // Starting balance
   referralCode: varchar("referral_code").unique(),
   referredById: varchar("referred_by_id"),

@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Menu, X } from "lucide-react";
+import { SiWhatsapp } from "react-icons/si";
+import { Menu, X } from "lucide-react";
 
 export default function Navbar() {
   const [location] = useLocation();
@@ -36,7 +37,7 @@ export default function Navbar() {
           <div className="flex items-center space-x-4">
             <Link href="/" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-white" />
+                <SiWhatsapp className="w-5 h-5 text-white" />
               </div>
               <span className="text-xl font-bold text-gray-900">SUBZERO-MD</span>
             </Link>
@@ -66,7 +67,7 @@ export default function Navbar() {
                   <p className="text-sm font-medium text-gray-900">
                     {user.firstName || user.email}
                   </p>
-                  <p className="text-xs text-gray-600">{user.coinBalance} coins</p>
+                  <p className="text-xs text-gray-600">{user.coinBalance || 0} coins</p>
                 </div>
                 {user.profileImageUrl && (
                   <img 
@@ -120,7 +121,7 @@ export default function Navbar() {
                 <p className="text-sm font-medium text-gray-900">
                   {user.firstName || user.email}
                 </p>
-                <p className="text-xs text-gray-600">{user.coinBalance} coins</p>
+                <p className="text-xs text-gray-600">{user.coinBalance || 0} coins</p>
               </div>
             )}
             <button 

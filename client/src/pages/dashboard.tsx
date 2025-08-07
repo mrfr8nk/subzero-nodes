@@ -28,17 +28,17 @@ export default function Dashboard() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/dashboard/stats"],
     retry: false,
   });
 
-  const { data: activity, isLoading: activityLoading } = useQuery({
+  const { data: activity, isLoading: activityLoading } = useQuery<any[]>({
     queryKey: ["/api/dashboard/activity"],
     retry: false,
   });
 
-  const { data: recentDeployments, isLoading: deploymentsLoading } = useQuery({
+  const { data: recentDeployments, isLoading: deploymentsLoading } = useQuery<any[]>({
     queryKey: ["/api/deployments"],
     retry: false,
   });

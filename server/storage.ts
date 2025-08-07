@@ -13,13 +13,15 @@ import {
   type Referral,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sum, count, and } from "drizzle-orm";
+import { eq, desc, sum, count, and, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  createLocalUser(userData: { email: string; password: string; firstName?: string; lastName?: string; referredById?: string }): Promise<User>;
   
   // Deployment operations
   createDeployment(deployment: InsertDeployment): Promise<Deployment>;
@@ -107,11 +109,12 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     // Deduct coins for deployment
-    await this.updateUserBalance(deployment.userId, -deployment.cost);
+    const cost = deployment.cost || 25;
+    await this.updateUserBalance(deployment.userId, -cost);
     await this.createTransaction({
       userId: deployment.userId,
       type: "deployment",
-      amount: -deployment.cost,
+      amount: -cost,
       description: `Bot deployment: ${deployment.name}`,
       relatedId: newDeployment.id,
     });
@@ -250,6 +253,55 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(users)
       .where(eq(users.referralCode, code));
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email));
+    return user;
+  }
+
+  async createLocalUser(userData: { email: string; password: string; firstName?: string; lastName?: string; referredById?: string }): Promise<User> {
+    const referralCode = await this.generateReferralCode();
+    
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: userData.email,
+        password: userData.password,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        authProvider: "local",
+        referralCode,
+        referredById: userData.referredById,
+      })
+      .returning();
+    
+    // If user was referred, create referral record and reward referrer
+    if (userData.referredById && user.id !== userData.referredById) {
+      try {
+        await this.createReferral({
+          referrerId: userData.referredById,
+          referredId: user.id,
+        });
+        
+        // Award referral bonus
+        await this.updateUserBalance(userData.referredById, 50);
+        await this.createTransaction({
+          userId: userData.referredById,
+          type: "referral",
+          amount: 50,
+          description: "Referral bonus for new user signup",
+          relatedId: null,
+        });
+      } catch (error) {
+        console.log("Referral processing failed:", error);
+      }
+    }
+    
     return user;
   }
 }

@@ -1,5 +1,7 @@
 import * as client from "openid-client";
 import { Strategy, type VerifyFunction } from "openid-client/passport";
+import { Strategy as LocalStrategy } from "passport-local";
+import bcrypt from "bcryptjs";
 
 import passport from "passport";
 import session from "express-session";
@@ -98,6 +100,40 @@ export async function setupAuth(app: Express) {
     passport.use(strategy);
   }
 
+  // Local authentication strategy
+  passport.use(new LocalStrategy(
+    { usernameField: 'email' },
+    async (email, password, done) => {
+      try {
+        const user = await storage.getUserByEmail(email);
+        if (!user || user.authProvider !== 'local' || !user.password) {
+          return done(null, false, { message: 'Invalid email or password' });
+        }
+        
+        const isValid = await bcrypt.compare(password, user.password);
+        if (!isValid) {
+          return done(null, false, { message: 'Invalid email or password' });
+        }
+        
+        // Create a session object similar to OIDC
+        const sessionUser = {
+          claims: {
+            sub: user.id,
+            email: user.email,
+            first_name: user.firstName,
+            last_name: user.lastName,
+            profile_image_url: user.profileImageUrl,
+          },
+          expires_at: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days
+        };
+        
+        return done(null, sessionUser);
+      } catch (error) {
+        return done(error);
+      }
+    }
+  ));
+
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
@@ -116,13 +152,20 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/logout", (req, res) => {
+    const user = req.user as any;
     req.logout(() => {
-      res.redirect(
-        client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-        }).href
-      );
+      // If it's a local user, just redirect to home
+      if (user?.claims?.sub && user.claims.sub.includes('local_')) {
+        res.redirect('/');
+      } else {
+        // For OIDC users, use the proper logout URL
+        res.redirect(
+          client.buildEndSessionUrl(config, {
+            client_id: process.env.REPL_ID!,
+            post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
+          }).href
+        );
+      }
     });
   });
 }

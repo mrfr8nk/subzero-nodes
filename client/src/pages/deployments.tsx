@@ -30,12 +30,12 @@ export default function Deployments() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: deployments, isLoading: deploymentsLoading } = useQuery({
+  const { data: deployments, isLoading: deploymentsLoading } = useQuery<any[]>({
     queryKey: ["/api/deployments"],
     retry: false,
   });
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/dashboard/stats"],
     retry: false,
   });
