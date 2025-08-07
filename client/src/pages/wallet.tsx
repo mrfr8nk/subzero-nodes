@@ -36,6 +36,12 @@ export default function Wallet() {
     retry: false,
   });
 
+  // Fetch currency settings
+  const { data: currencySettings } = useQuery<{currency: string, rate: number, symbol: string}>({
+    queryKey: ["/api/currency"],
+    retry: false,
+  });
+
   const claimDailyMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/wallet/claim-daily");
@@ -106,7 +112,11 @@ export default function Wallet() {
           <div>
             <p className="text-blue-200 mb-2">Current Balance</p>
             <p className="text-4xl font-bold">{user?.coinBalance || 0} Coins</p>
-            <p className="text-blue-200 mt-2">≈ ${((user?.coinBalance || 0) * 0.1).toFixed(2)} USD</p>
+            {currencySettings && (
+              <p className="text-blue-200 mt-2">
+                ≈ {currencySettings.symbol}{((user?.coinBalance || 0) * currencySettings.rate).toFixed(2)} {currencySettings.currency}
+              </p>
+            )}
           </div>
           <div className="w-16 h-16 bg-white bg-opacity-20 rounded-2xl flex items-center justify-center">
             <Coins className="w-8 h-8" />

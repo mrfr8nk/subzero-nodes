@@ -25,7 +25,8 @@ import {
   Bell,
   TrendingUp,
   Power,
-  Wrench
+  Wrench,
+  CreditCard
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -78,10 +79,17 @@ interface MaintenanceStatus {
   estimatedTime: string;
 }
 
+interface CurrencySettings {
+  currency: string;
+  rate: number;
+  symbol: string;
+}
+
 export default function AdminDashboard() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [coinAdjustment, setCoinAdjustment] = useState({ amount: 0, reason: "" });
   const [maintenanceForm, setMaintenanceForm] = useState({ message: '', estimatedTime: '' });
+  const [currencyForm, setCurrencyForm] = useState({ currency: 'USD', rate: 0.1, symbol: '$' });
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -115,13 +123,16 @@ export default function AdminDashboard() {
     staleTime: 30000,
   });
 
+  // Fetch currency settings
+  const { data: currencySettings } = useQuery<CurrencySettings>({
+    queryKey: ['/api/admin/currency'],
+    staleTime: 60000,
+  });
+
   // Update user status mutation
   const updateUserStatusMutation = useMutation({
     mutationFn: async ({ userId, status, restrictions }: { userId: string; status: string; restrictions?: string[] }) => {
-      return await apiRequest(`/api/admin/users/${userId}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status, restrictions }),
-      });
+      return await apiRequest('PATCH', `/api/admin/users/${userId}/status`, { status, restrictions });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
@@ -136,10 +147,7 @@ export default function AdminDashboard() {
   // Update user coins mutation
   const updateUserCoinsMutation = useMutation({
     mutationFn: async ({ userId, amount, reason }: { userId: string; amount: number; reason: string }) => {
-      return await apiRequest(`/api/admin/users/${userId}/coins`, {
-        method: 'PATCH',
-        body: JSON.stringify({ amount, reason }),
-      });
+      return await apiRequest('PATCH', `/api/admin/users/${userId}/coins`, { amount, reason });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
@@ -156,9 +164,7 @@ export default function AdminDashboard() {
   // Promote user mutation
   const promoteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      return await apiRequest(`/api/admin/users/${userId}/promote`, {
-        method: 'PATCH',
-      });
+      return await apiRequest('PATCH', `/api/admin/users/${userId}/promote`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
@@ -172,10 +178,7 @@ export default function AdminDashboard() {
   // Update app setting mutation
   const updateSettingMutation = useMutation({
     mutationFn: async ({ key, value, description }: { key: string; value: any; description?: string }) => {
-      return await apiRequest(`/api/admin/settings/${key}`, {
-        method: 'PUT',
-        body: JSON.stringify({ value, description }),
-      });
+      return await apiRequest('PUT', `/api/admin/settings/${key}`, { value, description });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/settings'] });
@@ -189,10 +192,7 @@ export default function AdminDashboard() {
   // Toggle maintenance mode mutation
   const toggleMaintenanceMutation = useMutation({
     mutationFn: async ({ enabled, message, estimatedTime }: { enabled: boolean; message?: string; estimatedTime?: string }) => {
-      return await apiRequest('/api/admin/maintenance/toggle', {
-        method: 'POST',
-        body: JSON.stringify({ enabled, message, estimatedTime }),
-      });
+      return await apiRequest('POST', '/api/admin/maintenance/toggle', { enabled, message, estimatedTime });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/maintenance/status'] });
@@ -205,6 +205,23 @@ export default function AdminDashboard() {
     },
     onError: (error: any) => {
       toast({ title: "Failed to toggle maintenance mode", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Update currency settings mutation
+  const updateCurrencyMutation = useMutation({
+    mutationFn: async ({ currency, rate, symbol }: { currency: string; rate: number; symbol: string }) => {
+      return await apiRequest('PUT', '/api/admin/currency', { currency, rate, symbol });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/currency'] });
+      toast({ 
+        title: "Currency settings updated",
+        description: `Currency set to ${currencyForm.currency} with rate ${currencyForm.rate}`
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to update currency settings", description: error.message, variant: "destructive" });
     }
   });
 
@@ -291,6 +308,10 @@ export default function AdminDashboard() {
             <Wrench className="w-4 h-4 mr-1" />
             Maintenance
             {maintenanceStatus?.enabled && <Badge variant="destructive" className="ml-1">ON</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="currency" data-testid="tab-currency">
+            <CreditCard className="w-4 h-4 mr-1" />
+            Currency
           </TabsTrigger>
           <TabsTrigger value="settings" data-testid="tab-settings">Settings</TabsTrigger>
         </TabsList>
@@ -574,6 +595,100 @@ export default function AdminDashboard() {
                   </AlertDescription>
                 </Alert>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="currency" className="space-y-4">
+          <Card data-testid="card-currency">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <CreditCard className="h-5 w-5" />
+                <span>Currency Configuration</span>
+              </CardTitle>
+              <CardDescription>
+                Configure the currency display settings for user coin balances
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="currency-name">Currency</Label>
+                    <Select 
+                      value={currencyForm.currency}
+                      onValueChange={(value) => setCurrencyForm(prev => ({ ...prev, currency: value }))}
+                    >
+                      <SelectTrigger data-testid="select-currency">
+                        <SelectValue placeholder="Select currency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USD">USD - US Dollar</SelectItem>
+                        <SelectItem value="NGN">NGN - Nigerian Naira</SelectItem>
+                        <SelectItem value="EUR">EUR - Euro</SelectItem>
+                        <SelectItem value="GBP">GBP - British Pound</SelectItem>
+                        <SelectItem value="JPY">JPY - Japanese Yen</SelectItem>
+                        <SelectItem value="INR">INR - Indian Rupee</SelectItem>
+                        <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
+                        <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="currency-rate">Exchange Rate</Label>
+                    <Input
+                      id="currency-rate"
+                      type="number"
+                      step="0.001"
+                      placeholder="e.g., 0.1 or 100"
+                      value={currencyForm.rate}
+                      onChange={(e) => setCurrencyForm(prev => ({ ...prev, rate: parseFloat(e.target.value) || 0 }))}
+                      data-testid="input-currency-rate"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      How much 1 coin equals in the selected currency
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="currency-symbol">Currency Symbol</Label>
+                    <Input
+                      id="currency-symbol"
+                      placeholder="e.g., $, ₦, €"
+                      value={currencyForm.symbol}
+                      onChange={(e) => setCurrencyForm(prev => ({ ...prev, symbol: e.target.value }))}
+                      data-testid="input-currency-symbol"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Symbol to display with the currency
+                    </p>
+                  </div>
+                </div>
+
+                {currencySettings && (
+                  <Alert>
+                    <CreditCard className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Current Setting:</strong> {currencySettings.currency} ({currencySettings.symbol}) 
+                      - Rate: {currencySettings.rate} per coin
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="flex justify-between items-center">
+                  <div className="text-sm text-muted-foreground">
+                    Preview: 100 coins = {currencyForm.symbol}{(100 * currencyForm.rate).toFixed(2)} {currencyForm.currency}
+                  </div>
+                  <Button 
+                    onClick={() => updateCurrencyMutation.mutate(currencyForm)}
+                    disabled={updateCurrencyMutation.isPending || !currencyForm.currency || !currencyForm.rate}
+                    data-testid="button-update-currency"
+                  >
+                    {updateCurrencyMutation.isPending ? "Updating..." : "Update Currency Settings"}
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

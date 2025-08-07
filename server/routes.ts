@@ -171,6 +171,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Currency settings for users (public endpoint for authenticated users)
+  app.get('/api/currency', isAuthenticated, async (req, res) => {
+    try {
+      const [currency, rate, symbol] = await Promise.all([
+        storage.getAppSetting('currency'),
+        storage.getAppSetting('currency_rate'),
+        storage.getAppSetting('currency_symbol')
+      ]);
+
+      res.json({
+        currency: currency?.value || 'USD',
+        rate: rate?.value || 0.1,
+        symbol: symbol?.value || '$'
+      });
+    } catch (error) {
+      console.error('Error getting currency settings:', error);
+      res.status(500).json({ error: 'Failed to get currency settings' });
+    }
+  });
+
   // Auth status route
   app.get('/api/auth/user', (req, res) => {
     if (req.isAuthenticated()) {
@@ -860,6 +880,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error toggling maintenance mode:', error);
       res.status(500).json({ error: 'Failed to toggle maintenance mode' });
+    }
+  });
+
+  // Admin currency management routes
+  app.get('/api/admin/currency', requireAdmin, async (req, res) => {
+    try {
+      const [currency, rate, symbol] = await Promise.all([
+        storage.getAppSetting('currency'),
+        storage.getAppSetting('currency_rate'),
+        storage.getAppSetting('currency_symbol')
+      ]);
+
+      res.json({
+        currency: currency?.value || 'USD',
+        rate: rate?.value || 0.1,
+        symbol: symbol?.value || '$'
+      });
+    } catch (error) {
+      console.error('Error getting currency settings:', error);
+      res.status(500).json({ error: 'Failed to get currency settings' });
+    }
+  });
+
+  app.put('/api/admin/currency', requireAdmin, async (req, res) => {
+    try {
+      const { currency, rate, symbol } = req.body;
+      const adminId = (req.user as any)?._id?.toString();
+
+      if (!currency || !rate || !symbol) {
+        return res.status(400).json({ error: 'Currency, rate, and symbol are required' });
+      }
+
+      // Save currency settings
+      await Promise.all([
+        storage.setAppSetting({
+          key: 'currency',
+          value: currency,
+          description: 'Selected currency for display',
+          updatedBy: adminId
+        }),
+        storage.setAppSetting({
+          key: 'currency_rate',
+          value: parseFloat(rate),
+          description: 'Exchange rate per coin',
+          updatedBy: adminId
+        }),
+        storage.setAppSetting({
+          key: 'currency_symbol',
+          value: symbol,
+          description: 'Currency symbol for display',
+          updatedBy: adminId
+        })
+      ]);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating currency settings:', error);
+      res.status(500).json({ error: 'Failed to update currency settings' });
     }
   });
 
