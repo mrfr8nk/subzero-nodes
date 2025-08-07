@@ -97,16 +97,6 @@ export default function Landing() {
             <div className="flex items-center space-x-2 sm:space-x-3">
               <ThemeToggle />
               <Button 
-                variant="ghost" 
-                onClick={handleGoogleLogin}
-                className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white text-sm sm:text-base px-2 sm:px-4"
-                data-testid="button-signin-nav"
-              >
-                <SiGoogle className="w-4 h-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Sign In</span>
-                <span className="sm:hidden">In</span>
-              </Button>
-              <Button 
                 onClick={handleGetStarted}
                 className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg text-sm sm:text-base px-3 sm:px-4"
                 data-testid="button-getstarted-nav"
