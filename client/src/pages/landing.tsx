@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { SiWhatsapp } from "react-icons/si";
-import { Rocket, Coins, Users, ChartLine, Smartphone, Shield, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { SiWhatsapp, SiGoogle } from "react-icons/si";
+import { Rocket, Coins, Users, ChartLine, Smartphone, Shield, Clock, CheckCircle, Star, ArrowRight, Play, Zap, Globe, Award } from "lucide-react";
 
 export default function Landing() {
   const handleGoogleLogin = () => {
@@ -11,73 +12,119 @@ export default function Landing() {
   const features = [
     {
       icon: Rocket,
-      title: "Quick Deployment",
-      description: "Deploy your SUBZERO-MD bots instantly with our one-click deployment system.",
-      gradient: "from-blue-50 to-blue-100",
-      iconColor: "text-blue-600",
-      bgColor: "bg-blue-600"
+      title: "Lightning Fast Deployment",
+      description: "Deploy your SUBZERO-MD bots in under 60 seconds with our advanced one-click system.",
+      gradient: "from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900",
+      iconColor: "text-blue-600 dark:text-blue-400",
+      bgColor: "bg-gradient-to-r from-blue-500 to-blue-600",
+      highlight: "Most Popular"
     },
     {
       icon: Coins,
-      title: "Coin System",
-      description: "Use our integrated coin system for seamless payment and resource management.",
-      gradient: "from-green-50 to-green-100",
-      iconColor: "text-green-600",
-      bgColor: "bg-green-600"
+      title: "Smart Coin Economy",
+      description: "Transparent pricing with our integrated coin system. Pay only for what you use.",
+      gradient: "from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900",
+      iconColor: "text-emerald-600 dark:text-emerald-400",
+      bgColor: "bg-gradient-to-r from-emerald-500 to-emerald-600"
     },
     {
       icon: Users,
       title: "Referral Rewards",
-      description: "Earn coins by referring friends and grow your network with our referral system.",
-      gradient: "from-purple-50 to-purple-100",
-      iconColor: "text-purple-600",
-      bgColor: "bg-purple-600"
+      description: "Earn up to 50 coins for each friend you refer. Build your network and profit together.",
+      gradient: "from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900",
+      iconColor: "text-purple-600 dark:text-purple-400",
+      bgColor: "bg-gradient-to-r from-purple-500 to-purple-600"
     },
     {
       icon: ChartLine,
-      title: "Analytics Dashboard",
-      description: "Monitor your bot performance with detailed analytics and usage statistics.",
-      gradient: "from-orange-50 to-orange-100",
-      iconColor: "text-orange-600",
-      bgColor: "bg-orange-600"
+      title: "Real-time Analytics",
+      description: "Advanced dashboard with live metrics, performance insights, and detailed reports.",
+      gradient: "from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900",
+      iconColor: "text-amber-600 dark:text-amber-400",
+      bgColor: "bg-gradient-to-r from-amber-500 to-amber-600"
     },
     {
-      icon: Smartphone,
-      title: "Mobile Optimized",
-      description: "Manage your bots on the go with our fully responsive mobile interface.",
-      gradient: "from-red-50 to-red-100",
-      iconColor: "text-red-600",
-      bgColor: "bg-red-600"
+      icon: Globe,
+      title: "Global Infrastructure",
+      description: "99.9% uptime with servers worldwide. Your bots run 24/7 without interruption.",
+      gradient: "from-cyan-50 to-cyan-100 dark:from-cyan-950 dark:to-cyan-900",
+      iconColor: "text-cyan-600 dark:text-cyan-400",
+      bgColor: "bg-gradient-to-r from-cyan-500 to-cyan-600"
     },
     {
       icon: Shield,
-      title: "Secure & Reliable",
-      description: "Enterprise-grade security and 99.9% uptime for your peace of mind.",
-      gradient: "from-indigo-50 to-indigo-100",
-      iconColor: "text-indigo-600",
-      bgColor: "bg-indigo-600"
+      title: "Enterprise Security",
+      description: "Bank-grade encryption and security. Your data and bots are completely protected.",
+      gradient: "from-rose-50 to-rose-100 dark:from-rose-950 dark:to-rose-900",
+      iconColor: "text-rose-600 dark:text-rose-400",
+      bgColor: "bg-gradient-to-r from-rose-500 to-rose-600"
     }
   ];
 
+  const testimonials = [
+    {
+      name: "Alex Chen",
+      role: "Bot Developer",
+      image: "AC",
+      content: "SUBZERO-MD made bot deployment so simple. What used to take hours now takes minutes!",
+      rating: 5
+    },
+    {
+      name: "Maria Santos",
+      role: "Business Owner",
+      image: "MS", 
+      content: "The referral system helped me earn enough coins to run my bots for free. Amazing platform!",
+      rating: 5
+    },
+    {
+      name: "David Kim",
+      role: "Tech Entrepreneur",
+      image: "DK",
+      content: "Professional, reliable, and incredibly easy to use. Highly recommend for any WhatsApp bot needs.",
+      rating: 5
+    }
+  ];
+
+  const stats = [
+    { label: "Bots Deployed", value: "15,000+", icon: Rocket },
+    { label: "Happy Users", value: "8,500+", icon: Users },
+    { label: "Uptime", value: "99.9%", icon: Shield },
+    { label: "Countries", value: "50+", icon: Globe }
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-950 dark:to-blue-950">
       {/* Navigation */}
-      <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+      <nav className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200/50 dark:border-slate-700/50 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-                <SiWhatsapp className="w-5 h-5 text-white" />
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
+                <SiWhatsapp className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-gray-900">SUBZERO-MD</span>
+              <div>
+                <span className="text-xl font-bold text-gray-900 dark:text-white">SUBZERO-MD</span>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Bot Deployment Platform</div>
+              </div>
             </div>
             
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" onClick={handleGoogleLogin}>
-                Sign In with Google
+            <div className="flex items-center space-x-3">
+              <Button 
+                variant="ghost" 
+                onClick={handleGoogleLogin}
+                className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                data-testid="button-signin-nav"
+              >
+                <SiGoogle className="w-4 h-4 mr-2" />
+                Sign In
               </Button>
-              <Button onClick={handleGoogleLogin} className="bg-blue-600 hover:bg-blue-700">
+              <Button 
+                onClick={handleGoogleLogin}
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg"
+                data-testid="button-getstarted-nav"
+              >
                 Get Started
+                <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
           </div>
@@ -129,14 +176,20 @@ export default function Landing() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-white dark:bg-slate-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
-              Everything You Need to Deploy Bots
+            <Badge className="mb-6 bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300 border-0">
+              <Award className="w-3 h-3 mr-1" />
+              Industry Leading Features
+            </Badge>
+            <h2 className="text-3xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-6">
+              Everything You Need to
+              <span className="block text-blue-600 dark:text-blue-400">Dominate WhatsApp</span>
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Our platform provides all the tools and features you need to successfully deploy and manage your WhatsApp bots.
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+              Built by developers, for developers. Our platform combines cutting-edge technology 
+              with intuitive design to give you the ultimate bot deployment experience.
             </p>
           </div>
 
@@ -144,14 +197,26 @@ export default function Landing() {
             {features.map((feature, index) => {
               const IconComponent = feature.icon;
               return (
-                <Card key={index} className={`bg-gradient-to-br ${feature.gradient} border-none`}>
-                  <CardContent className="p-8">
-                    <div className={`w-12 h-12 ${feature.bgColor} rounded-xl flex items-center justify-center mb-6`}>
-                      <IconComponent className="w-6 h-6 text-white" />
+                <Card key={index} className={`group hover:shadow-2xl transition-all duration-300 border-0 bg-gradient-to-br ${feature.gradient} relative overflow-hidden`}>
+                  {feature.highlight && (
+                    <div className="absolute top-4 right-4">
+                      <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 border-0 text-xs">
+                        {feature.highlight}
+                      </Badge>
                     </div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-4">{feature.title}</h3>
-                    <p className="text-gray-600">{feature.description}</p>
+                  )}
+                  <CardContent className="p-8 relative z-10">
+                    <div className={`w-14 h-14 ${feature.bgColor} rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform`}>
+                      <IconComponent className="w-7 h-7 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      {feature.title}
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                      {feature.description}
+                    </p>
                   </CardContent>
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 to-purple-500/0 group-hover:from-blue-500/5 group-hover:to-purple-500/5 transition-all duration-300"></div>
                 </Card>
               );
             })}
@@ -159,29 +224,106 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-20 bg-gray-900 text-white">
+      {/* Testimonials Section */}
+      <section className="py-20 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/50 dark:to-purple-950/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl font-bold text-blue-400 mb-2">10,000+</div>
-              <div className="text-gray-300">Bots Deployed</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-green-400 mb-2">5,000+</div>
-              <div className="text-gray-300">Active Users</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-purple-400 mb-2">99.9%</div>
-              <div className="text-gray-300">Uptime</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-orange-400 mb-2">24/7</div>
-              <div className="text-gray-300">Support</div>
+          <div className="text-center mb-16">
+            <Badge className="mb-6 bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 border-0">
+              <Star className="w-3 h-3 mr-1" />
+              Loved by thousands
+            </Badge>
+            <h2 className="text-3xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-6">
+              What Our Users Say
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+              Join thousands of developers and businesses who trust SUBZERO-MD for their WhatsApp bot deployments.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {testimonials.map((testimonial, index) => (
+              <Card key={index} className="bg-white dark:bg-slate-800 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group">
+                <CardContent className="p-8">
+                  <div className="flex items-center mb-6">
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold mr-4">
+                      {testimonial.image}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900 dark:text-white">{testimonial.name}</div>
+                      <div className="text-gray-600 dark:text-gray-400 text-sm">{testimonial.role}</div>
+                    </div>
+                  </div>
+                  <div className="flex mb-4">
+                    {[...Array(testimonial.rating)].map((_, i) => (
+                      <Star key={i} className="w-4 h-4 text-yellow-400 fill-current" />
+                    ))}
+                  </div>
+                  <p className="text-gray-600 dark:text-gray-300 italic leading-relaxed">
+                    "{testimonial.content}"
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-20 bg-gradient-to-r from-blue-600 to-purple-600 text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl lg:text-5xl font-bold mb-6">
+            Ready to Deploy Your First Bot?
+          </h2>
+          <p className="text-xl lg:text-2xl text-blue-100 mb-12 max-w-2xl mx-auto">
+            Join thousands of developers and start deploying powerful WhatsApp bots in under 60 seconds.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+            <Button 
+              onClick={handleGoogleLogin}
+              size="lg"
+              className="bg-white text-blue-600 hover:bg-blue-50 px-8 py-6 rounded-2xl font-bold text-lg shadow-xl group"
+              data-testid="button-start-free"
+            >
+              <SiGoogle className="w-5 h-5 mr-3" />
+              Start Free Today
+              <ArrowRight className="w-5 h-5 ml-3 group-hover:translate-x-1 transition-transform" />
+            </Button>
+            <div className="text-center">
+              <div className="text-blue-100 text-sm">
+                <CheckCircle className="w-4 h-4 inline mr-2" />
+                100 free coins included • No setup fees • Cancel anytime
+              </div>
             </div>
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="bg-slate-900 text-white py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="flex items-center space-x-3 mb-4 md:mb-0">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
+                <SiWhatsapp className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <span className="text-xl font-bold">SUBZERO-MD</span>
+                <div className="text-sm text-gray-400">Bot Deployment Platform</div>
+              </div>
+            </div>
+            <div className="text-center md:text-right">
+              <div className="text-gray-400 text-sm">
+                © 2025 SUBZERO-MD. All rights reserved.
+              </div>
+              <div className="text-gray-500 text-xs mt-1">
+                Built with ❤️ for the developer community
+              </div>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
