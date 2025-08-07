@@ -258,6 +258,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Resend verification email route
+  app.post('/api/auth/resend-verification', async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: 'Email is required' });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      
+      if (!user) {
+        return res.status(404).json({ message: 'No account found with this email address' });
+      }
+
+      if (user.authProvider !== 'local') {
+        return res.status(400).json({ message: 'Email verification is only required for email/password accounts' });
+      }
+
+      if (user.isVerified) {
+        return res.status(400).json({ message: 'This email address is already verified' });
+      }
+
+      // Generate new verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      // Update verification token in database
+      await storage.updateVerificationToken(email, verificationToken, verificationTokenExpiry);
+
+      // Send verification email
+      const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+      const host = req.get('host') || req.headers['x-forwarded-host'] || 'localhost:5000';
+      const baseUrl = `${protocol}://${host}`;
+      
+      const emailSent = await sendVerificationEmail(email, verificationToken, baseUrl);
+      
+      if (!emailSent) {
+        console.error('Failed to resend verification email');
+        return res.status(500).json({ message: 'Failed to send verification email. Please try again.' });
+      }
+
+      res.json({ message: 'Verification email has been sent. Please check your inbox and spam folder.' });
+    } catch (error) {
+      console.error('Resend verification error:', error);
+      res.status(500).json({ message: 'Failed to resend verification email' });
+    }
+  });
+
   // Dashboard stats
   app.get('/api/dashboard/stats', isAuthenticated, async (req: any, res) => {
     try {

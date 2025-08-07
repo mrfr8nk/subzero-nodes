@@ -23,6 +23,7 @@ export interface IStorage {
   verifyUser(userId: string): Promise<void>;
   setPasswordResetToken(email: string, token: string, expiry: Date): Promise<void>;
   resetPassword(userId: string, newPassword: string): Promise<void>;
+  updateVerificationToken(email: string, token: string, expiry: Date): Promise<void>;
   upsertUser(user: InsertUser): Promise<User>;
   
   // Deployment operations
@@ -120,6 +121,19 @@ export class MongoStorage implements IStorage {
         $unset: { 
           resetPasswordToken: "",
           resetPasswordExpiry: ""
+        }
+      }
+    );
+  }
+
+  async updateVerificationToken(email: string, token: string, expiry: Date): Promise<void> {
+    await this.usersCollection.updateOne(
+      { email },
+      { 
+        $set: { 
+          verificationToken: token,
+          verificationTokenExpiry: expiry,
+          updatedAt: new Date()
         }
       }
     );

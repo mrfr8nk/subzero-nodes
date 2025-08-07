@@ -27,6 +27,8 @@ export default function Login() {
   const [, navigate] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string>("");
 
   // Check for auth error in URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -82,6 +84,12 @@ export default function Login() {
         // Reload to trigger auth state update
         window.location.href = "/dashboard";
       } else {
+        // Check if it's an email verification error
+        if (result.message === "Please verify your email before signing in") {
+          setUnverifiedEmail(data.email);
+          setShowResendVerification(true);
+        }
+        
         toast({
           title: "Login Failed",
           description: result.message,
@@ -97,6 +105,41 @@ export default function Login() {
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    try {
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: unverifiedEmail }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Verification Email Sent",
+          description: result.message,
+        });
+        setShowResendVerification(false);
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Resend verification error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to resend verification email. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -151,6 +194,42 @@ export default function Login() {
           </CardHeader>
           
           <CardContent className="space-y-6 px-4 sm:px-8 pb-8">
+            {/* Email Verification Alert */}
+            {showResendVerification && (
+              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4 space-y-3">
+                <div className="flex items-start space-x-3">
+                  <Mail className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                      Email Verification Required
+                    </h4>
+                    <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                      Your account needs to be verified before you can sign in. Check your email for a verification link or request a new one.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    onClick={handleResendVerification}
+                    size="sm"
+                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                    data-testid="button-resend-verification"
+                  >
+                    Resend Verification Email
+                  </Button>
+                  <Button
+                    onClick={() => setShowResendVerification(false)}
+                    size="sm"
+                    variant="outline"
+                    className="border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300"
+                    data-testid="button-dismiss-verification-alert"
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Email/Password Login Form */}
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -293,15 +372,28 @@ export default function Login() {
               </div>
             </div>
 
-            <div className="text-center pt-4 border-t border-gray-200 dark:border-gray-700">
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-                New to SUBZERO-MD?
-              </p>
-              <Link href="/signup">
-                <Button variant="outline" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/30" data-testid="link-create-account">
-                  Create Account
-                </Button>
-              </Link>
+            <div className="text-center pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                  New to SUBZERO-MD?
+                </p>
+                <Link href="/signup">
+                  <Button variant="outline" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/30" data-testid="link-create-account">
+                    Create Account
+                  </Button>
+                </Link>
+              </div>
+              
+              <div className="text-center">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  Can't sign in? Need to verify your email?
+                </p>
+                <Link href="/resend-verification">
+                  <Button variant="link" className="text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 p-0 h-auto text-xs font-medium" data-testid="link-resend-verification">
+                    Resend Verification Email
+                  </Button>
+                </Link>
+              </div>
             </div>
           </CardContent>
         </Card>
