@@ -199,3 +199,84 @@ export async function sendWelcomeEmail(email: string, firstName?: string, baseUr
     html: htmlContent,
   });
 }
+
+export async function sendPasswordResetEmail(email: string, resetToken: string, baseUrl: string): Promise<boolean> {
+  const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
+  
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Reset Your Password - SUBZERO-MD</title>
+      <style>
+        body { font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; text-align: center; padding: 30px; border-radius: 10px 10px 0 0; }
+        .logo { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+        .content { background: #fef2f2; padding: 30px; border-radius: 0 0 10px 10px; }
+        .button { display: inline-block; background: #ef4444; color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 20px 0; }
+        .footer { text-align: center; color: #666; font-size: 12px; margin-top: 20px; }
+        .warning { background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin: 20px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">🔒 SUBZERO-MD</div>
+          <p>Password Reset Request</p>
+        </div>
+        <div class="content">
+          <h2>Reset Your Password</h2>
+          <p>We received a request to reset your password for your SUBZERO-MD account associated with ${email}.</p>
+          
+          <p>If you requested this password reset, click the button below to create a new password:</p>
+          
+          <div style="text-align: center;">
+            <a href="${resetUrl}" class="button">Reset Password</a>
+          </div>
+          
+          <p>Or copy and paste this link into your browser:</p>
+          <p style="word-break: break-all; background: #f3f4f6; padding: 10px; border-radius: 5px;">
+            ${resetUrl}
+          </p>
+          
+          <div class="warning">
+            <p><strong>⚠️ Important Security Information:</strong></p>
+            <ul style="margin: 10px 0;">
+              <li>This password reset link will expire in <strong>1 hour</strong></li>
+              <li>This link can only be used once</li>
+              <li>If you didn't request this reset, you can safely ignore this email</li>
+              <li>Your password will remain unchanged unless you click the link above</li>
+            </ul>
+          </div>
+          
+          <p>If you're having trouble with the button above, or if you didn't request this password reset, please contact our support team.</p>
+          
+          <p>For security reasons, we recommend:</p>
+          <ul>
+            <li>Choose a strong password with at least 8 characters</li>
+            <li>Use a combination of letters, numbers, and special characters</li>
+            <li>Don't reuse passwords from other accounts</li>
+          </ul>
+          
+          <p>Stay secure,<br>
+          The SUBZERO-MD Team</p>
+        </div>
+        <div class="footer">
+          <p>© 2025 SUBZERO-MD Bot Platform. All rights reserved.</p>
+          <p>This email was sent to ${email}</p>
+          <p>If you didn't request this reset, please ignore this email or contact support.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return await sendEmail({
+    to: email,
+    subject: '🔒 Reset Your SUBZERO-MD Password',
+    html: htmlContent,
+  });
+}

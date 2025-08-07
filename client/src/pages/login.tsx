@@ -1,18 +1,32 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 import { SiWhatsapp, SiGoogle } from "react-icons/si";
-import { ArrowRight, CheckCircle, ArrowLeft } from "lucide-react";
+import { ArrowRight, CheckCircle, ArrowLeft, Mail, Eye, EyeOff, Lock } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
+
+const loginSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const { toast } = useToast();
   const { user, isLoading } = useAuth();
   const [, navigate] = useLocation();
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Check for auth error in URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -35,8 +49,55 @@ export default function Login() {
     }
   }, [user, isLoading, navigate]);
 
+  const form = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
   const handleGoogleLogin = () => {
     window.location.href = "/api/auth/google";
+  };
+
+  const onSubmit = async (data: LoginFormData) => {
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/auth/local/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Login Successful",
+          description: "Welcome back! Redirecting to your dashboard.",
+        });
+        // Reload to trigger auth state update
+        window.location.href = "/dashboard";
+      } else {
+        toast({
+          title: "Login Failed",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      toast({
+        title: "Login Error",
+        description: "Failed to sign in. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isLoading) {
@@ -79,7 +140,7 @@ export default function Login() {
         <div className="w-full max-w-lg">
 
         {/* Login Card */}
-        <Card className="shadow-2xl border-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
+        <Card className="shadow-2xl border-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md">
           <CardHeader className="text-center pb-8 pt-12">
             <CardTitle className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
               Welcome Back
@@ -88,29 +149,126 @@ export default function Login() {
               Sign in to access your bot deployment dashboard
             </p>
           </CardHeader>
+          
           <CardContent className="space-y-6 px-4 sm:px-8 pb-8">
-            <Button
-              onClick={handleGoogleLogin}
-              size="lg"
-              className="w-full bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-2 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-slate-700 hover:border-gray-300 dark:hover:border-gray-500 h-12 sm:h-14 rounded-xl font-semibold text-base sm:text-lg shadow-lg group"
-              data-testid="button-google-signin"
-            >
-              <SiGoogle className="w-5 h-5 sm:w-6 sm:h-6 mr-3 sm:mr-4 text-red-500 group-hover:scale-110 transition-transform" />
-              Continue with Google
-              <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-auto group-hover:translate-x-1 transition-transform" />
-            </Button>
+            {/* Email/Password Login Form */}
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-gray-700 dark:text-gray-300">Email Address</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                          <Input
+                            {...field}
+                            type="email"
+                            placeholder="Enter your email"
+                            className="pl-10 h-12 bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400"
+                            disabled={isSubmitting}
+                            data-testid="input-email"
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-gray-700 dark:text-gray-300">Password</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                          <Input
+                            {...field}
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Enter your password"
+                            className="pl-10 pr-10 h-12 bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400"
+                            disabled={isSubmitting}
+                            data-testid="input-password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                            data-testid="button-toggle-password"
+                          >
+                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          </button>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex justify-end">
+                  <Link href="/forgot-password">
+                    <Button 
+                      type="button" 
+                      variant="link" 
+                      className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 p-0 h-auto font-medium"
+                      data-testid="link-forgot-password"
+                    >
+                      Forgot password?
+                    </Button>
+                  </Link>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-12 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                  disabled={isSubmitting}
+                  data-testid="button-sign-in"
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Signing in...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      <Lock className="w-5 h-5" />
+                      <span>Sign In</span>
+                      <ArrowRight className="w-5 h-5 ml-auto" />
+                    </div>
+                  )}
+                </Button>
+              </form>
+            </Form>
+
+            {/* Divider */}
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="px-4 bg-white dark:bg-slate-900 text-gray-500 dark:text-gray-400">
-                  Secure authentication powered by Google
+                  Or continue with
                 </span>
               </div>
             </div>
 
+            {/* Google Sign In */}
+            <Button
+              onClick={handleGoogleLogin}
+              size="lg"
+              className="w-full bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-2 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-slate-700 hover:border-gray-300 dark:hover:border-gray-500 h-12 rounded-xl font-semibold shadow-lg group"
+              data-testid="button-google-signin"
+            >
+              <SiGoogle className="w-5 h-5 mr-3 text-red-500 group-hover:scale-110 transition-transform" />
+              Continue with Google
+            </Button>
+
+            {/* Benefits */}
             <div className="space-y-4">
               <div className="flex items-center justify-center space-x-4 sm:space-x-6 text-sm text-gray-500 dark:text-gray-400">
                 <div className="flex items-center">
@@ -140,7 +298,7 @@ export default function Login() {
                 New to SUBZERO-MD?
               </p>
               <Link href="/signup">
-                <Button variant="outline" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/30">
+                <Button variant="outline" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/30" data-testid="link-create-account">
                   Create Account
                 </Button>
               </Link>

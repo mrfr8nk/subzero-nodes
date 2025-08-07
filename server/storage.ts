@@ -18,8 +18,11 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByGoogleId(googleId: string): Promise<User | undefined>;
   getUserByVerificationToken(token: string): Promise<User | undefined>;
+  getUserByResetToken(token: string): Promise<User | undefined>;
   createLocalUser(userData: any): Promise<any>;
   verifyUser(userId: string): Promise<void>;
+  setPasswordResetToken(email: string, token: string, expiry: Date): Promise<void>;
+  resetPassword(userId: string, newPassword: string): Promise<void>;
   upsertUser(user: InsertUser): Promise<User>;
   
   // Deployment operations
@@ -86,6 +89,40 @@ export class MongoStorage implements IStorage {
   async getUserByVerificationToken(token: string): Promise<User | undefined> {
     const user = await this.usersCollection.findOne({ verificationToken: token });
     return user || undefined;
+  }
+
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    const user = await this.usersCollection.findOne({ resetPasswordToken: token });
+    return user || undefined;
+  }
+
+  async setPasswordResetToken(email: string, token: string, expiry: Date): Promise<void> {
+    await this.usersCollection.updateOne(
+      { email },
+      { 
+        $set: { 
+          resetPasswordToken: token,
+          resetPasswordExpiry: expiry,
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
+  async resetPassword(userId: string, newPassword: string): Promise<void> {
+    await this.usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $set: { 
+          password: newPassword,
+          updatedAt: new Date()
+        },
+        $unset: { 
+          resetPasswordToken: "",
+          resetPasswordExpiry: ""
+        }
+      }
+    );
   }
 
   async createLocalUser(userData: any): Promise<any> {

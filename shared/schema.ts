@@ -18,6 +18,8 @@ export interface User {
   verificationToken?: string;
   verificationTokenExpiry?: Date;
   isVerified?: boolean;
+  resetPasswordToken?: string;
+  resetPasswordExpiry?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -75,6 +77,8 @@ export const insertUserSchema = z.object({
   verificationToken: z.string().optional(),
   verificationTokenExpiry: z.date().optional(),
   isVerified: z.boolean().optional(),
+  resetPasswordToken: z.string().optional(),
+  resetPasswordExpiry: z.date().optional(),
 });
 
 export const insertDeploymentSchema = z.object({

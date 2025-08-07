@@ -11,6 +11,8 @@ import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import VerifyEmail from "@/pages/verify-email";
 import EmailVerificationPending from "@/pages/email-verification-pending";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
 import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import Wallet from "@/pages/wallet";
@@ -29,6 +31,8 @@ function Router() {
         <Route path="/signup" component={Signup} />
         <Route path="/verify-email" component={VerifyEmail} />
         <Route path="/email-verification-pending" component={EmailVerificationPending} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route component={Landing} />
       </Switch>
     );

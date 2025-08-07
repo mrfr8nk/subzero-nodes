@@ -4,7 +4,7 @@ import passport from "passport";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./googleAuth";
 import { insertDeploymentSchema, insertTransactionSchema } from "@shared/schema";
-import { sendVerificationEmail, sendWelcomeEmail } from "./emailService";
+import { sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail } from "./emailService";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
@@ -173,6 +173,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Login error:', error);
       res.status(500).json({ message: 'Login failed' });
+    }
+  });
+
+  // Forgot password route
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: 'Email is required' });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      
+      if (!user) {
+        // Return success even if user not found for security reasons
+        return res.json({ message: 'If an account with that email exists, we have sent password reset instructions.' });
+      }
+
+      if (user.authProvider !== 'local') {
+        return res.status(400).json({ message: 'Password reset is only available for email/password accounts. Please sign in with Google instead.' });
+      }
+
+      // Generate reset token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const resetExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      // Save reset token to database
+      await storage.setPasswordResetToken(email, resetToken, resetExpiry);
+
+      // Send password reset email
+      const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+      const host = req.get('host') || req.headers['x-forwarded-host'] || 'localhost:5000';
+      const baseUrl = `${protocol}://${host}`;
+      
+      const emailSent = await sendPasswordResetEmail(email, resetToken, baseUrl);
+      
+      if (!emailSent) {
+        console.error('Failed to send password reset email');
+        return res.status(500).json({ message: 'Failed to send password reset email. Please try again.' });
+      }
+
+      res.json({ message: 'If an account with that email exists, we have sent password reset instructions.' });
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({ message: 'Failed to process password reset request' });
+    }
+  });
+
+  // Reset password route
+  app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+
+      if (!token || !newPassword) {
+        return res.status(400).json({ message: 'Reset token and new password are required' });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+      }
+
+      const user = await storage.getUserByResetToken(token);
+      
+      if (!user) {
+        return res.status(400).json({ message: 'Invalid or expired reset token' });
+      }
+
+      if (user.resetPasswordExpiry && new Date() > user.resetPasswordExpiry) {
+        return res.status(400).json({ message: 'Reset token has expired' });
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update password and clear reset token
+      await storage.resetPassword(user._id.toString(), hashedPassword);
+
+      res.json({ message: 'Password reset successfully. You can now sign in with your new password.' });
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ message: 'Failed to reset password' });
     }
   });
 
