@@ -115,8 +115,9 @@ export async function setupAuth(app: Express) {
           return done(null, false, { message: 'Invalid email or password' });
         }
         
-        // Create a session object similar to OIDC
+        // Create a session object similar to OIDC with user data
         const sessionUser = {
+          ...user, // Include full user object for email verification check
           claims: {
             sub: user.id,
             email: user.email,

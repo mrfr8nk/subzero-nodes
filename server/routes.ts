@@ -5,6 +5,8 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertDeploymentSchema, insertTransactionSchema } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import passport from "passport";
+import { sendVerificationEmail, sendWelcomeEmail } from "./emailService";
+import { randomBytes } from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -190,6 +192,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Email verification routes
+  app.get('/api/auth/verify-email', async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ message: "Invalid verification token" });
+      }
+      
+      const user = await storage.verifyEmail(token);
+      
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired verification token" });
+      }
+      
+      // Send welcome email
+      await sendWelcomeEmail(user.email!, user.firstName || undefined);
+      
+      res.json({ message: "Email verified successfully", verified: true });
+    } catch (error) {
+      console.error("Email verification error:", error);
+      res.status(500).json({ message: "Failed to verify email" });
+    }
+  });
+  
+  app.post('/api/auth/resend-verification', async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      
+      const user = await storage.getUserByEmail(email);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      if (user.emailVerified) {
+        return res.status(400).json({ message: "Email is already verified" });
+      }
+      
+      // Generate new verification token
+      const verificationToken = randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      
+      await storage.setEmailVerificationToken(user.id, verificationToken, expiresAt);
+      
+      // Send verification email
+      const baseUrl = `https://${req.hostname}`;
+      const emailSent = await sendVerificationEmail(user.email!, verificationToken, baseUrl);
+      
+      if (!emailSent) {
+        return res.status(500).json({ message: "Failed to send verification email" });
+      }
+      
+      res.json({ message: "Verification email sent successfully" });
+    } catch (error) {
+      console.error("Resend verification error:", error);
+      res.status(500).json({ message: "Failed to resend verification email" });
+    }
+  });
+
   // Local authentication routes
   app.post('/api/auth/local/signup', async (req, res) => {
     try {
@@ -213,7 +279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 12);
       
-      // Create user
+      // Create user (not verified yet)
       const user = await storage.createLocalUser({
         email,
         password: hashedPassword,
@@ -222,23 +288,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         referredById: referrerId,
       });
       
-      // Log them in
-      const sessionUser = {
-        claims: {
-          sub: user.id,
-          email: user.email,
-          first_name: user.firstName,
-          last_name: user.lastName,
-          profile_image_url: user.profileImageUrl,
-        },
-        expires_at: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days
-      };
+      // Generate verification token
+      const verificationToken = randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
       
-      req.login(sessionUser, (err) => {
-        if (err) {
-          return res.status(500).json({ message: "Login failed" });
-        }
-        res.json({ message: "Account created successfully" });
+      await storage.setEmailVerificationToken(user.id, verificationToken, expiresAt);
+      
+      // Send verification email
+      const baseUrl = `https://${req.hostname}`;
+      const emailSent = await sendVerificationEmail(email, verificationToken, baseUrl);
+      
+      if (!emailSent) {
+        console.error('Failed to send verification email to:', email);
+        // Don't fail the signup, but log the error
+      }
+      
+      res.json({ 
+        message: "Account created successfully. Please check your email to verify your account.",
+        requiresVerification: true
       });
     } catch (error) {
       console.error("Signup error:", error);
@@ -253,6 +320,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (!user) {
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
+      }
+      
+      // Check if email is verified for local auth users
+      if (user.authProvider === 'local' && !user.emailVerified) {
+        return res.status(403).json({ 
+          message: "Please verify your email before logging in",
+          requiresVerification: true,
+          email: user.email
+        });
       }
       
       req.login(user, (err) => {

@@ -23,14 +23,65 @@ export default function Login() {
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  
+  // Get email from URL for verification purposes
+  const urlParams = new URLSearchParams(window.location.search);
+  const emailFromUrl = urlParams.get('email');
+  const needsVerification = urlParams.get('verified') === 'false';
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
+      email: emailFromUrl || "",
       password: "",
     },
   });
+  
+  const handleResendVerification = async () => {
+    const email = emailFromUrl || form.getValues('email');
+    if (!email) {
+      toast({
+        title: "Error",
+        description: "Please enter your email address",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsResending(true);
+    try {
+      const response = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+      
+      if (response.ok) {
+        toast({
+          title: "Verification Email Sent",
+          description: "Please check your email for a new verification link.",
+        });
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Failed to Resend",
+          description: error.message || "Could not resend verification email.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   const handleReplayLogin = () => {
     window.location.href = "/api/login";
@@ -51,6 +102,17 @@ export default function Login() {
         window.location.href = "/dashboard";
       } else {
         const error = await response.json();
+        
+        // Handle email verification required
+        if (error.requiresVerification) {
+          toast({
+            title: "Email Verification Required",
+            description: "Please verify your email before signing in. Check your inbox for a verification link.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
         toast({
           title: "Login Failed",
           description: error.message || "Invalid email or password",
@@ -89,6 +151,22 @@ export default function Login() {
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold text-gray-900">Welcome Back</CardTitle>
             <p className="text-gray-600">Sign in to your account to continue</p>
+            {needsVerification && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
+                <p className="text-sm text-yellow-800">
+                  📧 Please verify your email before signing in. Check your inbox for a verification link.
+                </p>
+                <Button
+                  type="button"
+                  variant="link"
+                  onClick={handleResendVerification}
+                  disabled={isResending}
+                  className="text-yellow-700 hover:text-yellow-800 p-0 h-auto"
+                >
+                  {isResending ? "Sending..." : "Resend verification email"}
+                </Button>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Replit Login Button */}

@@ -35,6 +35,9 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   authProvider: varchar("auth_provider").default("replit"), // 'replit' or 'local'
+  emailVerified: boolean("email_verified").default(false),
+  emailVerificationToken: varchar("email_verification_token"),
+  emailVerificationTokenExpires: timestamp("email_verification_token_expires"),
   coinBalance: integer("coin_balance").default(100), // Starting balance
   referralCode: varchar("referral_code").unique(),
   referredById: varchar("referred_by_id"),

@@ -70,11 +70,13 @@ export default function Signup() {
       });
 
       if (response.ok) {
+        const result = await response.json();
         toast({
           title: "Account Created",
-          description: "Your account has been created successfully! You are now logged in.",
+          description: "Please check your email to verify your account before signing in.",
         });
-        window.location.href = "/dashboard";
+        // Redirect to login page with email for verification
+        setLocation(`/login?email=${encodeURIComponent(data.email)}&verified=false`);
       } else {
         const error = await response.json();
         toast({

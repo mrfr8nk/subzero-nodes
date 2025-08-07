@@ -23,6 +23,11 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   createLocalUser(userData: { email: string; password: string; firstName?: string; lastName?: string; referredById?: string }): Promise<User>;
   
+  // Email verification operations
+  setEmailVerificationToken(userId: string, token: string, expiresAt: Date): Promise<void>;
+  verifyEmail(token: string): Promise<User | null>;
+  clearEmailVerificationToken(userId: string): Promise<void>;
+  
   // Deployment operations
   createDeployment(deployment: InsertDeployment): Promise<Deployment>;
   getUserDeployments(userId: string): Promise<Deployment[]>;
@@ -262,6 +267,57 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(eq(users.email, email));
     return user;
+  }
+
+  async setEmailVerificationToken(userId: string, token: string, expiresAt: Date): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        emailVerificationToken: token,
+        emailVerificationTokenExpires: expiresAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async verifyEmail(token: string): Promise<User | null> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.emailVerificationToken, token),
+          sql`${users.emailVerificationTokenExpires} > NOW()`
+        )
+      );
+
+    if (!user) {
+      return null;
+    }
+
+    // Update user as verified and clear token
+    await db
+      .update(users)
+      .set({
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationTokenExpires: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, user.id));
+
+    return { ...user, emailVerified: true };
+  }
+
+  async clearEmailVerificationToken(userId: string): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        emailVerificationToken: null,
+        emailVerificationTokenExpires: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
   }
 
   async createLocalUser(userData: { email: string; password: string; firstName?: string; lastName?: string; referredById?: string }): Promise<User> {
