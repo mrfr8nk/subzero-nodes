@@ -2,7 +2,7 @@
 
 ## Overview
 
-SUBZERO-MD is a full-stack web application for deploying and managing WhatsApp bots. The platform provides a comprehensive dashboard for users to deploy bots, manage resources through a coin-based system, track referrals, and monitor deployment statistics. Built with a modern React frontend and Express backend, it features authentication integration with Replit's OIDC system and uses PostgreSQL with Drizzle ORM for data persistence.
+SUBZERO-MD is a full-stack web application for deploying and managing WhatsApp bots. The platform provides a comprehensive dashboard for users to deploy bots, manage resources through a coin-based system, track referrals, and monitor deployment statistics. Built with a modern React frontend and Express backend, it features Google OAuth authentication and uses MongoDB for data persistence.
 
 ## User Preferences
 
@@ -20,20 +20,20 @@ Preferred communication style: Simple, everyday language.
 
 ### Backend Architecture  
 - **Express.js Server**: RESTful API server with middleware for logging and error handling
-- **Authentication**: Replit OIDC integration with Passport.js strategy
-- **Session Management**: Express sessions stored in PostgreSQL using connect-pg-simple
-- **Database Layer**: Drizzle ORM with Neon serverless PostgreSQL connection
+- **Authentication**: Google OAuth 2.0 integration with Passport.js strategy
+- **Session Management**: Express sessions stored in MongoDB using connect-mongo
+- **Database Layer**: Native MongoDB driver with TypeScript interfaces
 - **API Design**: Resource-based endpoints for deployments, transactions, referrals, and user management
 
 ### Database Design
-- **Users Table**: Stores user profiles with coin balance and referral codes
-- **Deployments Table**: Bot deployment records with status tracking and configuration
-- **Transactions Table**: Financial transaction history for coin system
-- **Referrals Table**: User referral relationships and earnings tracking
-- **Sessions Table**: Express session storage for authentication persistence
+- **Users Collection**: Stores user profiles with Google ID, coin balance and referral codes
+- **Deployments Collection**: Bot deployment records with status tracking and configuration
+- **Transactions Collection**: Financial transaction history for coin system
+- **Referrals Collection**: User referral relationships and earnings tracking
+- **Sessions Collection**: Express session storage for authentication persistence
 
 ### Authentication & Authorization
-- **OIDC Integration**: Uses Replit's OpenID Connect for user authentication
+- **Google OAuth Integration**: Uses Google's OAuth 2.0 for user authentication
 - **Session-Based Auth**: Server-side sessions with secure cookie management
 - **Protected Routes**: Middleware-based route protection for authenticated endpoints
 - **User Context**: React context for client-side authentication state
@@ -48,12 +48,12 @@ Preferred communication style: Simple, everyday language.
 ## External Dependencies
 
 ### Database & Storage
-- **Neon PostgreSQL**: Serverless PostgreSQL database with connection pooling
-- **Drizzle ORM**: Type-safe database operations with schema migration support
+- **MongoDB**: Document database with native TypeScript integration
+- **Connect-Mongo**: MongoDB session store for Express sessions
 
 ### Authentication Services  
-- **Replit OIDC**: OAuth 2.0/OpenID Connect authentication provider
-- **Passport.js**: Authentication middleware with OpenID Connect strategy
+- **Google OAuth 2.0**: Google's OAuth 2.0/OpenID Connect authentication provider
+- **Passport.js**: Authentication middleware with Google OAuth strategy
 
 ### UI & Styling
 - **Radix UI**: Headless UI components for accessibility and customization

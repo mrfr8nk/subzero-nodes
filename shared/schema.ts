@@ -1,149 +1,109 @@
-import { sql } from 'drizzle-orm';
-import {
-  index,
-  jsonb,
-  pgTable,
-  timestamp,
-  varchar,
-  integer,
-  text,
-  boolean,
-  decimal,
-  serial,
-} from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { ObjectId } from "mongodb";
 
-// Session storage table for Replit Auth
-export const sessions = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)],
-);
+// Define MongoDB document interfaces
+export interface User {
+  _id: ObjectId;
+  googleId: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  profileImageUrl?: string;
+  authProvider: string;
+  emailVerified: boolean;
+  coinBalance: number;
+  referralCode?: string;
+  referredById?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-// Users table for both Replit Auth and local auth
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique(),
-  password: varchar("password"), // For local auth users
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  authProvider: varchar("auth_provider").default("replit"), // 'replit' or 'local'
-  emailVerified: boolean("email_verified").default(false),
-  emailVerificationToken: varchar("email_verification_token"),
-  emailVerificationTokenExpires: timestamp("email_verification_token_expires"),
-  coinBalance: integer("coin_balance").default(100), // Starting balance
-  referralCode: varchar("referral_code").unique(),
-  referredById: varchar("referred_by_id"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+export interface Deployment {
+  _id: ObjectId;
+  userId: ObjectId;
+  name: string;
+  status: string;
+  configuration: string;
+  cost: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Transaction {
+  _id: ObjectId;
+  userId: ObjectId;
+  type: string;
+  amount: number;
+  description: string;
+  relatedId?: ObjectId;
+  createdAt: Date;
+}
+
+export interface Referral {
+  _id: ObjectId;
+  referrerId: ObjectId;
+  referredId: ObjectId;
+  rewardClaimed: boolean;
+  rewardAmount: number;
+  createdAt: Date;
+}
+
+export interface Session {
+  _id: ObjectId;
+  sid: string;
+  sess: any;
+  expire: Date;
+}
+
+// Zod schemas for validation
+export const insertUserSchema = z.object({
+  googleId: z.string(),
+  email: z.string().email(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  profileImageUrl: z.string().optional(),
+  authProvider: z.string().default("google"),
+  emailVerified: z.boolean().default(true),
+  coinBalance: z.number().default(100),
+  referralCode: z.string().optional(),
+  referredById: z.string().optional(),
 });
 
-// Bot deployments table
-export const deployments = pgTable("deployments", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  name: varchar("name").notNull(),
-  status: varchar("status").notNull().default("active"), // active, stopped, failed
-  configuration: varchar("configuration").default("standard"),
-  cost: integer("cost").notNull().default(25),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+export const insertDeploymentSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  status: z.string().default("active"),
+  configuration: z.string().default("standard"),
+  cost: z.number().default(25),
 });
 
-// Transactions table for coin movements
-export const transactions = pgTable("transactions", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  type: varchar("type").notNull(), // deployment, referral, purchase, daily_reward
-  amount: integer("amount").notNull(), // positive for credits, negative for debits
-  description: text("description").notNull(),
-  relatedId: integer("related_id"), // deployment_id, referral_id, etc.
-  createdAt: timestamp("created_at").defaultNow(),
+export const insertTransactionSchema = z.object({
+  userId: z.string(),
+  type: z.string(),
+  amount: z.number(),
+  description: z.string(),
+  relatedId: z.string().optional(),
 });
 
-// Referrals table
-export const referrals = pgTable("referrals", {
-  id: serial("id").primaryKey(),
-  referrerId: varchar("referrer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  referredId: varchar("referred_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  rewardClaimed: boolean("reward_claimed").default(false),
-  rewardAmount: integer("reward_amount").default(50),
-  createdAt: timestamp("created_at").defaultNow(),
+export const insertReferralSchema = z.object({
+  referrerId: z.string(),
+  referredId: z.string(),
+  rewardClaimed: z.boolean().default(false),
+  rewardAmount: z.number().default(50),
 });
 
-// Relations
-export const userRelations = relations(users, ({ many, one }) => ({
-  deployments: many(deployments),
-  transactions: many(transactions),
-  referralsMade: many(referrals, { relationName: "referrer" }),
-  referredBy: one(users, {
-    fields: [users.referredById],
-    references: [users.id],
-  }),
-}));
-
-export const deploymentRelations = relations(deployments, ({ one }) => ({
-  user: one(users, {
-    fields: [deployments.userId],
-    references: [users.id],
-  }),
-}));
-
-export const transactionRelations = relations(transactions, ({ one }) => ({
-  user: one(users, {
-    fields: [transactions.userId],
-    references: [users.id],
-  }),
-}));
-
-export const referralRelations = relations(referrals, ({ one }) => ({
-  referrer: one(users, {
-    fields: [referrals.referrerId],
-    references: [users.id],
-    relationName: "referrer",
-  }),
-  referred: one(users, {
-    fields: [referrals.referredId],
-    references: [users.id],
-  }),
-}));
-
-// Insert schemas
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+export const insertSessionSchema = z.object({
+  sid: z.string(),
+  sess: z.any(),
+  expire: z.date(),
 });
 
-export const insertDeploymentSchema = createInsertSchema(deployments).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertTransactionSchema = createInsertSchema(transactions).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertReferralSchema = createInsertSchema(referrals).omit({
-  id: true,
-  createdAt: true,
-});
-
-// Types
-export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect;
+// Insert types
+export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertDeployment = z.infer<typeof insertDeploymentSchema>;
-export type Deployment = typeof deployments.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
-export type Transaction = typeof transactions.$inferSelect;
 export type InsertReferral = z.infer<typeof insertReferralSchema>;
-export type Referral = typeof referrals.$inferSelect;
+export type InsertSession = z.infer<typeof insertSessionSchema>;
+
+// For backward compatibility
+export type UpsertUser = InsertUser;

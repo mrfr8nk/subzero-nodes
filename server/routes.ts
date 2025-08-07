@@ -1,33 +1,17 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated } from "./googleAuth";
 import { insertDeploymentSchema, insertTransactionSchema } from "@shared/schema";
-import bcrypt from "bcryptjs";
-import passport from "passport";
-import { sendVerificationEmail, sendWelcomeEmail } from "./emailService";
-import { randomBytes } from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
-
   // Dashboard stats
   app.get('/api/dashboard/stats', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user._id.toString();
       const user = await storage.getUser(userId);
       const deploymentStats = await storage.getDeploymentStats(userId);
       const referralStats = await storage.getReferralStats(userId);
@@ -46,7 +30,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Recent activity
   app.get('/api/dashboard/activity', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user._id.toString();
       const transactions = await storage.getUserTransactions(userId, 10);
       res.json(transactions);
     } catch (error) {
@@ -58,7 +42,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Deployments
   app.get('/api/deployments', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user._id.toString();
       const deployments = await storage.getUserDeployments(userId);
       res.json(deployments);
     } catch (error) {
@@ -69,7 +53,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/deployments', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user._id.toString();
       const user = await storage.getUser(userId);
       
       if (!user) {
@@ -98,11 +82,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/deployments/:id/status', isAuthenticated, async (req: any, res) => {
     try {
-      const deploymentId = parseInt(req.params.id);
+      const deploymentId = req.params.id;
       const { status } = req.body;
+      const userId = req.user._id.toString();
       
       const deployment = await storage.getDeployment(deploymentId);
-      if (!deployment || deployment.userId !== req.user.claims.sub) {
+      if (!deployment || deployment.userId.toString() !== userId) {
         return res.status(404).json({ message: "Deployment not found" });
       }
 
@@ -117,7 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Wallet
   app.get('/api/wallet/transactions', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user._id.toString();
       const transactions = await storage.getUserTransactions(userId);
       res.json(transactions);
     } catch (error) {
@@ -128,7 +113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/wallet/claim-daily', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user._id.toString();
       
       // Award daily reward (simplified - in production, check if already claimed today)
       await storage.updateUserBalance(userId, 10);
@@ -137,7 +122,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: "daily_reward",
         amount: 10,
         description: "Daily login bonus",
-        relatedId: null,
       });
 
       res.json({ message: "Daily reward claimed", amount: 10 });
@@ -150,7 +134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Referrals
   app.get('/api/referrals', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user._id.toString();
       const referrals = await storage.getUserReferrals(userId);
       res.json(referrals);
     } catch (error) {
@@ -161,7 +145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/referrals/stats', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user._id.toString();
       const user = await storage.getUser(userId);
       const stats = await storage.getReferralStats(userId);
       
@@ -182,7 +166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUserByReferralCode(code);
       
       if (user) {
-        res.json({ valid: true, referrerId: user.id });
+        res.json({ valid: true, referrerId: user._id.toString() });
       } else {
         res.json({ valid: false });
       }
@@ -190,154 +174,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error validating referral code:", error);
       res.status(500).json({ message: "Failed to validate referral code" });
     }
-  });
-
-  // Email verification routes
-  app.get('/api/auth/verify-email', async (req, res) => {
-    try {
-      const { token } = req.query;
-      
-      if (!token || typeof token !== 'string') {
-        return res.status(400).json({ message: "Invalid verification token" });
-      }
-      
-      const user = await storage.verifyEmail(token);
-      
-      if (!user) {
-        return res.status(400).json({ message: "Invalid or expired verification token" });
-      }
-      
-      // Send welcome email
-      await sendWelcomeEmail(user.email!, user.firstName || undefined);
-      
-      res.json({ message: "Email verified successfully", verified: true });
-    } catch (error) {
-      console.error("Email verification error:", error);
-      res.status(500).json({ message: "Failed to verify email" });
-    }
-  });
-  
-  app.post('/api/auth/resend-verification', async (req, res) => {
-    try {
-      const { email } = req.body;
-      
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
-      }
-      
-      const user = await storage.getUserByEmail(email);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      if (user.emailVerified) {
-        return res.status(400).json({ message: "Email is already verified" });
-      }
-      
-      // Generate new verification token
-      const verificationToken = randomBytes(32).toString('hex');
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-      
-      await storage.setEmailVerificationToken(user.id, verificationToken, expiresAt);
-      
-      // Send verification email
-      const baseUrl = `https://${req.hostname}`;
-      const emailSent = await sendVerificationEmail(user.email!, verificationToken, baseUrl);
-      
-      if (!emailSent) {
-        return res.status(500).json({ message: "Failed to send verification email" });
-      }
-      
-      res.json({ message: "Verification email sent successfully" });
-    } catch (error) {
-      console.error("Resend verification error:", error);
-      res.status(500).json({ message: "Failed to resend verification email" });
-    }
-  });
-
-  // Local authentication routes
-  app.post('/api/auth/local/signup', async (req, res) => {
-    try {
-      const { email, password, firstName, lastName, referralCode } = req.body;
-      
-      // Check if user already exists
-      const existingUser = await storage.getUserByEmail(email);
-      if (existingUser) {
-        return res.status(400).json({ message: "User already exists with this email" });
-      }
-      
-      // Validate referral code if provided
-      let referrerId: string | undefined;
-      if (referralCode) {
-        const referrer = await storage.getUserByReferralCode(referralCode);
-        if (referrer) {
-          referrerId = referrer.id;
-        }
-      }
-      
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, 12);
-      
-      // Create user (not verified yet)
-      const user = await storage.createLocalUser({
-        email,
-        password: hashedPassword,
-        firstName,
-        lastName,
-        referredById: referrerId,
-      });
-      
-      // Generate verification token
-      const verificationToken = randomBytes(32).toString('hex');
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-      
-      await storage.setEmailVerificationToken(user.id, verificationToken, expiresAt);
-      
-      // Send verification email
-      const baseUrl = `https://${req.hostname}`;
-      const emailSent = await sendVerificationEmail(email, verificationToken, baseUrl);
-      
-      if (!emailSent) {
-        console.error('Failed to send verification email to:', email);
-        // Don't fail the signup, but log the error
-      }
-      
-      res.json({ 
-        message: "Account created successfully. Please check your email to verify your account.",
-        requiresVerification: true
-      });
-    } catch (error) {
-      console.error("Signup error:", error);
-      res.status(500).json({ message: "Failed to create account" });
-    }
-  });
-  
-  app.post('/api/auth/local/login', (req, res, next) => {
-    passport.authenticate('local', (err: any, user: any, info: any) => {
-      if (err) {
-        return res.status(500).json({ message: "Authentication error" });
-      }
-      if (!user) {
-        return res.status(401).json({ message: info?.message || "Invalid credentials" });
-      }
-      
-      // Check if email is verified for local auth users
-      if (user.authProvider === 'local' && !user.emailVerified) {
-        return res.status(403).json({ 
-          message: "Please verify your email before logging in",
-          requiresVerification: true,
-          email: user.email
-        });
-      }
-      
-      req.login(user, (err) => {
-        if (err) {
-          return res.status(500).json({ message: "Login failed" });
-        }
-        res.json({ message: "Login successful" });
-      });
-    })(req, res, next);
   });
 
   const httpServer = createServer(app);
