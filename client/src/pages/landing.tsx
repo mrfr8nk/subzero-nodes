@@ -4,8 +4,8 @@ import { SiWhatsapp } from "react-icons/si";
 import { Rocket, Coins, Users, ChartLine, Smartphone, Shield, Clock } from "lucide-react";
 
 export default function Landing() {
-  const handleLogin = () => {
-    window.location.href = "/login";
+  const handleGoogleLogin = () => {
+    window.location.href = "/api/auth/google";
   };
 
   const features = [
@@ -73,10 +73,10 @@ export default function Landing() {
             </div>
             
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" onClick={handleLogin}>
-                Sign In
+              <Button variant="ghost" onClick={handleGoogleLogin}>
+                Sign In with Google
               </Button>
-              <Button onClick={handleLogin} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={handleGoogleLogin} className="bg-blue-600 hover:bg-blue-700">
                 Get Started
               </Button>
             </div>
@@ -101,14 +101,14 @@ export default function Landing() {
               </p>
               <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
                 <Button 
-                  onClick={handleLogin}
+                  onClick={handleGoogleLogin}
                   className="bg-white text-blue-600 hover:bg-blue-50 px-8 py-4 rounded-xl font-semibold text-lg h-auto"
                 >
                   Start Deploying
                 </Button>
                 <Button 
                   variant="outline"
-                  onClick={handleLogin}
+                  onClick={handleGoogleLogin}
                   className="border-2 border-white text-white hover:bg-white hover:text-blue-600 px-8 py-4 rounded-xl font-semibold text-lg h-auto"
                 >
                   View Demo

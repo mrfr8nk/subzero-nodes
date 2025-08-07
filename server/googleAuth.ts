@@ -37,11 +37,17 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Google OAuth Strategy
+  // Dynamic callback URL based on environment
+  const callbackURL = process.env.REPLIT_DEV_DOMAIN 
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}/api/auth/google/callback`
+    : 'http://localhost:5000/api/auth/google/callback';
+
+  console.log('Google OAuth callback URL:', callbackURL);
+
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID!,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    callbackURL: "/api/auth/google/callback"
+    callbackURL: callbackURL
   }, async (accessToken, refreshToken, profile, done) => {
     try {
       // Extract user information from Google profile

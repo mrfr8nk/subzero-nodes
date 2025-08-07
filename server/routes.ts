@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import passport from "passport";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./googleAuth";
 import { insertDeploymentSchema, insertTransactionSchema } from "@shared/schema";
@@ -7,6 +8,38 @@ import { insertDeploymentSchema, insertTransactionSchema } from "@shared/schema"
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+
+  // Google OAuth routes
+  app.get('/api/auth/google', passport.authenticate('google', { 
+    scope: ['profile', 'email'] 
+  }));
+
+  app.get('/api/auth/google/callback', 
+    passport.authenticate('google', { failureRedirect: '/login?error=auth_failed' }),
+    (req, res) => {
+      // Successful authentication, redirect to dashboard
+      res.redirect('/dashboard');
+    }
+  );
+
+  // Auth status route
+  app.get('/api/auth/user', (req, res) => {
+    if (req.isAuthenticated()) {
+      res.json(req.user);
+    } else {
+      res.status(401).json({ message: 'Not authenticated' });
+    }
+  });
+
+  // Logout route
+  app.post('/api/auth/logout', (req, res) => {
+    req.logout((err) => {
+      if (err) {
+        return res.status(500).json({ message: 'Logout failed' });
+      }
+      res.json({ message: 'Logged out successfully' });
+    });
+  });
 
   // Dashboard stats
   app.get('/api/dashboard/stats', isAuthenticated, async (req: any, res) => {
