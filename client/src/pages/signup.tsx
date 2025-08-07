@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 import { SiWhatsapp, SiGoogle } from "react-icons/si";
 import { Mail, Eye, EyeOff, UserPlus, ArrowLeft } from "lucide-react";
@@ -75,8 +76,10 @@ export default function Signup() {
           title: "Account Created",
           description: "Please check your email to verify your account before signing in.",
         });
-        // Redirect to login page with email for verification
-        setLocation(`/login?email=${encodeURIComponent(data.email)}&verified=false`);
+        // Redirect to email verification pending page
+        setTimeout(() => {
+          setLocation(`/email-verification-pending?email=${encodeURIComponent(data.email)}`);
+        }, 1000);
       } else {
         const error = await response.json();
         toast({
@@ -102,32 +105,36 @@ export default function Signup() {
       <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200/50 dark:border-slate-700/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center space-x-3 group">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                <SiWhatsapp className="w-6 h-6 text-white" />
+            <Link href="/" className="flex items-center space-x-2 sm:space-x-3 group">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                <SiWhatsapp className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-xl font-bold text-gray-900 dark:text-white tracking-wide">SUBZERO-MD</span>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
+                <span className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white tracking-wide">SUBZERO-MD</span>
                 <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Bot Platform</span>
               </div>
             </Link>
             
-            <Link href="/" className="flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Home
-            </Link>
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              <ThemeToggle />
+              <Link href="/" className="flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors text-sm sm:text-base">
+                <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Back to Home</span>
+                <span className="sm:hidden">Back</span>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] p-4">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-lg">
           {/* Signup Card */}
           <Card className="shadow-2xl border-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
-            <CardHeader className="text-center pb-6">
-              <CardTitle className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Join SUBZERO-MD</CardTitle>
-              <p className="text-gray-600 dark:text-gray-300">Start deploying WhatsApp bots in minutes</p>
+            <CardHeader className="text-center pb-4 sm:pb-6 px-4 sm:px-6">
+              <CardTitle className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Join SUBZERO-MD</CardTitle>
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">Start deploying WhatsApp bots in minutes</p>
               {referralCode && (
                 <div className="mt-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
                   <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
@@ -136,7 +143,7 @@ export default function Signup() {
                 </div>
               )}
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6 pb-6">
               {/* Google Sign Up Button */}
               <Button
                 onClick={handleGoogleLogin}

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { SiWhatsapp, SiGoogle } from "react-icons/si";
 import { Rocket, Coins, Users, ChartLine, Smartphone, Shield, Clock, CheckCircle, Star, ArrowRight, Play, Zap, Globe, Award } from "lucide-react";
 import { useLocation } from "wouter";
@@ -84,32 +85,35 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
-                <SiWhatsapp className="w-6 h-6 text-white" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
+                <SiWhatsapp className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-xl font-bold text-gray-900 dark:text-white tracking-wide">SUBZERO-MD</span>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
+                <span className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white tracking-wide">SUBZERO-MD</span>
                 <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Bot Platform</span>
               </div>
             </div>
             
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              <ThemeToggle />
               <Button 
                 variant="ghost" 
                 onClick={handleGoogleLogin}
-                className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white text-sm sm:text-base px-2 sm:px-4"
                 data-testid="button-signin-nav"
               >
-                <SiGoogle className="w-4 h-4 mr-2" />
-                Sign In
+                <SiGoogle className="w-4 h-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Sign In</span>
+                <span className="sm:hidden">In</span>
               </Button>
               <Button 
                 onClick={handleGetStarted}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg"
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg text-sm sm:text-base px-3 sm:px-4"
                 data-testid="button-getstarted-nav"
               >
-                Get Started
-                <ArrowRight className="w-4 h-4 ml-2" />
+                <span className="hidden sm:inline">Get Started</span>
+                <span className="sm:hidden">Start</span>
+                <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2" />
               </Button>
             </div>
           </div>
@@ -119,31 +123,32 @@ export default function Landing() {
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white">
         <div className="absolute inset-0 bg-black opacity-10"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 lg:py-32">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             <div>
-              <h1 className="text-4xl lg:text-6xl font-bold mb-6 leading-tight">
+              <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold mb-6 leading-tight">
                 Deploy Your
                 <span className="text-blue-200 block">WhatsApp Bot</span>
                 in Minutes
               </h1>
-              <p className="text-xl text-blue-100 mb-8 leading-relaxed">
+              <p className="text-lg sm:text-xl text-blue-100 mb-8 leading-relaxed">
                 Launch powerful SUBZERO-MD WhatsApp bots with our intuitive platform. 
                 Manage deployments, track usage, and earn through our referral system.
               </p>
               <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
                 <Button 
                   onClick={handleGetStarted}
-                  className="bg-white text-blue-600 hover:bg-blue-50 px-8 py-4 rounded-xl font-semibold text-lg h-auto"
+                  className="bg-white text-blue-600 hover:bg-blue-50 px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-semibold text-base sm:text-lg h-auto"
                 >
                   Start Deploying
                 </Button>
                 <Button 
                   variant="outline"
                   onClick={handleGoogleLogin}
-                  className="border-2 border-white text-white hover:bg-white hover:text-blue-600 px-8 py-4 rounded-xl font-semibold text-lg h-auto"
+                  className="border-2 border-white text-white hover:bg-white hover:text-blue-600 px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-semibold text-base sm:text-lg h-auto"
                 >
-                  Sign In with Google
+                  <SiGoogle className="w-4 h-4 mr-2" />
+                  Sign In
                 </Button>
               </div>
             </div>
@@ -178,26 +183,26 @@ export default function Landing() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {features.map((feature, index) => {
               const IconComponent = feature.icon;
               return (
                 <Card key={index} className={`group hover:shadow-2xl transition-all duration-300 border-0 bg-gradient-to-br ${feature.gradient} relative overflow-hidden`}>
                   {feature.highlight && (
-                    <div className="absolute top-4 right-4">
+                    <div className="absolute top-3 sm:top-4 right-3 sm:right-4">
                       <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 border-0 text-xs">
                         {feature.highlight}
                       </Badge>
                     </div>
                   )}
-                  <CardContent className="p-8 relative z-10">
-                    <div className={`w-14 h-14 ${feature.bgColor} rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform`}>
-                      <IconComponent className="w-7 h-7 text-white" />
+                  <CardContent className="p-6 sm:p-8 relative z-10">
+                    <div className={`w-12 h-12 sm:w-14 sm:h-14 ${feature.bgColor} rounded-2xl flex items-center justify-center mb-4 sm:mb-6 shadow-lg group-hover:scale-110 transition-transform`}>
+                      <IconComponent className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
                     </div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                       {feature.title}
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 leading-relaxed">
                       {feature.description}
                     </p>
                   </CardContent>

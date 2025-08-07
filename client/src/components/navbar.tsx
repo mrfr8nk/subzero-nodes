@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { SiWhatsapp } from "react-icons/si";
 import { Menu, X } from "lucide-react";
 
@@ -31,7 +32,7 @@ export default function Navbar() {
   ];
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+    <nav className="bg-white dark:bg-slate-900 shadow-sm border-b border-gray-200 dark:border-slate-700 sticky top-0 z-50 backdrop-blur-md bg-opacity-95 dark:bg-opacity-95">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-4">
@@ -39,7 +40,7 @@ export default function Navbar() {
               <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
                 <SiWhatsapp className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xl font-bold text-gray-900">SUBZERO-MD</span>
+              <span className="text-xl font-bold text-gray-900 dark:text-white">SUBZERO-MD</span>
             </Link>
           </div>
           
@@ -51,8 +52,8 @@ export default function Navbar() {
                 href={item.path}
                 className={`font-medium transition-colors ${
                   isActive(item.path)
-                    ? "text-blue-600 font-semibold"
-                    : "text-gray-600 hover:text-blue-600"
+                    ? "text-blue-600 dark:text-blue-400 font-semibold"
+                    : "text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
                 }`}
               >
                 {item.label}
@@ -61,13 +62,14 @@ export default function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center space-x-4">
+            <ThemeToggle />
             {user && (
               <div className="flex items-center space-x-3">
                 <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
                     {user.firstName || user.email}
                   </p>
-                  <p className="text-xs text-gray-600">{user.coinBalance || 0} coins</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">{user.coinBalance || 0} coins</p>
                 </div>
                 {user.profileImageUrl && (
                   <img 
@@ -78,28 +80,31 @@ export default function Navbar() {
                 )}
               </div>
             )}
-            <Button onClick={handleLogout} variant="outline">
+            <Button onClick={handleLogout} variant="outline" className="dark:border-gray-600 dark:hover:bg-gray-800">
               Sign Out
             </Button>
           </div>
 
           {/* Mobile menu button */}
-          <button 
-            className="md:hidden p-2"
-            onClick={toggleMobileMenu}
-          >
-            {isMobileMenuOpen ? (
-              <X className="w-6 h-6 text-gray-600" />
-            ) : (
-              <Menu className="w-6 h-6 text-gray-600" />
-            )}
-          </button>
+          <div className="md:hidden flex items-center space-x-2">
+            <ThemeToggle />
+            <button 
+              className="p-2"
+              onClick={toggleMobileMenu}
+            >
+              {isMobileMenuOpen ? (
+                <X className="w-6 h-6 text-gray-600 dark:text-gray-300" />
+              ) : (
+                <Menu className="w-6 h-6 text-gray-600 dark:text-gray-300" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Mobile Navigation */}
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-white border-t border-gray-200">
+        <div className="md:hidden bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700">
           <div className="px-4 py-2 space-y-2">
             {navItems.map((item) => (
               <Link 
@@ -108,25 +113,25 @@ export default function Navbar() {
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={`block py-2 transition-colors ${
                   isActive(item.path)
-                    ? "text-blue-600 font-semibold"
-                    : "text-gray-600 hover:text-blue-600"
+                    ? "text-blue-600 dark:text-blue-400 font-semibold"
+                    : "text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
                 }`}
               >
                 {item.label}
               </Link>
             ))}
-            <hr className="my-2" />
+            <hr className="my-2 border-gray-200 dark:border-slate-700" />
             {user && (
               <div className="py-2">
-                <p className="text-sm font-medium text-gray-900">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
                   {user.firstName || user.email}
                 </p>
-                <p className="text-xs text-gray-600">{user.coinBalance || 0} coins</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">{user.coinBalance || 0} coins</p>
               </div>
             )}
             <button 
               onClick={handleLogout}
-              className="block py-2 text-gray-600 hover:text-blue-600 w-full text-left"
+              className="block py-2 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 w-full text-left"
             >
               Sign Out
             </button>

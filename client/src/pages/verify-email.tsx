@@ -193,24 +193,24 @@ export default function VerifyEmail() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 dark:from-slate-950 dark:to-blue-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6 sm:mb-8">
           <div className="inline-flex items-center space-x-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center">
-              <SiWhatsapp className="w-7 h-7 text-white" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center">
+              <SiWhatsapp className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">SUBZERO-MD</h1>
-              <p className="text-sm text-gray-600">WhatsApp Bot Platform</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">SUBZERO-MD</h1>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">WhatsApp Bot Platform</p>
             </div>
           </div>
         </div>
 
         {/* Verification Card */}
-        <Card className="shadow-xl border-0">
-          <CardHeader className="text-center">
+        <Card className="shadow-xl border-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
+          <CardHeader className="text-center p-6 sm:p-8">
             {renderContent()}
           </CardHeader>
         </Card>
