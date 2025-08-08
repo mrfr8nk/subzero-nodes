@@ -46,7 +46,7 @@ export default function DeploymentDetails() {
   }, [match, deploymentId, setLocation]);
 
   const { data: deployment, isLoading: deploymentLoading, refetch: refetchDeployment } = useQuery<any>({
-    queryKey: ["/api/deployments", deploymentId],
+    queryKey: [`/api/deployments/${deploymentId}`],
     enabled: !!deploymentId,
     retry: false,
   });
