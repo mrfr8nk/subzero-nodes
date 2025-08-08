@@ -186,7 +186,7 @@ export default function Dashboard() {
                   <div className="text-gray-500">Loading activity...</div>
                 ) : activity && activity.length > 0 ? (
                   activity.map((transaction: any) => (
-                    <div key={transaction.id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl">
+                    <div key={transaction._id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl">
                       <div className={`w-10 h-10 ${getActivityColor(transaction.type)} rounded-full flex items-center justify-center`}>
                         {getActivityIcon(transaction.type)}
                       </div>
@@ -264,7 +264,7 @@ export default function Dashboard() {
                   <div className="text-gray-500">Loading...</div>
                 ) : recentDeployments && recentDeployments.length > 0 ? (
                   recentDeployments.slice(0, 3).map((deployment: any) => (
-                    <div key={deployment.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div key={deployment._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div>
                         <p className="font-medium text-gray-900">{deployment.name}</p>
                         <p className="text-sm text-gray-600 capitalize">{deployment.status}</p>
