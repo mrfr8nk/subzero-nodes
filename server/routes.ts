@@ -740,7 +740,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user has enough coins
       const userBalance = user.coinBalance || 0;
       if (userBalance < cost) {
-        return res.status(400).json({ message: "Insufficient coins" });
+        return res.status(400).json({ 
+          message: `Insufficient coins. You need ${cost} coins to deploy this bot. You currently have ${userBalance} coins.` 
+        });
       }
 
       // Get GitHub settings configured by admin
