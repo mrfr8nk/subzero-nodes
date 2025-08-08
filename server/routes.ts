@@ -184,6 +184,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(maintenanceMiddleware);
 
+  // IP ban middleware - check if IP is banned
+  const ipBanMiddleware = async (req: any, res: any, next: any) => {
+    const url = req.originalUrl || req.url;
+    
+    // Skip IP ban check for admin routes (admins can access from any IP)
+    if (url.startsWith('/api/admin') || 
+        url.startsWith('/favicon.ico') ||
+        url.includes('vite') ||
+        url.includes('@')) {
+      return next();
+    }
+
+    // Check if user is admin - admins can bypass IP bans
+    const isAdmin = req.user && (req.user.isAdmin || req.user.role === 'admin' || req.user.role === 'super_admin');
+    if (isAdmin) {
+      return next();
+    }
+
+    try {
+      const userIp = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
+      if (userIp) {
+        const isBanned = await storage.isIpBanned(userIp);
+        if (isBanned) {
+          // For API requests, return JSON response
+          if (url.startsWith('/api/')) {
+            return res.status(403).json({ 
+              error: 'Access Forbidden', 
+              message: 'Your IP address has been banned. Please contact support if you believe this is an error.' 
+            });
+          }
+          // For regular requests, this will be handled by the frontend router
+          return res.status(403).send('Access Forbidden: IP address banned');
+        }
+      }
+    } catch (error) {
+      console.error('Error checking IP ban:', error);
+    }
+    
+    next();
+  };
+
+  app.use(ipBanMiddleware);
+
   // Google OAuth routes
   app.get('/api/auth/google', (req, res, next) => {
     // Store referral code in session if provided
@@ -1144,6 +1187,80 @@ jobs:
     } catch (error) {
       console.error('Error fetching users by IP:', error);
       res.status(500).json({ message: 'Failed to fetch users by IP' });
+    }
+  });
+
+  // Delete user (super admin only)
+  app.delete('/api/admin/users/:userId', requireSuperAdmin, async (req, res) => {
+    const { userId } = req.params;
+    const adminId = (req.user as any)?._id?.toString();
+
+    try {
+      await storage.deleteUser(userId, adminId);
+      res.json({ message: 'User deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      res.status(500).json({ message: 'Failed to delete user' });
+    }
+  });
+
+  // Ban user IP (admin only)
+  app.post('/api/admin/ip/ban', requireAdmin, async (req, res) => {
+    const { ip, reason } = req.body;
+    const adminId = (req.user as any)?._id?.toString();
+
+    if (!ip) {
+      return res.status(400).json({ message: 'IP address is required' });
+    }
+
+    try {
+      await storage.banUserIp(ip, adminId, reason);
+      res.json({ message: 'IP address banned successfully' });
+    } catch (error) {
+      console.error('Error banning IP:', error);
+      res.status(500).json({ message: 'Failed to ban IP address' });
+    }
+  });
+
+  // Unban user IP (admin only)
+  app.post('/api/admin/ip/unban', requireAdmin, async (req, res) => {
+    const { ip } = req.body;
+    const adminId = (req.user as any)?._id?.toString();
+
+    if (!ip) {
+      return res.status(400).json({ message: 'IP address is required' });
+    }
+
+    try {
+      await storage.unbanUserIp(ip, adminId);
+      res.json({ message: 'IP address unbanned successfully' });
+    } catch (error) {
+      console.error('Error unbanning IP:', error);
+      res.status(500).json({ message: 'Failed to unban IP address' });
+    }
+  });
+
+  // Get banned IPs
+  app.get('/api/admin/ip/banned', requireAdmin, async (req, res) => {
+    try {
+      const bannedIps = await storage.getBannedIps();
+      res.json(bannedIps);
+    } catch (error) {
+      console.error('Error fetching banned IPs:', error);
+      res.status(500).json({ message: 'Failed to fetch banned IPs' });
+    }
+  });
+
+  // Check if IP is banned
+  app.get('/api/admin/ip/check/:ip', requireAdmin, async (req, res) => {
+    const { ip } = req.params;
+    
+    try {
+      const isBanned = await storage.isIpBanned(ip);
+      res.json({ ip, banned: isBanned });
+    } catch (error) {
+      console.error('Error checking IP ban status:', error);
+      res.status(500).json({ message: 'Failed to check IP ban status' });
     }
   });
 

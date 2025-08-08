@@ -135,6 +135,12 @@ export default function AdminDashboard() {
     staleTime: 60000,
   });
 
+  // Fetch banned IPs
+  const { data: bannedIps = [] } = useQuery<string[]>({
+    queryKey: ['/api/admin/ip/banned'],
+    staleTime: 30000,
+  });
+
   // Fetch all deployments for logs dropdown
   const { data: allDeployments = [] } = useQuery<any[]>({
     queryKey: ['/api/admin/deployments'],
@@ -165,6 +171,8 @@ export default function AdminDashboard() {
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [realtimeUpdates, setRealtimeUpdates] = useState<any[]>([]);
   const [monitoredBranches, setMonitoredBranches] = useState<Set<string>>(new Set());
+  const [ipBanForm, setIpBanForm] = useState({ ip: '', reason: '' });
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   
   // WebSocket connection for real-time updates
   const { isConnected: wsConnected, sendMessage, lastMessage, connectionError } = useWebSocket();
@@ -315,6 +323,55 @@ export default function AdminDashboard() {
     }
   });
 
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest('DELETE', `/api/admin/users/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+      toast({ title: "User deleted successfully" });
+      setUserToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to delete user", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Ban IP mutation
+  const banIpMutation = useMutation({
+    mutationFn: async ({ ip, reason }: { ip: string; reason: string }) => {
+      return await apiRequest('POST', '/api/admin/ip/ban', { ip, reason });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/ip/banned'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/notifications'] });
+      toast({ title: "IP address banned successfully" });
+      setIpBanForm({ ip: '', reason: '' });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to ban IP address", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Unban IP mutation
+  const unbanIpMutation = useMutation({
+    mutationFn: async (ip: string) => {
+      return await apiRequest('POST', '/api/admin/ip/unban', { ip });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/ip/banned'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/notifications'] });
+      toast({ title: "IP address unbanned successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to unban IP address", description: error.message, variant: "destructive" });
+    }
+  });
+
   // Update app setting mutation
   const updateSettingMutation = useMutation({
     mutationFn: async ({ key, value, description }: { key: string; value: any; description?: string }) => {
@@ -424,6 +481,22 @@ export default function AdminDashboard() {
 
   const handlePromoteUser = (userId: string) => {
     promoteUserMutation.mutate(userId);
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    deleteUserMutation.mutate(userId);
+  };
+
+  const handleBanIp = () => {
+    if (!ipBanForm.ip.trim()) {
+      toast({ title: "Please enter an IP address", variant: "destructive" });
+      return;
+    }
+    banIpMutation.mutate(ipBanForm);
+  };
+
+  const handleUnbanIp = (ip: string) => {
+    unbanIpMutation.mutate(ip);
   };
 
   const checkBranchAvailability = async (branchName: string) => {
@@ -605,6 +678,12 @@ export default function AdminDashboard() {
                     Deployments
                   </div>
                 </SelectItem>
+                <SelectItem value="ip-management">
+                  <div className="flex items-center">
+                    <Ban className="w-4 h-4 mr-2" />
+                    IP Management
+                  </div>
+                </SelectItem>
                 <SelectItem value="settings">
                   <div className="flex items-center">
                     <Settings className="w-4 h-4 mr-2" />
@@ -754,6 +833,52 @@ export default function AdminDashboard() {
                                       </Button>
                                     </div>
                                   )}
+
+                                  <div className="space-y-4 pt-4 border-t">
+                                    <div className="space-y-2">
+                                      <Label>IP Actions</Label>
+                                      <div className="flex space-x-2">
+                                        <Button 
+                                          onClick={() => {
+                                            if (user.registrationIp) {
+                                              setIpBanForm(prev => ({ ...prev, ip: user.registrationIp! }));
+                                            }
+                                          }}
+                                          variant="outline"
+                                          size="sm"
+                                          disabled={!user.registrationIp}
+                                        >
+                                          <Ban className="w-4 h-4 mr-1" />
+                                          Ban IP
+                                        </Button>
+                                        {user.registrationIp && bannedIps.includes(user.registrationIp) && (
+                                          <Button 
+                                            onClick={() => handleUnbanIp(user.registrationIp!)}
+                                            variant="outline"
+                                            size="sm"
+                                          >
+                                            <UserCheck className="w-4 h-4 mr-1" />
+                                            Unban IP
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {!user.isAdmin && (
+                                      <div className="space-y-2">
+                                        <Label className="text-red-600">Danger Zone</Label>
+                                        <Button 
+                                          onClick={() => setUserToDelete(user)}
+                                          variant="destructive"
+                                          size="sm"
+                                          data-testid="button-delete-user"
+                                        >
+                                          <AlertTriangle className="w-4 h-4 mr-1" />
+                                          Delete User
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </DialogContent>
                             </Dialog>
@@ -998,6 +1123,79 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
+          </div>
+        )}
+
+        {selectedSection === "ip-management" && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>IP Address Management</CardTitle>
+                <CardDescription>Ban or unban IP addresses to control access</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Ban IP Address</Label>
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Enter IP address (e.g., 192.168.1.1)"
+                      value={ipBanForm.ip}
+                      onChange={(e) => setIpBanForm(prev => ({ ...prev, ip: e.target.value }))}
+                    />
+                    <Input
+                      placeholder="Reason for ban"
+                      value={ipBanForm.reason}
+                      onChange={(e) => setIpBanForm(prev => ({ ...prev, reason: e.target.value }))}
+                    />
+                    <Button 
+                      onClick={handleBanIp}
+                      disabled={!ipBanForm.ip.trim() || banIpMutation.isPending}
+                    >
+                      <Ban className="w-4 h-4 mr-1" />
+                      Ban IP
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Banned IP Addresses ({bannedIps.length})</Label>
+                  {bannedIps.length === 0 ? (
+                    <div className="text-sm text-muted-foreground p-4 border rounded">
+                      No IP addresses are currently banned.
+                    </div>
+                  ) : (
+                    <div className="border rounded">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>IP Address</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {bannedIps.map((ip) => (
+                            <TableRow key={ip}>
+                              <TableCell className="font-mono">{ip}</TableCell>
+                              <TableCell>
+                                <Button 
+                                  onClick={() => handleUnbanIp(ip)}
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={unbanIpMutation.isPending}
+                                >
+                                  <UserCheck className="w-4 h-4 mr-1" />
+                                  Unban
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -1532,6 +1730,61 @@ export default function AdminDashboard() {
           </div>
         )}
       </div>
+
+      {/* Delete User Confirmation Dialog */}
+      <Dialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Delete User Account</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete this user account? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {userToDelete && (
+            <div className="space-y-4">
+              <div className="p-4 bg-red-50 border border-red-200 rounded">
+                <div className="text-sm">
+                  <strong>User:</strong> {userToDelete.firstName} {userToDelete.lastName}<br/>
+                  <strong>Email:</strong> {userToDelete.email}<br/>
+                  <strong>Coins:</strong> {userToDelete.coinBalance}<br/>
+                  <strong>Registration IP:</strong> {userToDelete.registrationIp}
+                </div>
+              </div>
+              
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  This will permanently delete:
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>User account and profile</li>
+                    <li>All user deployments</li>
+                    <li>All transaction history</li>
+                    <li>All referral records</li>
+                  </ul>
+                </AlertDescription>
+              </Alert>
+              
+              <div className="flex space-x-2 justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setUserToDelete(null)}
+                  disabled={deleteUserMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={() => handleDeleteUser(userToDelete._id)}
+                  disabled={deleteUserMutation.isPending}
+                >
+                  {deleteUserMutation.isPending ? "Deleting..." : "Delete User"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

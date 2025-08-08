@@ -90,6 +90,13 @@ export interface IStorage {
   // Maintenance mode operations
   isMaintenanceModeEnabled(): Promise<boolean>;
   setMaintenanceMode(enabled: boolean, adminId: string, message?: string): Promise<void>;
+  
+  // User deletion and IP management
+  deleteUser(userId: string, adminId: string): Promise<void>;
+  banUserIp(ip: string, adminId: string, reason?: string): Promise<void>;
+  unbanUserIp(ip: string, adminId: string): Promise<void>;
+  getBannedIps(): Promise<string[]>;
+  isIpBanned(ip: string): Promise<boolean>;
 }
 
 export class MongoStorage implements IStorage {
@@ -783,6 +790,138 @@ export class MongoStorage implements IStorage {
       data: { enabled, message, adminId },
       read: false
     });
+  }
+
+  // User deletion and IP management operations
+  async deleteUser(userId: string, adminId: string): Promise<void> {
+    // First, get user info for logging
+    const user = await this.getUser(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Delete user's deployments
+    await this.deploymentsCollection.deleteMany({ userId: new ObjectId(userId) });
+    
+    // Delete user's transactions
+    await this.transactionsCollection.deleteMany({ userId: new ObjectId(userId) });
+    
+    // Delete user's referrals (both as referrer and referred)
+    await this.referralsCollection.deleteMany({ 
+      $or: [
+        { referrerId: new ObjectId(userId) },
+        { referredId: new ObjectId(userId) }
+      ]
+    });
+    
+    // Delete the user
+    await this.usersCollection.deleteOne({ _id: new ObjectId(userId) });
+    
+    // Create admin notification
+    await this.createAdminNotification({
+      type: 'user_deleted',
+      title: 'User Deleted',
+      message: `User ${user.email} has been permanently deleted by admin`,
+      data: { 
+        deletedUserId: userId, 
+        deletedBy: adminId, 
+        userEmail: user.email,
+        deletedAt: new Date().toISOString()
+      },
+      read: false
+    });
+  }
+
+  async banUserIp(ip: string, adminId: string, reason?: string): Promise<void> {
+    // Add IP to banned list
+    await this.setAppSetting({
+      key: `banned_ip_${ip.replace(/\./g, '_')}`,
+      value: {
+        ip,
+        bannedBy: adminId,
+        bannedAt: new Date().toISOString(),
+        reason: reason || 'No reason provided'
+      },
+      description: `Banned IP: ${ip}`,
+      updatedBy: adminId
+    });
+
+    // Get all users with this IP
+    const usersWithIp = await this.getUsersByIp(ip);
+    
+    // Ban all users with this IP
+    for (const user of usersWithIp) {
+      await this.updateUserStatus(user._id.toString(), 'banned', ['ip_banned']);
+    }
+
+    // Create admin notification
+    await this.createAdminNotification({
+      type: 'ip_banned',
+      title: 'IP Address Banned',
+      message: `IP ${ip} has been banned. ${usersWithIp.length} users affected.`,
+      data: { 
+        ip, 
+        bannedBy: adminId, 
+        affectedUsers: usersWithIp.length,
+        reason: reason || 'No reason provided'
+      },
+      read: false
+    });
+  }
+
+  async unbanUserIp(ip: string, adminId: string): Promise<void> {
+    // Remove IP from banned list
+    await this.appSettingsCollection.deleteOne({ 
+      key: `banned_ip_${ip.replace(/\./g, '_')}`
+    });
+
+    // Get all users with this IP that were banned due to IP ban
+    const usersWithIp = await this.getUsersByIp(ip);
+    const bannedUsers = usersWithIp.filter(user => 
+      user.status === 'banned' && 
+      user.restrictions?.includes('ip_banned')
+    );
+    
+    // Unban users that were only banned due to IP ban
+    for (const user of bannedUsers) {
+      const remainingRestrictions = user.restrictions?.filter(r => r !== 'ip_banned') || [];
+      if (remainingRestrictions.length === 0) {
+        await this.updateUserStatus(user._id.toString(), 'active', []);
+      } else {
+        await this.updateUserStatus(user._id.toString(), user.status || 'active', remainingRestrictions);
+      }
+    }
+
+    // Create admin notification
+    await this.createAdminNotification({
+      type: 'ip_unbanned',
+      title: 'IP Address Unbanned',
+      message: `IP ${ip} has been unbanned. ${bannedUsers.length} users restored.`,
+      data: { 
+        ip, 
+        unbannedBy: adminId, 
+        restoredUsers: bannedUsers.length
+      },
+      read: false
+    });
+  }
+
+  async getBannedIps(): Promise<string[]> {
+    const bannedIpSettings = await this.appSettingsCollection
+      .find({ key: { $regex: /^banned_ip_/ } })
+      .toArray();
+    
+    return bannedIpSettings.map(setting => {
+      if (typeof setting.value === 'object' && setting.value.ip) {
+        return setting.value.ip;
+      }
+      return setting.key.replace('banned_ip_', '').replace(/_/g, '.');
+    });
+  }
+
+  async isIpBanned(ip: string): Promise<boolean> {
+    const setting = await this.getAppSetting(`banned_ip_${ip.replace(/\./g, '_')}`);
+    return !!setting;
   }
 }
 
