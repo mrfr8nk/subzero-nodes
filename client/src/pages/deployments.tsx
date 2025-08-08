@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Plus, CheckCircle, PauseCircle, Calendar, Eye, Square, Play } from "lucide-react";
+import { MessageSquare, Plus, CheckCircle, PauseCircle, Calendar, Eye, Square, Play, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import DeployModal from "@/components/deploy-modal";
@@ -72,6 +72,38 @@ export default function Deployments() {
     },
   });
 
+  const deleteDeploymentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/deployments/${id}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Deployment deleted successfully!",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/deployments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to delete deployment",
+        variant: "destructive",
+      });
+    },
+  });
+
   if (!isAuthenticated || isLoading) {
     return null;
   }
@@ -114,14 +146,26 @@ export default function Deployments() {
         <p className="text-gray-600">Deploy and manage your SUBZERO-MD WhatsApp bots.</p>
       </div>
 
-      {/* Deploy New Bot Button */}
+      {/* Deploy New Bot Button - Made more accessible */}
       <div className="mb-8">
         <Button 
           onClick={() => setShowDeployModal(true)}
-          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-lg px-6 py-3 h-auto"
+          size="lg"
         >
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="w-5 h-5 mr-2" />
           Deploy New Bot
+        </Button>
+      </div>
+
+      {/* Floating Deploy Button for Mobile */}
+      <div className="fixed bottom-6 right-6 z-50 md:hidden">
+        <Button 
+          onClick={() => setShowDeployModal(true)}
+          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg rounded-full w-14 h-14 p-0"
+          size="sm"
+        >
+          <Plus className="w-6 h-6" />
         </Button>
       </div>
 
@@ -259,6 +303,15 @@ export default function Deployments() {
                           Start
                         </>
                       )}
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteDeploymentMutation.mutate(deployment._id)}
+                      disabled={deleteDeploymentMutation.isPending}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>

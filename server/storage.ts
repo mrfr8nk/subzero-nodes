@@ -32,6 +32,7 @@ export interface IStorage {
   
   // Deployment operations
   createDeployment(deployment: InsertDeployment): Promise<Deployment>;
+  deleteDeployment(id: string): Promise<void>;
   getUserDeployments(userId: string): Promise<Deployment[]>;
   getAllDeployments(): Promise<Deployment[]>;
   getDeployment(id: string): Promise<Deployment | undefined>;
@@ -379,6 +380,10 @@ export class MongoStorage implements IStorage {
       { _id: new ObjectId(id) },
       { $set: { status, updatedAt: new Date() } }
     );
+  }
+
+  async deleteDeployment(id: string): Promise<void> {
+    await this.deploymentsCollection.deleteOne({ _id: new ObjectId(id) });
   }
 
   async getDeploymentStats(userId: string): Promise<{

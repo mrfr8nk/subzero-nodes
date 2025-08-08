@@ -779,8 +779,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sha: mainSha
         });
 
-        // Get creds.js content and update it
-        const credsFile = await makeGitHubRequest('GET', `contents/creds.js?ref=${sanitizedBranchName}`);
+        // Get creds.js content from main branch first, then update it in new branch
+        const credsFile = await makeGitHubRequest('GET', `contents/creds.js?ref=${MAIN_BRANCH}`);
         const originalContent = Buffer.from(credsFile.content, 'base64').toString('utf8');
         
         const updatedContent = originalContent
@@ -796,7 +796,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Trigger GitHub Actions workflow
-        await makeGitHubRequest('POST', 'actions/workflows/SUBZERO.yml/dispatches', {
+        await makeGitHubRequest('POST', `actions/workflows/${WORKFLOW_FILE}/dispatches`, {
           ref: sanitizedBranchName
         });
 
@@ -1264,6 +1264,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error checking branch:', error);
       res.status(500).json({ message: 'Failed to check branch' });
+    }
+  });
+
+  // Delete deployment
+  app.delete('/api/deployments/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const deploymentId = req.params.id;
+      
+      // Get deployment to verify ownership
+      const deployment = await storage.getDeployment(deploymentId);
+      if (!deployment) {
+        return res.status(404).json({ message: "Deployment not found" });
+      }
+      
+      // Check if user owns this deployment or is admin
+      const user = await storage.getUser(userId);
+      if (deployment.userId.toString() !== userId && !user?.isAdmin) {
+        return res.status(403).json({ message: "Not authorized to delete this deployment" });
+      }
+      
+      await storage.deleteDeployment(deploymentId);
+      res.json({ message: "Deployment deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting deployment:", error);
+      res.status(500).json({ message: "Failed to delete deployment" });
     }
   });
 
