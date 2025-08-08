@@ -352,7 +352,7 @@ export default function Login() {
               <div className="flex items-center justify-center space-x-4 sm:space-x-6 text-sm text-gray-500 dark:text-gray-400">
                 <div className="flex items-center">
                   <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                  <span>100 free coins</span>
+                  <span>10 free coins</span>
                 </div>
                 <div className="flex items-center">
                   <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
@@ -362,7 +362,7 @@ export default function Login() {
               
               <div className="text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                 By signing in, you agree to our{" "}
-                <a href="#" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
+                <a href="/terms" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
                   Terms of Service
                 </a>{" "}
                 and{" "}
@@ -375,7 +375,7 @@ export default function Login() {
             <div className="text-center pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-                  New to SUBZERO-MD?
+                  New to SUBZERO-NODES?
                 </p>
                 <Link href="/signup">
                   <Button variant="outline" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/30" data-testid="link-create-account">
