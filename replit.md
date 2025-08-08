@@ -89,10 +89,23 @@ The application requires several environment variables for proper operation. Ref
 - `SESSION_SECRET`: Secure session secret key
 
 ### Google OAuth Domain Configuration
-For production deployment, add the base domain URL to Google Cloud Console:
-- **Authorized domain**: `https://subzero-deploy.onrender.com`
-- **NOT the auth route**: The OAuth callback route is automatically handled by the application
-- The callback URL pattern is: `{DOMAIN}/api/auth/google/callback`
+The application automatically detects the correct callback URL based on the hosting platform:
+
+**Supported Platforms:**
+- **Replit**: Automatically uses `REPLIT_DEV_DOMAIN`
+- **Render.com**: Automatically uses `RENDER_EXTERNAL_URL` or detects `.onrender.com` domains
+- **Koyeb**: Automatically uses `KOYEB_PUBLIC_DOMAIN`
+- **Vercel**: Automatically uses `VERCEL_URL`
+- **Heroku**: Automatically uses `HEROKU_APP_NAME`
+
+**Manual Configuration (Optional):**
+- Set `CALLBACK_URL` environment variable to override automatic detection
+- Example: `CALLBACK_URL=https://your-domain.com/api/auth/google/callback`
+
+**Google Cloud Console Setup:**
+Add your domain's callback URL to Google Cloud Console OAuth settings:
+- Pattern: `https://your-domain.com/api/auth/google/callback`
+- The application will log the detected URL on startup for verification
 
 ### Recent Changes (January 2025)
 - **Enhanced Admin Controls**: Super admins can now demote and delete other existing admins

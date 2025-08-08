@@ -29,6 +29,56 @@ export function getSession() {
   });
 }
 
+// Function to dynamically detect the callback URL
+function getDynamicCallbackURL(): string {
+  // Check various environment variables that indicate the hosting platform
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    return `https://${process.env.REPLIT_DEV_DOMAIN}/api/auth/google/callback`;
+  }
+  
+  if (process.env.KOYEB_PUBLIC_DOMAIN) {
+    return `https://${process.env.KOYEB_PUBLIC_DOMAIN}/api/auth/google/callback`;
+  }
+  
+  // For Render.com - they set RENDER_EXTERNAL_URL
+  if (process.env.RENDER_EXTERNAL_URL) {
+    return `${process.env.RENDER_EXTERNAL_URL}/api/auth/google/callback`;
+  }
+  
+  // Check for Render's internal hostname patterns
+  if (process.env.RENDER_INTERNAL_HOSTNAME && process.env.NODE_ENV === 'production') {
+    // Render typically uses .onrender.com domains
+    const hostname = process.env.RENDER_INTERNAL_HOSTNAME;
+    if (hostname.includes('onrender.com')) {
+      return `https://${hostname}/api/auth/google/callback`;
+    }
+  }
+  
+  // Check for other common hosting environment variables
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}/api/auth/google/callback`;
+  }
+  
+  if (process.env.HEROKU_APP_NAME) {
+    return `https://${process.env.HEROKU_APP_NAME}.herokuapp.com/api/auth/google/callback`;
+  }
+  
+  // If we have a custom CALLBACK_URL set, use it
+  if (process.env.CALLBACK_URL) {
+    return process.env.CALLBACK_URL;
+  }
+  
+  // For production without specific platform detection, try to guess from PORT
+  if (process.env.NODE_ENV === 'production' && process.env.PORT) {
+    // This is a fallback - you should ideally set CALLBACK_URL for production
+    console.warn('Production environment detected but no platform-specific URL found. Please set CALLBACK_URL environment variable.');
+    return `https://subzero-deploy.onrender.com/api/auth/google/callback`;
+  }
+  
+  // Development fallback
+  return 'http://localhost:5000/api/auth/google/callback';
+}
+
 export async function setupAuth(app: Express) {
   // Ensure MongoDB connection
   await connectToMongoDB();
@@ -38,21 +88,8 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Dynamic callback URL based on environment
-  let callbackURL = 'http://localhost:5000/api/auth/google/callback';
-  
-  if (process.env.REPLIT_DEV_DOMAIN) {
-    callbackURL = `https://${process.env.REPLIT_DEV_DOMAIN}/api/auth/google/callback`;
-  } else if (process.env.KOYEB_PUBLIC_DOMAIN) {
-    callbackURL = `https://${process.env.KOYEB_PUBLIC_DOMAIN}/api/auth/google/callback`;
-  } else if (process.env.RENDER_EXTERNAL_URL) {
-    // For Render.com deployments
-    callbackURL = `${process.env.RENDER_EXTERNAL_URL}/api/auth/google/callback`;
-  } else if (process.env.NODE_ENV === 'production') {
-    // For production deployments, use environment variable or fallback
-    callbackURL = process.env.CALLBACK_URL || `https://subzero-deploy.onrender.com/api/auth/google/callback`;
-  }
-
+  // Get dynamic callback URL
+  const callbackURL = getDynamicCallbackURL();
   console.log('Google OAuth callback URL:', callbackURL);
 
   passport.use(new GoogleStrategy({
