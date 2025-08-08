@@ -41,7 +41,7 @@ export default function Deployments() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
       await apiRequest("PATCH", `/api/deployments/${id}/status`, { status });
     },
     onSuccess: () => {
@@ -102,7 +102,7 @@ export default function Deployments() {
     }
   };
 
-  const handleStatusChange = (deploymentId: number, currentStatus: string) => {
+  const handleStatusChange = (deploymentId: string, currentStatus: string) => {
     const newStatus = currentStatus === "active" ? "stopped" : "active";
     updateStatusMutation.mutate({ id: deploymentId, status: newStatus });
   };
@@ -216,7 +216,7 @@ export default function Deployments() {
               <div className="text-gray-500">Loading deployments...</div>
             ) : deployments && deployments.length > 0 ? (
               deployments.map((deployment: any) => (
-                <div key={deployment.id} className="flex flex-col lg:flex-row lg:items-center justify-between p-4 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+                <div key={deployment._id} className="flex flex-col lg:flex-row lg:items-center justify-between p-4 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
                   <div className="flex items-center space-x-4 mb-4 lg:mb-0">
                     <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
                       <MessageSquare className="w-6 h-6 text-blue-600" />
@@ -245,7 +245,7 @@ export default function Deployments() {
                     <Button 
                       variant={deployment.status === "active" ? "destructive" : "default"}
                       size="sm"
-                      onClick={() => handleStatusChange(deployment.id, deployment.status)}
+                      onClick={() => handleStatusChange(deployment._id, deployment.status)}
                       disabled={updateStatusMutation.isPending}
                     >
                       {deployment.status === "active" ? (
