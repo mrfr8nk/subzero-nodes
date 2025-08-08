@@ -8,7 +8,119 @@ import { adminLogin, requireAdmin, requireSuperAdmin } from "./adminAuth";
 import { insertDeploymentSchema, insertTransactionSchema, insertAppSettingsSchema } from "@shared/schema";
 import { sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail } from "./emailService";
 import bcrypt from "bcryptjs";
+import { WebSocketServer, WebSocket } from 'ws';
 import crypto from "crypto";
+
+// WebSocket connections for real-time updates
+const wsConnections = new Map<string, WebSocket>();
+const monitoringDeployments = new Map<string, NodeJS.Timeout>();
+
+// Function to broadcast to WebSocket clients
+function broadcastToClients(type: string, data: any) {
+  const message = JSON.stringify({ type, data, timestamp: new Date().toISOString() });
+  wsConnections.forEach((ws, clientId) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(message);
+    } else {
+      wsConnections.delete(clientId);
+    }
+  });
+}
+
+// Function to monitor workflow status for a specific branch
+async function monitorWorkflowStatus(branchName: string) {
+  try {
+    const [githubToken, repoOwner, repoName, workflowFile] = await Promise.all([
+      storage.getAppSetting('github_token'),
+      storage.getAppSetting('github_repo_owner'),
+      storage.getAppSetting('github_repo_name'),
+      storage.getAppSetting('github_workflow_file')
+    ]);
+
+    if (!githubToken?.value || !repoOwner?.value || !repoName?.value) return;
+
+    const GITHUB_TOKEN = githubToken.value;
+    const REPO_OWNER = repoOwner.value;
+    const REPO_NAME = repoName.value;
+    const WORKFLOW_FILE = workflowFile?.value || 'SUBZERO.yml';
+
+    // Get latest workflow run for this branch
+    const runsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/runs?branch=${branchName}&per_page=1`;
+    const response = await fetch(runsUrl, {
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const runs = data.workflow_runs || [];
+      
+      if (runs.length > 0) {
+        const latestRun = runs[0];
+        broadcastToClients('workflow_status_update', {
+          branch: branchName,
+          run: {
+            id: latestRun.id,
+            status: latestRun.status,
+            conclusion: latestRun.conclusion,
+            created_at: latestRun.created_at,
+            updated_at: latestRun.updated_at,
+            html_url: latestRun.html_url
+          }
+        });
+
+        // If workflow is complete, stop monitoring
+        if (latestRun.status === 'completed') {
+          const timeoutId = monitoringDeployments.get(branchName);
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            monitoringDeployments.delete(branchName);
+          }
+          
+          broadcastToClients('workflow_completed', {
+            branch: branchName,
+            conclusion: latestRun.conclusion,
+            completed_at: latestRun.updated_at
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`Error monitoring workflow for ${branchName}:`, error);
+  }
+}
+
+// Function to start monitoring a deployment
+function startWorkflowMonitoring(branchName: string) {
+  // Clear existing monitoring if any
+  const existingTimeout = monitoringDeployments.get(branchName);
+  if (existingTimeout) {
+    clearTimeout(existingTimeout);
+  }
+
+  // Monitor every 30 seconds for up to 30 minutes
+  let attempts = 0;
+  const maxAttempts = 60; // 30 minutes
+  
+  const monitor = () => {
+    if (attempts >= maxAttempts) {
+      monitoringDeployments.delete(branchName);
+      broadcastToClients('monitoring_timeout', { branch: branchName });
+      return;
+    }
+    
+    monitorWorkflowStatus(branchName);
+    attempts++;
+    
+    const timeoutId = setTimeout(monitor, 30000); // 30 seconds
+    monitoringDeployments.set(branchName, timeoutId);
+  };
+
+  // Start monitoring immediately
+  monitor();
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // CORS configuration for production domains
@@ -1090,6 +1202,20 @@ jobs:
         ref: branchName
       });
       
+      // Broadcast deployment creation to WebSocket clients
+      broadcastToClients('deployment_created', {
+        branch: branchName,
+        sessionId,
+        ownerNumber,
+        prefix,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Start monitoring this deployment after a short delay to allow GitHub to process
+      setTimeout(() => {
+        startWorkflowMonitoring(branchName);
+      }, 10000); // 10 second delay
+      
       res.json({ 
         success: true, 
         message: 'Deployment successful!',
@@ -1314,5 +1440,51 @@ jobs:
   });
 
   const httpServer = createServer(app);
+  
+  // Setup WebSocket server
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  wss.on('connection', (ws: WebSocket, req) => {
+    const clientId = Math.random().toString(36).substring(2, 15);
+    wsConnections.set(clientId, ws);
+    
+    console.log(`WebSocket client connected: ${clientId}`);
+    
+    // Send connection confirmation
+    ws.send(JSON.stringify({ 
+      type: 'connected', 
+      data: { clientId },
+      timestamp: new Date().toISOString()
+    }));
+    
+    ws.on('message', (message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        
+        // Handle client requests
+        if (data.type === 'monitor_deployment' && data.branch) {
+          startWorkflowMonitoring(data.branch);
+          ws.send(JSON.stringify({
+            type: 'monitoring_started',
+            data: { branch: data.branch },
+            timestamp: new Date().toISOString()
+          }));
+        }
+      } catch (error) {
+        console.error('WebSocket message error:', error);
+      }
+    });
+    
+    ws.on('close', () => {
+      wsConnections.delete(clientId);
+      console.log(`WebSocket client disconnected: ${clientId}`);
+    });
+    
+    ws.on('error', (error) => {
+      console.error('WebSocket error:', error);
+      wsConnections.delete(clientId);
+    });
+  });
+  
   return httpServer;
 }

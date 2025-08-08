@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface AdminStats {
   totalUsers: number;
@@ -155,6 +156,11 @@ export default function AdminDashboard() {
   const [workflowRuns, setWorkflowRuns] = useState<any[]>([]);
   const [selectedRunLogs, setSelectedRunLogs] = useState<any>(null);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [realtimeUpdates, setRealtimeUpdates] = useState<any[]>([]);
+  const [monitoredBranches, setMonitoredBranches] = useState<Set<string>>(new Set());
+  
+  // WebSocket connection for real-time updates
+  const { isConnected: wsConnected, sendMessage, lastMessage, connectionError } = useWebSocket();
 
   // Fetch GitHub settings
   const { data: githubData, refetch: refetchGithub } = useQuery({
@@ -174,6 +180,87 @@ export default function AdminDashboard() {
       });
     }
   });
+
+  // Handle WebSocket messages for real-time updates
+  useState(() => {
+    if (lastMessage) {
+      const { type, data } = lastMessage;
+      
+      switch (type) {
+        case 'connected':
+          console.log('WebSocket connected for real-time logs');
+          break;
+          
+        case 'deployment_created':
+          toast({ 
+            title: "Deployment Created", 
+            description: `Branch: ${data.branch} - Starting workflow...` 
+          });
+          setRealtimeUpdates(prev => [{
+            id: Date.now(),
+            type: 'deployment_created',
+            branch: data.branch,
+            timestamp: data.timestamp,
+            message: `Deployment created for branch: ${data.branch}`
+          }, ...prev]);
+          break;
+          
+        case 'workflow_status_update':
+          const update = {
+            id: Date.now(),
+            type: 'status_update',
+            branch: data.branch,
+            status: data.run.status,
+            conclusion: data.run.conclusion,
+            timestamp: data.run.updated_at,
+            message: `Workflow ${data.run.status}${data.run.conclusion ? ` (${data.run.conclusion})` : ''}`
+          };
+          
+          setRealtimeUpdates(prev => {
+            // Remove previous updates for this branch and add new one
+            const filtered = prev.filter(item => 
+              !(item.branch === data.branch && item.type === 'status_update')
+            );
+            return [update, ...filtered];
+          });
+          break;
+          
+        case 'workflow_completed':
+          toast({ 
+            title: data.conclusion === 'success' ? "Deployment Successful" : "Deployment Failed", 
+            description: `Branch: ${data.branch} - ${data.conclusion}`,
+            variant: data.conclusion === 'success' ? 'default' : 'destructive'
+          });
+          
+          setRealtimeUpdates(prev => [{
+            id: Date.now(),
+            type: 'completed',
+            branch: data.branch,
+            conclusion: data.conclusion,
+            timestamp: data.completed_at,
+            message: `Deployment ${data.conclusion === 'success' ? 'completed successfully' : 'failed'}`
+          }, ...prev]);
+          
+          // Remove from monitored branches
+          setMonitoredBranches(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(data.branch);
+            return newSet;
+          });
+          break;
+          
+        case 'monitoring_timeout':
+          setRealtimeUpdates(prev => [{
+            id: Date.now(),
+            type: 'timeout',
+            branch: data.branch,
+            timestamp: new Date().toISOString(),
+            message: `Monitoring timeout for branch: ${data.branch}`
+          }, ...prev]);
+          break;
+      }
+    }
+  }, [lastMessage, toast]);
 
   // Update user status mutation
   const updateUserStatusMutation = useMutation({
@@ -351,6 +438,17 @@ export default function AdminDashboard() {
       return;
     }
     createDeploymentMutation.mutate(deploymentForm);
+  };
+
+  const startRealtimeMonitoring = (branchName: string) => {
+    if (wsConnected && branchName.trim() && !monitoredBranches.has(branchName)) {
+      sendMessage({
+        type: 'monitor_deployment',
+        branch: branchName
+      });
+      setMonitoredBranches(prev => new Set([...prev, branchName]));
+      toast({ title: "Real-time monitoring started", description: `Monitoring ${branchName}` });
+    }
   };
 
   const fetchWorkflowRuns = async (branchName: string) => {
@@ -1086,6 +1184,19 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {/* WebSocket Status */}
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                    <span className="text-sm font-medium">
+                      Real-time Updates: {wsConnected ? 'Connected' : 'Disconnected'}
+                    </span>
+                  </div>
+                  {connectionError && (
+                    <span className="text-sm text-destructive">{connectionError}</span>
+                  )}
+                </div>
+
                 <div className="flex space-x-2">
                   <Input
                     placeholder="Enter app name (branch name) to view logs"
@@ -1101,7 +1212,52 @@ export default function AdminDashboard() {
                     {isLoadingLogs ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
                     View Logs
                   </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => startRealtimeMonitoring(selectedBranchForLogs)}
+                    disabled={!wsConnected || !selectedBranchForLogs.trim() || monitoredBranches.has(selectedBranchForLogs)}
+                    data-testid="button-monitor-realtime"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                    {monitoredBranches.has(selectedBranchForLogs) ? 'Monitoring...' : 'Monitor Live'}
+                  </Button>
                 </div>
+
+                {/* Real-time Updates Feed */}
+                {realtimeUpdates.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium flex items-center">
+                      <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse" />
+                      Real-time Updates
+                    </h4>
+                    <div className="max-h-64 overflow-y-auto space-y-2 border rounded-lg p-3">
+                      {realtimeUpdates.slice(0, 10).map((update) => (
+                        <div key={update.id} className="flex items-start space-x-2 text-sm">
+                          <Badge 
+                            variant={
+                              update.type === 'completed' 
+                                ? (update.conclusion === 'success' ? 'default' : 'destructive')
+                                : update.type === 'deployment_created' 
+                                ? 'secondary' 
+                                : 'outline'
+                            }
+                          >
+                            {update.type === 'deployment_created' ? '🚀' : 
+                             update.type === 'completed' ? (update.conclusion === 'success' ? '✅' : '❌') :
+                             update.type === 'status_update' ? '⏳' : '⚠️'}
+                          </Badge>
+                          <div className="flex-1">
+                            <p className="font-medium">{update.branch}</p>
+                            <p className="text-muted-foreground">{update.message}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(update.timestamp).toLocaleTimeString()}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {workflowRuns.length > 0 && (
                   <div className="space-y-4">
@@ -1180,6 +1336,18 @@ export default function AdminDashboard() {
                   <Alert>
                     <AlertDescription>
                       No workflow runs found for "{selectedBranchForLogs}". Make sure the app name is correct and has been deployed.
+                      {wsConnected && (
+                        <div className="mt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => startRealtimeMonitoring(selectedBranchForLogs)}
+                            disabled={monitoredBranches.has(selectedBranchForLogs)}
+                          >
+                            Start Real-time Monitoring
+                          </Button>
+                        </div>
+                      )}
                     </AlertDescription>
                   </Alert>
                 )}
