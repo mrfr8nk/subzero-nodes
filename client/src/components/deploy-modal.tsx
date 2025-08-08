@@ -245,6 +245,18 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
               className="mt-2"
               disabled={githubDeployMutation.isPending}
             />
+            <p className="text-sm text-gray-600 mt-1">
+              Don't have session ID? Visit{' '}
+              <a 
+                href="https://subzero-auth.koyeb.app" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-700 underline"
+              >
+                subzero-auth.koyeb.app
+              </a>{' '}
+              to get one
+            </p>
           </div>
 
           <div>
