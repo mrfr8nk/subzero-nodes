@@ -780,7 +780,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       sanitizedBranchName = `${sanitizedBranchName}-${timestamp}`;
 
       // Deduct coins first
-      await storage.updateUserCoins(userId, -cost, `GitHub deployment: ${sanitizedBranchName}`, userId);
+      await storage.updateUserBalance(userId, -cost);
 
       // GitHub API helper
       const makeGitHubRequest = async (method: string, endpoint: string, data: any = null) => {
@@ -837,26 +837,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sha: mainSha
         });
 
-        // Get creds.js content from main branch
-        const credsFile = await makeGitHubRequest('GET', `contents/creds.js?ref=${MAIN_BRANCH}`);
-        const originalContent = Buffer.from(credsFile.content, 'base64').toString('utf8');
+        // 2. Update settings.js (exact same as admin deployment)
+        const fileData = await makeGitHubRequest('GET', `contents/settings.js?ref=${sanitizedBranchName}`);
+        const newContent = `module.exports = {
+  SESSION_ID: "${sessionId}",
+  OWNER_NUMBER: "${ownerNumber}", 
+  PREFIX: "${prefix}"
+};`;
         
-        const updatedContent = originalContent
-          .replace(/global\.sessionId = ".*?";/, `global.sessionId = "${sessionId}";`)
-          .replace(/global\.owner = ".*?";/, `global.owner = "${ownerNumber}";`)
-          .replace(/global\.prefix = ".*?";/, `global.prefix = "${prefix}";`);
-
-        // Get the file info from the new branch to get the correct SHA
-        const newBranchFile = await makeGitHubRequest('GET', `contents/creds.js?ref=${sanitizedBranchName}`);
-        
-        await makeGitHubRequest('PUT', `contents/creds.js`, {
-          message: `Update credentials for ${sanitizedBranchName} deployment`,
-          content: Buffer.from(updatedContent).toString('base64'),
-          sha: newBranchFile.sha,
+        await makeGitHubRequest('PUT', 'contents/settings.js', {
+          message: `Update settings.js for ${sanitizedBranchName}`,
+          content: Buffer.from(newContent).toString('base64'),
+          sha: fileData.sha,
           branch: sanitizedBranchName
         });
+        
+        // 3. Update workflow file (exact same as admin deployment)
+        const workflowContent = `name: SUBZERO-MD-X-MR-FRANK
 
-        // Trigger GitHub Actions workflow
+on:
+  workflow_dispatch:
+
+jobs:
+  loop-task:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Bot (loop & auto-restart if crash)
+        run: |
+          echo "Running SUBZERO-MD in auto-restart mode..."
+          timeout 18000 bash -c 'while true; do npm start || echo "Bot crashed, restarting..."; sleep 2; done'
+
+      - name: Re-Trigger Workflow
+        if: always()
+        run: |
+          echo "Re-running workflow..."
+          curl -X POST \\
+            -H "Authorization: Bearer \\$\{{ secrets.SUBZERO }}" \\
+            -H "Accept: application/vnd.github.v3+json" \\
+            https://api.github.com/repos/\\$\{{ github.repository }}/actions/workflows/${WORKFLOW_FILE}/dispatches \\
+            -d '{"ref":"${sanitizedBranchName}"}'`;
+
+        try {
+          const existingFile = await makeGitHubRequest('GET', `contents/.github/workflows/${WORKFLOW_FILE}?ref=${sanitizedBranchName}`);
+          
+          // Update existing file
+          await makeGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
+            message: `Update workflow to use ${sanitizedBranchName} branch`,
+            content: Buffer.from(workflowContent).toString('base64'),
+            sha: existingFile.sha,
+            branch: sanitizedBranchName
+          });
+        } catch (error) {
+          // Create new file if it doesn't exist
+          await makeGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
+            message: `Create workflow for ${sanitizedBranchName} branch`,
+            content: Buffer.from(workflowContent).toString('base64'),
+            branch: sanitizedBranchName
+          });
+        }
+        
+        // 4. Trigger workflow (exact same as admin deployment)
         await makeGitHubRequest('POST', `actions/workflows/${WORKFLOW_FILE}/dispatches`, {
           ref: sanitizedBranchName
         });
@@ -881,7 +933,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       } catch (githubError) {
         // Refund coins if GitHub deployment fails
-        await storage.updateUserCoins(userId, cost, `Refund for failed GitHub deployment: ${sanitizedBranchName}`, userId);
+        await storage.updateUserBalance(userId, cost);
         throw githubError;
       }
 
