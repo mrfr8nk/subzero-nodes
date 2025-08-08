@@ -5,15 +5,17 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Plus, CheckCircle, PauseCircle, Calendar, Eye, Square, Play, Trash2 } from "lucide-react";
+import { MessageSquare, Plus, CheckCircle, PauseCircle, Calendar, Eye, Square, Play, Trash2, FileText } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import DeployModal from "@/components/deploy-modal";
+import DeploymentLogsModal from "@/components/deployment-logs-modal";
 
 export default function Deployments() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [showDeployModal, setShowDeployModal] = useState(false);
+  const [selectedDeploymentForLogs, setSelectedDeploymentForLogs] = useState<any>(null);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -282,9 +284,14 @@ export default function Deployments() {
                     </div>
                   </div>
                   <div className="flex space-x-2">
-                    <Button variant="outline" size="sm">
-                      <Eye className="w-4 h-4 mr-1" />
-                      View
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setSelectedDeploymentForLogs(deployment)}
+                      data-testid={`button-view-logs-${deployment._id}`}
+                    >
+                      <FileText className="w-4 h-4 mr-1" />
+                      Logs
                     </Button>
                     <Button 
                       variant={deployment.status === "active" ? "destructive" : "default"}
@@ -329,6 +336,16 @@ export default function Deployments() {
         isOpen={showDeployModal}
         onClose={() => setShowDeployModal(false)}
       />
+
+      {selectedDeploymentForLogs && (
+        <DeploymentLogsModal
+          isOpen={!!selectedDeploymentForLogs}
+          onClose={() => setSelectedDeploymentForLogs(null)}
+          deploymentId={selectedDeploymentForLogs._id}
+          deploymentName={selectedDeploymentForLogs.name}
+          isAdmin={false}
+        />
+      )}
     </div>
   );
 }

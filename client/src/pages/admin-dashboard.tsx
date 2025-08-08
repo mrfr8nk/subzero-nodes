@@ -30,11 +30,13 @@ import {
   Github,
   Rocket,
   Eye,
-  RefreshCw
+  RefreshCw,
+  FileText
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import DeploymentLogsModal from "@/components/deployment-logs-modal";
 
 interface AdminStats {
   totalUsers: number;
@@ -169,6 +171,7 @@ export default function AdminDashboard() {
   const [workflowRuns, setWorkflowRuns] = useState<any[]>([]);
   const [selectedRunLogs, setSelectedRunLogs] = useState<any>(null);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [selectedDeploymentForLogs, setSelectedDeploymentForLogs] = useState<any>(null);
   const [realtimeUpdates, setRealtimeUpdates] = useState<any[]>([]);
   const [monitoredBranches, setMonitoredBranches] = useState<Set<string>>(new Set());
   const [ipBanForm, setIpBanForm] = useState({ ip: '', reason: '' });
@@ -1632,6 +1635,74 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
+
+          {/* All Deployments Table */}
+          <Card data-testid="card-all-deployments">
+            <CardHeader>
+              <CardTitle>All Deployments</CardTitle>
+              <CardDescription>Manage and view logs for all user deployments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {allDeployments.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No deployments found
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Deployment Name</TableHead>
+                        <TableHead>User</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead>Cost</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {allDeployments.map((deployment: any) => (
+                        <TableRow key={deployment._id}>
+                          <TableCell className="font-medium">
+                            {deployment.name}
+                          </TableCell>
+                          <TableCell>
+                            {deployment.userEmail || 'Unknown User'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={deployment.status === 'active' ? 'default' : 'secondary'}
+                            >
+                              {deployment.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(deployment.createdAt).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            {deployment.cost} coins
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedDeploymentForLogs(deployment)}
+                                data-testid={`button-admin-view-logs-${deployment._id}`}
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                Logs
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
           </div>
         )}
 
@@ -1785,6 +1856,16 @@ export default function AdminDashboard() {
           )}
         </DialogContent>
       </Dialog>
+
+      {selectedDeploymentForLogs && (
+        <DeploymentLogsModal
+          isOpen={!!selectedDeploymentForLogs}
+          onClose={() => setSelectedDeploymentForLogs(null)}
+          deploymentId={selectedDeploymentForLogs._id}
+          deploymentName={selectedDeploymentForLogs.name}
+          isAdmin={true}
+        />
+      )}
     </div>
   );
 }

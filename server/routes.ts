@@ -959,6 +959,7 @@ jobs:
         const deploymentData = insertDeploymentSchema.parse({
           userId,
           name: sanitizedBranchName,
+          branchName: sanitizedBranchName,
           status: "deploying",
           configuration: `GitHub: ${sanitizedBranchName}`,
           cost
@@ -1398,6 +1399,144 @@ jobs:
     } catch (error) {
       console.error('Error updating GitHub settings:', error);
       res.status(500).json({ message: 'Failed to update GitHub settings' });
+    }
+  });
+
+  // User deployment logs endpoints - only access own deployments
+  app.get('/api/deployments/:deploymentId/logs', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const { deploymentId } = req.params;
+      
+      // Get deployment and verify ownership
+      const deployment = await storage.getDeployment(deploymentId);
+      if (!deployment) {
+        return res.status(404).json({ message: 'Deployment not found' });
+      }
+      
+      if (deployment.userId.toString() !== userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      if (!deployment.branchName) {
+        return res.status(400).json({ message: 'No branch name associated with this deployment' });
+      }
+      
+      const [githubToken, repoOwner, repoName, workflowFile] = await Promise.all([
+        storage.getAppSetting('github_token'),
+        storage.getAppSetting('github_repo_owner'),
+        storage.getAppSetting('github_repo_name'),
+        storage.getAppSetting('github_workflow_file')
+      ]);
+
+      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
+        return res.status(400).json({ message: 'GitHub settings not configured' });
+      }
+
+      const GITHUB_TOKEN = githubToken.value;
+      const REPO_OWNER = repoOwner.value;
+      const REPO_NAME = repoName.value;
+      const WORKFLOW_FILE = workflowFile?.value || 'SUBZERO.yml';
+
+      // Get workflow runs for the specific branch
+      const runsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/runs?branch=${deployment.branchName}&per_page=10`;
+      const runsResponse = await fetch(runsUrl, {
+        headers: {
+          'Authorization': `token ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+
+      if (!runsResponse.ok) {
+        throw new Error(`GitHub API error: ${runsResponse.statusText}`);
+      }
+
+      const runsData = await runsResponse.json();
+      res.json({
+        deployment,
+        workflowRuns: runsData.workflow_runs || []
+      });
+    } catch (error) {
+      console.error('Error fetching deployment logs:', error);
+      res.status(500).json({ message: 'Failed to fetch deployment logs' });
+    }
+  });
+
+  // User endpoint to get specific workflow run logs  
+  app.get('/api/deployments/:deploymentId/runs/:runId/logs', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const { deploymentId, runId } = req.params;
+      
+      // Get deployment and verify ownership
+      const deployment = await storage.getDeployment(deploymentId);
+      if (!deployment) {
+        return res.status(404).json({ message: 'Deployment not found' });
+      }
+      
+      if (deployment.userId.toString() !== userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      const [githubToken, repoOwner, repoName] = await Promise.all([
+        storage.getAppSetting('github_token'),
+        storage.getAppSetting('github_repo_owner'),
+        storage.getAppSetting('github_repo_name')
+      ]);
+
+      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
+        return res.status(400).json({ message: 'GitHub settings not configured' });
+      }
+
+      const GITHUB_TOKEN = githubToken.value;
+      const REPO_OWNER = repoOwner.value;
+      const REPO_NAME = repoName.value;
+
+      // Get jobs for the workflow run
+      const jobsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs/${runId}/jobs`;
+      const jobsResponse = await fetch(jobsUrl, {
+        headers: {
+          'Authorization': `token ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+
+      if (!jobsResponse.ok) {
+        throw new Error(`GitHub API error: ${jobsResponse.statusText}`);
+      }
+
+      const jobsData = await jobsResponse.json();
+      
+      // Get logs for each job
+      const logsPromises = jobsData.jobs.map(async (job: any) => {
+        try {
+          const logsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/jobs/${job.id}/logs`;
+          const logsResponse = await fetch(logsUrl, {
+            headers: {
+              'Authorization': `token ${GITHUB_TOKEN}`,
+              'Accept': 'application/vnd.github.v3+json'
+            }
+          });
+          
+          if (logsResponse.ok) {
+            const logs = await logsResponse.text();
+            return { jobId: job.id, jobName: job.name, logs };
+          }
+          return { jobId: job.id, jobName: job.name, logs: 'No logs available' };
+        } catch (error) {
+          return { jobId: job.id, jobName: job.name, logs: 'Error fetching logs' };
+        }
+      });
+
+      const allLogs = await Promise.all(logsPromises);
+      res.json({ 
+        deployment,
+        jobs: jobsData.jobs, 
+        logs: allLogs 
+      });
+    } catch (error) {
+      console.error('Error fetching specific workflow logs:', error);
+      res.status(500).json({ message: 'Failed to fetch workflow logs' });
     }
   });
 

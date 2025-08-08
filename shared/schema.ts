@@ -39,6 +39,7 @@ export interface Deployment {
   status: string;
   configuration: string;
   cost: number;
+  branchName?: string; // GitHub branch name for logs
   createdAt: Date;
   updatedAt: Date;
 }
@@ -120,6 +121,7 @@ export const insertUserSchema = z.object({
 export const insertDeploymentSchema = z.object({
   userId: z.string(),
   name: z.string(),
+  branchName: z.string().optional(),
   status: z.string().default("active"),
   configuration: z.string().default("standard"),
   cost: z.number().default(25),
