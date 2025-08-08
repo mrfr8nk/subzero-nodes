@@ -367,6 +367,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // User account deletion route
+  app.delete('/api/user/account', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Prevent admins from deleting their own accounts through this endpoint
+      if (user.isAdmin) {
+        return res.status(403).json({ 
+          message: 'Admin accounts cannot be self-deleted. Please contact another admin for account removal.' 
+        });
+      }
+
+      // Delete the user and all associated data
+      await storage.deleteUser(userId, userId); // User deletes themselves
+
+      // Clear the session
+      req.logout((err: any) => {
+        if (err) {
+          console.error('Error clearing session after account deletion:', err);
+        }
+      });
+
+      res.json({ 
+        success: true, 
+        message: 'Your account has been permanently deleted along with all associated data.' 
+      });
+    } catch (error) {
+      console.error('Error deleting user account:', error);
+      res.status(500).json({ 
+        message: 'Failed to delete account. Please try again.' 
+      });
+    }
+  });
+
   // Local email signup route
   app.post('/api/auth/local/signup', async (req, res) => {
     try {

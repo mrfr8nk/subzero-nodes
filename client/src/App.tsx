@@ -22,6 +22,7 @@ import Deployments from "@/pages/deployments";
 import DeploymentDetails from "@/pages/deployment-details";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
+import AccountSettings from "@/pages/account-settings";
 import Maintenance from "@/pages/maintenance";
 import Navbar from "@/components/navbar";
 
@@ -69,6 +70,7 @@ function Router() {
         <Route path="/referrals" component={Referrals} />
         <Route path="/deployments" component={Deployments} />
         <Route path="/deployments/:id" component={DeploymentDetails} />
+        <Route path="/account-settings" component={AccountSettings} />
         {isAdmin && <Route path="/admin/dashboard" component={AdminDashboard} />}
         <Route component={NotFound} />
       </Switch>

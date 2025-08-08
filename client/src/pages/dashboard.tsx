@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Coins, Users, Rocket, Plus, Wallet, Share, Eye } from "lucide-react";
+import { MessageSquare, Coins, Users, Rocket, Plus, Wallet, Share, Eye, Settings } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function Dashboard() {
@@ -241,6 +241,14 @@ export default function Dashboard() {
               >
                 <Share className="w-4 h-4 mr-2" />
                 Share Referral
+              </Button>
+              <Button 
+                onClick={() => setLocation("/account-settings")}
+                variant="outline" 
+                className="w-full p-4 h-auto border-gray-200 text-gray-700 hover:bg-gray-50"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Account Settings
               </Button>
             </CardContent>
           </Card>

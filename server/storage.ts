@@ -1083,6 +1083,10 @@ export class MongoStorage implements IStorage {
     const now = new Date();
     const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
+    // Get daily charge rate from settings
+    const dailyChargeSetting = await this.getAppSetting('daily_charge');
+    const dailyCharge = dailyChargeSetting?.value || 5;
+
     for (const deployment of activeDeployments) {
       try {
         // Get user to check balance
@@ -1090,7 +1094,7 @@ export class MongoStorage implements IStorage {
         if (!user) continue;
 
         // Check if user has enough coins
-        if (user.coinBalance < deployment.cost) {
+        if (user.coinBalance < dailyCharge) {
           // Stop the deployment and update status
           await this.updateDeploymentStatus(deployment._id.toString(), 'insufficient_funds');
           
@@ -1098,7 +1102,7 @@ export class MongoStorage implements IStorage {
           await this.createTransaction({
             userId: deployment.userId.toString(),
             type: 'deployment_charge_failed',
-            amount: -deployment.cost,
+            amount: -dailyCharge,
             description: `Failed daily charge for deployment: ${deployment.name} (insufficient funds)`,
             relatedId: deployment._id.toString()
           });
@@ -1106,13 +1110,13 @@ export class MongoStorage implements IStorage {
         }
 
         // Deduct coins from user
-        await this.updateUserBalance(deployment.userId.toString(), -deployment.cost);
+        await this.updateUserBalance(deployment.userId.toString(), -dailyCharge);
         
         // Create transaction record
         await this.createTransaction({
           userId: deployment.userId.toString(),
           type: 'deployment_charge',
-          amount: -deployment.cost,
+          amount: -dailyCharge,
           description: `Daily charge for deployment: ${deployment.name}`,
           relatedId: deployment._id.toString()
         });
@@ -1124,7 +1128,7 @@ export class MongoStorage implements IStorage {
           tomorrow
         );
 
-        console.log(`Charged ${deployment.cost} coins for deployment ${deployment.name} (${deployment._id})`);
+        console.log(`Charged ${dailyCharge} coins for deployment ${deployment.name} (${deployment._id})`);
       } catch (error) {
         console.error(`Error processing daily charge for deployment ${deployment._id}:`, error);
       }

@@ -237,6 +237,7 @@ export default function AdminDashboard() {
   const [monitoredBranches, setMonitoredBranches] = useState<Set<string>>(new Set());
   const [ipBanForm, setIpBanForm] = useState({ ip: '', reason: '' });
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [costSettings, setCostSettings] = useState({ deploymentCost: 25, dailyCharge: 5 });
   
   // WebSocket connection for real-time updates
   const { isConnected: wsConnected, sendMessage, lastMessage, connectionError } = useWebSocket();
@@ -259,6 +260,18 @@ export default function AdminDashboard() {
       });
     }
   }, [githubData]);
+
+  // Update cost settings when data changes
+  useEffect(() => {
+    if (settings) {
+      const deploymentCostSetting = settings.find(s => s.key === 'deployment_cost');
+      const dailyChargeSetting = settings.find(s => s.key === 'daily_charge');
+      setCostSettings({
+        deploymentCost: deploymentCostSetting?.value || 25,
+        dailyCharge: dailyChargeSetting?.value || 5
+      });
+    }
+  }, [settings]);
 
   // Handle WebSocket messages for real-time updates
   useEffect(() => {
@@ -557,6 +570,23 @@ export default function AdminDashboard() {
     },
     onError: (error: any) => {
       toast({ title: "Failed to update GitHub settings", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Cost settings mutation
+  const updateCostSettingsMutation = useMutation({
+    mutationFn: async (costs: typeof costSettings) => {
+      await Promise.all([
+        apiRequest('PUT', '/api/admin/settings/deployment_cost', { value: costs.deploymentCost, description: 'Cost to deploy a new bot' }),
+        apiRequest('PUT', '/api/admin/settings/daily_charge', { value: costs.dailyCharge, description: 'Daily charge for running deployments' })
+      ]);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/settings'] });
+      toast({ title: "Cost settings updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to update cost settings", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1480,6 +1510,33 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   
+                  <div>
+                    <Label htmlFor="daily-charge">Daily Deployment Charge (coins)</Label>
+                    <div className="flex space-x-2 mt-2">
+                      <Input
+                        id="daily-charge"
+                        type="number"
+                        placeholder="5"
+                        defaultValue={settings.find(s => s.key === 'daily_charge')?.value || 5}
+                        data-testid="input-daily-charge"
+                      />
+                      <Button 
+                        onClick={() => {
+                          const input = document.getElementById('daily-charge') as HTMLInputElement;
+                          const value = parseInt(input.value);
+                          updateSettingMutation.mutate({ 
+                            key: 'daily_charge', 
+                            value,
+                            description: 'Daily charge for active deployments'
+                          });
+                        }}
+                        data-testid="button-save-daily-charge"
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+
                   <div>
                     <Label htmlFor="daily-login-bonus">Daily Login Bonus (coins)</Label>
                     <div className="flex space-x-2 mt-2">
