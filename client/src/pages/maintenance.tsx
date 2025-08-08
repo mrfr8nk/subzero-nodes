@@ -158,7 +158,7 @@ export default function Maintenance() {
 
         <div className="text-center">
           <p className="text-xs text-muted-foreground">
-            © 2025 SUBZERO-MD. All rights reserved.
+            © 2025 SUBZERO-NODES. All rights reserved.
           </p>
         </div>
       </div>
