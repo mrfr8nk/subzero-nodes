@@ -1296,6 +1296,50 @@ jobs:
     }
   });
 
+  // Demote admin to user (super admin only)
+  app.patch('/api/admin/users/:userId/demote', requireSuperAdmin, async (req, res) => {
+    const { userId } = req.params;
+    const adminId = (req.user as any)?._id?.toString();
+
+    try {
+      // Prevent super admin from demoting themselves
+      if (userId === adminId) {
+        return res.status(400).json({ message: 'Cannot demote yourself' });
+      }
+
+      await storage.demoteFromAdmin(userId, adminId);
+      res.json({ message: 'Admin demoted to user successfully' });
+    } catch (error) {
+      console.error('Error demoting admin:', error);
+      res.status(500).json({ message: 'Failed to demote admin' });
+    }
+  });
+
+  // Delete admin (super admin only)
+  app.delete('/api/admin/users/:userId/admin', requireSuperAdmin, async (req, res) => {
+    const { userId } = req.params;
+    const adminId = (req.user as any)?._id?.toString();
+
+    try {
+      // Prevent super admin from deleting themselves
+      if (userId === adminId) {
+        return res.status(400).json({ message: 'Cannot delete yourself' });
+      }
+
+      // Check if target user is actually an admin
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser || !targetUser.isAdmin) {
+        return res.status(400).json({ message: 'User is not an admin' });
+      }
+
+      await storage.deleteAdmin(userId, adminId);
+      res.json({ message: 'Admin deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting admin:', error);
+      res.status(500).json({ message: 'Failed to delete admin' });
+    }
+  });
+
   // Get users by IP
   app.get('/api/admin/users/by-ip/:ip', requireAdmin, async (req, res) => {
     const { ip } = req.params;
@@ -1924,6 +1968,38 @@ jobs:
       const user = await storage.getUser(userId);
       if (deployment.userId.toString() !== userId && !user?.isAdmin) {
         return res.status(403).json({ message: "Not authorized to delete this deployment" });
+      }
+      
+      // Delete GitHub branch if it exists
+      if (deployment.branchName) {
+        try {
+          const [githubToken, repoOwner, repoName] = await Promise.all([
+            storage.getAppSetting('github_token'),
+            storage.getAppSetting('github_repo_owner'),
+            storage.getAppSetting('github_repo_name')
+          ]);
+
+          if (githubToken?.value && repoOwner?.value && repoName?.value) {
+            const deleteUrl = `https://api.github.com/repos/${repoOwner.value}/${repoName.value}/git/refs/heads/${deployment.branchName}`;
+            const deleteResponse = await fetch(deleteUrl, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `token ${githubToken.value}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'SUBZERO-Deployment-Bot'
+              }
+            });
+
+            if (deleteResponse.ok || deleteResponse.status === 404) {
+              console.log(`Successfully deleted GitHub branch: ${deployment.branchName}`);
+            } else {
+              console.warn(`Failed to delete GitHub branch ${deployment.branchName}: ${deleteResponse.status} ${deleteResponse.statusText}`);
+            }
+          }
+        } catch (branchDeleteError) {
+          console.warn(`Error deleting GitHub branch ${deployment.branchName}:`, branchDeleteError);
+          // Continue with deployment deletion even if branch deletion fails
+        }
       }
       
       await storage.deleteDeployment(deploymentId);

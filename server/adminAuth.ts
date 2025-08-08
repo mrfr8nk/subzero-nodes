@@ -100,7 +100,7 @@ export async function adminLogin(req: Request, res: Response) {
       }
       
       // Update IP tracking
-      if (req.ip) {
+      if (req.ip && adminUser) {
         await storage.updateUserIp(adminUser._id.toString(), req.ip);
       }
     }
@@ -110,7 +110,7 @@ export async function adminLogin(req: Request, res: Response) {
     }
 
     // Log in the user using passport  
-    req.logIn(adminUser!, (err) => {
+    req.logIn(adminUser, (err) => {
       if (err) {
         console.error("Admin login error:", err);
         return res.status(500).json({ message: "Login failed" });

@@ -204,6 +204,12 @@ export default function AdminDashboard() {
     staleTime: 30000,
   });
 
+  // Fetch current user to check super admin status
+  const { data: currentUser } = useQuery<User>({
+    queryKey: ['/api/user/me'],
+    staleTime: 300000, // 5 minutes
+  });
+
   // GitHub settings state
   const [githubSettings, setGithubSettings] = useState({
     githubToken: '',
@@ -378,6 +384,36 @@ export default function AdminDashboard() {
     },
     onError: (error: any) => {
       toast({ title: "Failed to promote user", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Demote admin mutation
+  const demoteAdminMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest('PATCH', `/api/admin/users/${userId}/demote`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: "Admin demoted to user successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to demote admin", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Delete admin mutation
+  const deleteAdminMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest('DELETE', `/api/admin/users/${userId}/admin`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+      toast({ title: "Admin deleted successfully" });
+      setSelectedUser(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to delete admin", description: error.message, variant: "destructive" });
     }
   });
 
@@ -571,6 +607,14 @@ export default function AdminDashboard() {
     promoteUserMutation.mutate(userId);
   };
 
+  const handleDemoteAdmin = (userId: string) => {
+    demoteAdminMutation.mutate(userId);
+  };
+
+  const handleDeleteAdmin = (userId: string) => {
+    deleteAdminMutation.mutate(userId);
+  };
+
   const handleDeleteUser = (userId: string) => {
     deleteUserMutation.mutate(userId);
   };
@@ -652,6 +696,11 @@ export default function AdminDashboard() {
     } finally {
       setIsLoadingLogs(false);
     }
+  };
+
+  // Helper function to check if current user is super admin
+  const isSuperAdmin = (user: User | undefined) => {
+    return user?.role === 'super_admin' || user?.role === 'admin'; // Environment admins are super admins
   };
 
   const handleCoinAdjustment = () => {
@@ -914,8 +963,51 @@ export default function AdminDashboard() {
                                     </Button>
                                   </div>
 
-                                  {!user.isAdmin && (
-                                    <div className="space-y-2">
+                                  {/* Super Admin Controls */}
+                                  {isSuperAdmin(currentUser) && (
+                                    <div className="space-y-2 pt-4 border-t">
+                                      <Label>Admin Management (Super Admin Only)</Label>
+                                      
+                                      {!user.isAdmin && (
+                                        <Button 
+                                          onClick={() => handlePromoteUser(user._id)}
+                                          variant="default"
+                                          size="sm"
+                                          data-testid="button-promote-admin"
+                                        >
+                                          <Crown className="w-4 h-4 mr-1" />
+                                          Promote to Admin
+                                        </Button>
+                                      )}
+                                      
+                                      {user.isAdmin && user._id !== currentUser?._id && (
+                                        <div className="space-y-2">
+                                          <Button 
+                                            onClick={() => handleDemoteAdmin(user._id)}
+                                            variant="outline"
+                                            size="sm"
+                                            data-testid="button-demote-admin"
+                                          >
+                                            <UserCheck className="w-4 h-4 mr-1" />
+                                            Demote to User
+                                          </Button>
+                                          <Button 
+                                            onClick={() => handleDeleteAdmin(user._id)}
+                                            variant="destructive"
+                                            size="sm"
+                                            data-testid="button-delete-admin"
+                                          >
+                                            <Trash2 className="w-4 h-4 mr-1" />
+                                            Delete Admin
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                  
+                                  {/* Regular admin controls for non-admin users */}
+                                  {!isSuperAdmin(currentUser) && !user.isAdmin && (
+                                    <div className="space-y-2 pt-4 border-t">
                                       <Label>Promote to Admin</Label>
                                       <Button 
                                         onClick={() => handlePromoteUser(user._id)}

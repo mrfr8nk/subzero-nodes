@@ -86,6 +86,8 @@ export interface IStorage {
   updateUserCoins(userId: string, amount: number, reason: string, adminId: string): Promise<void>;
   updateUserClaimDate(userId: string, claimDate: Date): Promise<void>;
   promoteToAdmin(userId: string, adminId: string): Promise<void>;
+  demoteFromAdmin(userId: string, adminId: string): Promise<void>;
+  deleteAdmin(userId: string, adminId: string): Promise<void>;
   getUsersByIp(ip: string): Promise<User[]>;
   updateUserIp(userId: string, ip: string): Promise<void>;
   
@@ -647,6 +649,35 @@ export class MongoStorage implements IStorage {
       data: { userId, promotedBy: adminId },
       read: false
     });
+  }
+
+  async demoteFromAdmin(userId: string, adminId: string): Promise<void> {
+    await this.updateUserRole(userId, "user");
+    
+    await this.createAdminNotification({
+      type: "admin_demotion",
+      title: "Admin Demoted to User",
+      message: `Admin has been demoted to user by ${adminId}`,
+      data: { userId, demotedBy: adminId },
+      read: false
+    });
+  }
+
+  async deleteAdmin(userId: string, adminId: string): Promise<void> {
+    const user = await this.getUser(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    await this.createAdminNotification({
+      type: "admin_deletion",
+      title: "Admin Account Deleted",
+      message: `Admin ${user.email} has been deleted by super admin ${adminId}`,
+      data: { userId, deletedBy: adminId, userEmail: user.email },
+      read: false
+    });
+
+    await this.deleteUser(userId, adminId);
   }
 
   async getUsersByIp(ip: string): Promise<User[]> {
