@@ -83,6 +83,27 @@ app.use((req, res, next) => {
     }
   }, 30000); // Check every 30 seconds
 
+  // Start daily billing scheduler
+  setInterval(async () => {
+    try {
+      console.log('Processing daily deployment charges...');
+      await storage.processDeploymentDailyCharges();
+      console.log('Daily deployment charges processed successfully');
+    } catch (error) {
+      console.error('Error processing daily deployment charges:', error);
+    }
+  }, 24 * 60 * 60 * 1000); // Run every 24 hours
+
+  // Process charges immediately on startup for any overdue deployments
+  setTimeout(async () => {
+    try {
+      console.log('Processing any overdue deployment charges on startup...');
+      await storage.processDeploymentDailyCharges();
+    } catch (error) {
+      console.error('Error processing startup deployment charges:', error);
+    }
+  }, 10000); // Wait 10 seconds after startup
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";

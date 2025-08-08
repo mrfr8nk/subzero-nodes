@@ -699,9 +699,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
+      const now = new Date();
+      const nextChargeDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+      
       const deploymentData = insertDeploymentSchema.parse({
         ...req.body,
         userId,
+        lastChargeDate: now,
+        nextChargeDate: nextChargeDate,
       });
 
       // Check if user has enough coins
@@ -958,13 +963,18 @@ jobs:
         });
 
         // Create deployment record
+        const now = new Date();
+        const nextChargeDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+        
         const deploymentData = insertDeploymentSchema.parse({
           userId,
           name: sanitizedBranchName,
           branchName: sanitizedBranchName,
           status: "deploying",
           configuration: `GitHub: ${sanitizedBranchName}`,
-          cost
+          cost,
+          lastChargeDate: now,
+          nextChargeDate: nextChargeDate,
         });
 
         const deployment = await storage.createDeployment(deploymentData);
@@ -1870,6 +1880,244 @@ jobs:
     } catch (error) {
       console.error("Error deleting deployment:", error);
       res.status(500).json({ message: "Failed to delete deployment" });
+    }
+  });
+
+  // Deployment Variables Management
+
+  // Get all variables for a deployment
+  app.get('/api/deployments/:id/variables', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const deploymentId = req.params.id;
+      
+      // Verify deployment ownership
+      const deployment = await storage.getDeployment(deploymentId);
+      if (!deployment) {
+        return res.status(404).json({ message: "Deployment not found" });
+      }
+      
+      if (deployment.userId.toString() !== userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      
+      const variables = await storage.getDeploymentVariables(deploymentId);
+      res.json(variables);
+    } catch (error) {
+      console.error("Error fetching deployment variables:", error);
+      res.status(500).json({ message: "Failed to fetch variables" });
+    }
+  });
+
+  // Create or update a deployment variable
+  app.post('/api/deployments/:id/variables', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const deploymentId = req.params.id;
+      const { key, value, description, isRequired } = req.body;
+      
+      // Verify deployment ownership
+      const deployment = await storage.getDeployment(deploymentId);
+      if (!deployment) {
+        return res.status(404).json({ message: "Deployment not found" });
+      }
+      
+      if (deployment.userId.toString() !== userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      
+      const variable = await storage.upsertDeploymentVariable(
+        deploymentId, 
+        key, 
+        value, 
+        description, 
+        isRequired
+      );
+      
+      res.json(variable);
+    } catch (error) {
+      console.error("Error creating/updating deployment variable:", error);
+      res.status(500).json({ message: "Failed to save variable" });
+    }
+  });
+
+  // Update a specific deployment variable
+  app.put('/api/deployments/:id/variables/:variableId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const deploymentId = req.params.id;
+      const variableId = req.params.variableId;
+      const { value } = req.body;
+      
+      // Verify deployment ownership
+      const deployment = await storage.getDeployment(deploymentId);
+      if (!deployment) {
+        return res.status(404).json({ message: "Deployment not found" });
+      }
+      
+      if (deployment.userId.toString() !== userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      
+      await storage.updateDeploymentVariable(variableId, value);
+      res.json({ message: "Variable updated successfully" });
+    } catch (error) {
+      console.error("Error updating deployment variable:", error);
+      res.status(500).json({ message: "Failed to update variable" });
+    }
+  });
+
+  // Delete a deployment variable
+  app.delete('/api/deployments/:id/variables/:variableId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const deploymentId = req.params.id;
+      const variableId = req.params.variableId;
+      
+      // Verify deployment ownership
+      const deployment = await storage.getDeployment(deploymentId);
+      if (!deployment) {
+        return res.status(404).json({ message: "Deployment not found" });
+      }
+      
+      if (deployment.userId.toString() !== userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      
+      await storage.deleteDeploymentVariable(variableId);
+      res.json({ message: "Variable deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting deployment variable:", error);
+      res.status(500).json({ message: "Failed to delete variable" });
+    }
+  });
+
+  // Redeploy with updated variables
+  app.post('/api/deployments/:id/redeploy', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const deploymentId = req.params.id;
+      
+      // Verify deployment ownership
+      const deployment = await storage.getDeployment(deploymentId);
+      if (!deployment) {
+        return res.status(404).json({ message: "Deployment not found" });
+      }
+      
+      if (deployment.userId.toString() !== userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      
+      if (!deployment.branchName) {
+        return res.status(400).json({ message: "No branch associated with this deployment" });
+      }
+      
+      // Get deployment variables
+      const variables = await storage.getDeploymentVariables(deploymentId);
+      
+      // Get GitHub settings
+      const [githubToken, repoOwner, repoName, mainBranch] = await Promise.all([
+        storage.getAppSetting('github_token'),
+        storage.getAppSetting('github_repo_owner'),
+        storage.getAppSetting('github_repo_name'),
+        storage.getAppSetting('github_main_branch')
+      ]);
+
+      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
+        return res.status(500).json({ message: 'GitHub settings not configured' });
+      }
+
+      const GITHUB_TOKEN = githubToken.value;
+      const REPO_OWNER = repoOwner.value;
+      const REPO_NAME = repoName.value;
+      const MAIN_BRANCH = mainBranch?.value || 'main';
+
+      // Helper function for GitHub API requests
+      const makeGitHubRequest = async (method: string, endpoint: string, data?: any) => {
+        const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/${endpoint}`;
+        const response = await fetch(url, {
+          method,
+          headers: {
+            'Authorization': `token ${GITHUB_TOKEN}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json',
+          },
+          body: data ? JSON.stringify(data) : undefined,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`GitHub API error: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+
+        return response.json();
+      };
+
+      // Update settings.js with new variables
+      const settingsContent = `const fs = require('fs');
+if (fs.existsSync('config.env')) require('dotenv').config({ path: './config.env' });
+
+function convertToBool(text, fault = 'true') {
+    return text === fault ? true : false;
+}
+
+module.exports = {
+${variables.map(v => `    ${v.key.toUpperCase()}: process.env.${v.key.toUpperCase()} || "${v.value}",`).join('\n')}
+    ALIVE_MSG: process.env.ALIVE_MSG || "Hello, I am alive!",
+    LANG: process.env.THEME || "SUBZERO-MD",
+    HANDLERS: process.env.PREFIX || ".",
+    BRANCH: "main",
+    STICKER_DATA: process.env.STICKER_DATA || "Subzero;M.D",
+    ALWAYS_ONLINE: convertToBool(process.env.ALWAYS_ONLINE) || false,
+    AUTO_READ: convertToBool(process.env.AUTO_READ) || false,
+    PM_BLOCKER: convertToBool(process.env.PM_BLOCKER) || false,
+    READ_MESSAGES: convertToBool(process.env.READ_MESSAGES) || false,
+    AUTO_STATUS_READ: convertToBool(process.env.AUTO_STATUS_READ) || false,
+    MODE: process.env.MODE || "private",
+    AUTO_VOICE: convertToBool(process.env.AUTO_VOICE) || false,
+    AUTO_STICKER: convertToBool(process.env.AUTO_STICKER) || false,
+    AUTO_REPLY: convertToBool(process.env.AUTO_REPLY) || false,
+    ANTI_BOT: convertToBool(process.env.ANTI_BOT) || false,
+    ANTI_CALL: convertToBool(process.env.ANTI_CALL) || false,
+    ANTI_DELETE: convertToBool(process.env.ANTI_DELETE) || false,
+    ANTI_LINK: convertToBool(process.env.ANTI_LINK) || false,
+    ANTI_BAD: convertToBool(process.env.ANTI_BAD) || false,
+    LOGS: convertToBool(process.env.LOGS) || true,
+    HEROKU_APP_NAME: process.env.HEROKU_APP_NAME || "",
+    HEROKU_API_KEY: process.env.HEROKU_API_KEY || "",
+};`;
+
+      // Update settings.js in the branch
+      try {
+        // Get current file to get its SHA
+        const currentFile = await makeGitHubRequest('GET', `contents/settings.js?ref=${deployment.branchName}`);
+        
+        // Update the file
+        await makeGitHubRequest('PUT', 'contents/settings.js', {
+          message: `Update settings.js with new variables for ${deployment.name}`,
+          content: Buffer.from(settingsContent).toString('base64'),
+          sha: currentFile.sha,
+          branch: deployment.branchName
+        });
+
+        // Trigger workflow to redeploy
+        const WORKFLOW_FILE = 'main.yml'; // Default workflow file
+        await makeGitHubRequest('POST', `actions/workflows/${WORKFLOW_FILE}/dispatches`, {
+          ref: deployment.branchName
+        });
+
+        res.json({ 
+          success: true, 
+          message: 'Deployment restarted with updated variables!',
+          deployment
+        });
+      } catch (error) {
+        console.error('Redeploy error:', error);
+        res.status(500).json({ message: 'Failed to redeploy with updated variables' });
+      }
+    } catch (error) {
+      console.error("Error redeploying:", error);
+      res.status(500).json({ message: "Failed to redeploy" });
     }
   });
 

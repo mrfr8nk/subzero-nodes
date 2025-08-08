@@ -5,12 +5,14 @@ import {
   Referral,
   AdminNotification,
   AppSettings,
+  DeploymentVariable,
   InsertUser,
   InsertDeployment,
   InsertTransaction,
   InsertReferral,
   InsertAdminNotification,
   InsertAppSettings,
+  InsertDeploymentVariable,
 } from "@shared/schema";
 import { getDb } from "./db";
 import { ObjectId } from "mongodb";
@@ -43,6 +45,15 @@ export interface IStorage {
     stopped: number;
     thisMonth: number;
   }>;
+  updateDeploymentChargeDate(id: string, lastChargeDate: Date, nextChargeDate: Date): Promise<void>;
+  getActiveDeploymentsForBilling(): Promise<Deployment[]>;
+  
+  // Deployment variable operations
+  createDeploymentVariable(variable: InsertDeploymentVariable): Promise<DeploymentVariable>;
+  getDeploymentVariables(deploymentId: string): Promise<DeploymentVariable[]>;
+  updateDeploymentVariable(id: string, value: string): Promise<void>;
+  deleteDeploymentVariable(id: string): Promise<void>;
+  upsertDeploymentVariable(deploymentId: string, key: string, value: string, description?: string, isRequired?: boolean): Promise<DeploymentVariable>;
   
   // Transaction operations
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
@@ -98,6 +109,9 @@ export interface IStorage {
   unbanUserIp(ip: string, adminId: string): Promise<void>;
   getBannedIps(): Promise<string[]>;
   isIpBanned(ip: string): Promise<boolean>;
+  
+  // Daily billing operations
+  processDeploymentDailyCharges(): Promise<void>;
 }
 
 export class MongoStorage implements IStorage {
@@ -123,6 +137,10 @@ export class MongoStorage implements IStorage {
 
   private get appSettingsCollection() {
     return getDb().collection<AppSettings>("appSettings");
+  }
+
+  private get deploymentVariablesCollection() {
+    return getDb().collection<DeploymentVariable>("deploymentVariables");
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -939,6 +957,147 @@ export class MongoStorage implements IStorage {
   async isIpBanned(ip: string): Promise<boolean> {
     const setting = await this.getAppSetting(`banned_ip_${ip.replace(/\./g, '_')}`);
     return !!setting;
+  }
+
+  // New deployment billing methods
+  async updateDeploymentChargeDate(id: string, lastChargeDate: Date, nextChargeDate: Date): Promise<void> {
+    await this.deploymentsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { 
+        $set: { 
+          lastChargeDate, 
+          nextChargeDate,
+          updatedAt: new Date() 
+        } 
+      }
+    );
+  }
+
+  async getActiveDeploymentsForBilling(): Promise<Deployment[]> {
+    const now = new Date();
+    return await this.deploymentsCollection.find({
+      status: 'active',
+      $or: [
+        { nextChargeDate: { $lte: now } },
+        { nextChargeDate: { $exists: false } }
+      ]
+    }).toArray();
+  }
+
+  // Deployment variable methods
+  async createDeploymentVariable(variable: InsertDeploymentVariable): Promise<DeploymentVariable> {
+    const newVariable = {
+      ...variable,
+      _id: new ObjectId(),
+      deploymentId: new ObjectId(variable.deploymentId),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await this.deploymentVariablesCollection.insertOne(newVariable);
+    return newVariable;
+  }
+
+  async getDeploymentVariables(deploymentId: string): Promise<DeploymentVariable[]> {
+    return await this.deploymentVariablesCollection
+      .find({ deploymentId: new ObjectId(deploymentId) })
+      .toArray();
+  }
+
+  async updateDeploymentVariable(id: string, value: string): Promise<void> {
+    await this.deploymentVariablesCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { 
+        $set: { 
+          value, 
+          updatedAt: new Date() 
+        } 
+      }
+    );
+  }
+
+  async deleteDeploymentVariable(id: string): Promise<void> {
+    await this.deploymentVariablesCollection.deleteOne({ _id: new ObjectId(id) });
+  }
+
+  async upsertDeploymentVariable(
+    deploymentId: string, 
+    key: string, 
+    value: string, 
+    description?: string, 
+    isRequired: boolean = true
+  ): Promise<DeploymentVariable> {
+    const existingVariable = await this.deploymentVariablesCollection.findOne({
+      deploymentId: new ObjectId(deploymentId),
+      key
+    });
+
+    if (existingVariable) {
+      await this.updateDeploymentVariable(existingVariable._id.toString(), value);
+      return { ...existingVariable, value, updatedAt: new Date() };
+    } else {
+      return await this.createDeploymentVariable({
+        deploymentId,
+        key,
+        value,
+        description,
+        isRequired
+      });
+    }
+  }
+
+  // Daily billing process
+  async processDeploymentDailyCharges(): Promise<void> {
+    const activeDeployments = await this.getActiveDeploymentsForBilling();
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+    for (const deployment of activeDeployments) {
+      try {
+        // Get user to check balance
+        const user = await this.getUser(deployment.userId.toString());
+        if (!user) continue;
+
+        // Check if user has enough coins
+        if (user.coinBalance < deployment.cost) {
+          // Stop the deployment and update status
+          await this.updateDeploymentStatus(deployment._id.toString(), 'insufficient_funds');
+          
+          // Create transaction record for failed charge
+          await this.createTransaction({
+            userId: deployment.userId.toString(),
+            type: 'deployment_charge_failed',
+            amount: -deployment.cost,
+            description: `Failed daily charge for deployment: ${deployment.name} (insufficient funds)`,
+            relatedId: deployment._id.toString()
+          });
+          continue;
+        }
+
+        // Deduct coins from user
+        await this.updateUserBalance(deployment.userId.toString(), -deployment.cost);
+        
+        // Create transaction record
+        await this.createTransaction({
+          userId: deployment.userId.toString(),
+          type: 'deployment_charge',
+          amount: -deployment.cost,
+          description: `Daily charge for deployment: ${deployment.name}`,
+          relatedId: deployment._id.toString()
+        });
+
+        // Update deployment charge dates
+        await this.updateDeploymentChargeDate(
+          deployment._id.toString(),
+          now,
+          tomorrow
+        );
+
+        console.log(`Charged ${deployment.cost} coins for deployment ${deployment.name} (${deployment._id})`);
+      } catch (error) {
+        console.error(`Error processing daily charge for deployment ${deployment._id}:`, error);
+      }
+    }
   }
 }
 

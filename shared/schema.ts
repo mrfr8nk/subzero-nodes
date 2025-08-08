@@ -37,10 +37,12 @@ export interface Deployment {
   _id: ObjectId;
   userId: ObjectId;
   name: string;
-  status: string;
+  status: string; // 'active', 'stopped', 'failed', 'insufficient_funds'
   configuration: string;
   cost: number;
   branchName?: string; // GitHub branch name for logs
+  lastChargeDate?: Date; // Last time coins were deducted for this deployment
+  nextChargeDate?: Date; // When the next charge will occur
   createdAt: Date;
   updatedAt: Date;
 }
@@ -91,6 +93,17 @@ export interface AppSettings {
   updatedAt: Date;
 }
 
+export interface DeploymentVariable {
+  _id: ObjectId;
+  deploymentId: ObjectId;
+  key: string;
+  value: string;
+  description?: string;
+  isRequired: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Zod schemas for validation
 export const insertUserSchema = z.object({
   googleId: z.string().optional(),
@@ -127,6 +140,16 @@ export const insertDeploymentSchema = z.object({
   status: z.string().default("active"),
   configuration: z.string().default("standard"),
   cost: z.number().default(25),
+  lastChargeDate: z.date().optional(),
+  nextChargeDate: z.date().optional(),
+});
+
+export const insertDeploymentVariableSchema = z.object({
+  deploymentId: z.string(),
+  key: z.string(),
+  value: z.string(),
+  description: z.string().optional(),
+  isRequired: z.boolean().default(true),
 });
 
 export const insertTransactionSchema = z.object({
@@ -173,6 +196,7 @@ export type InsertReferral = z.infer<typeof insertReferralSchema>;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type InsertAdminNotification = z.infer<typeof insertAdminNotificationSchema>;
 export type InsertAppSettings = z.infer<typeof insertAppSettingsSchema>;
+export type InsertDeploymentVariable = z.infer<typeof insertDeploymentVariableSchema>;
 
 // For backward compatibility
 export type UpsertUser = InsertUser;

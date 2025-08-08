@@ -5,17 +5,19 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Plus, CheckCircle, PauseCircle, Calendar, Eye, Square, Play, Trash2, FileText } from "lucide-react";
+import { MessageSquare, Plus, CheckCircle, PauseCircle, Calendar, Eye, Square, Play, Trash2, FileText, Settings, AlertTriangle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import DeployModal from "@/components/deploy-modal";
 import DeploymentLogsModal from "@/components/deployment-logs-modal";
+import DeploymentVariablesModal from "@/components/deployment-variables-modal";
 
 export default function Deployments() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [showDeployModal, setShowDeployModal] = useState(false);
   const [selectedDeploymentForLogs, setSelectedDeploymentForLogs] = useState<any>(null);
+  const [selectedDeploymentForVariables, setSelectedDeploymentForVariables] = useState<any>(null);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -118,6 +120,8 @@ export default function Deployments() {
         return <PauseCircle className="w-5 h-5 text-gray-600" />;
       case "failed":
         return <Square className="w-5 h-5 text-red-600" />;
+      case "insufficient_funds":
+        return <AlertTriangle className="w-5 h-5 text-orange-600" />;
       default:
         return <PauseCircle className="w-5 h-5 text-gray-600" />;
     }
@@ -131,6 +135,8 @@ export default function Deployments() {
         return "bg-gray-100 text-gray-800";
       case "failed":
         return "bg-red-100 text-red-800";
+      case "insufficient_funds":
+        return "bg-orange-100 text-orange-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -275,11 +281,19 @@ export default function Deployments() {
                       <div className="flex items-center space-x-4 mt-1">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(deployment.status)}`}>
                           <span className={`w-2 h-2 rounded-full mr-1 ${
-                            deployment.status === 'active' ? 'bg-green-600' : 'bg-gray-600'
+                            deployment.status === 'active' ? 'bg-green-600' : 
+                            deployment.status === 'insufficient_funds' ? 'bg-orange-600' : 
+                            deployment.status === 'failed' ? 'bg-red-600' : 'bg-gray-600'
                           }`}></span>
-                          {deployment.status.charAt(0).toUpperCase() + deployment.status.slice(1)}
+                          {deployment.status === 'insufficient_funds' ? 'No Funds' : 
+                           deployment.status.charAt(0).toUpperCase() + deployment.status.slice(1)}
                         </span>
-                        <span className="text-xs text-gray-500">Cost: {deployment.cost} coins</span>
+                        <span className="text-xs text-gray-500">Cost: {deployment.cost} coins/day</span>
+                        {deployment.nextChargeDate && (
+                          <span className="text-xs text-gray-500">
+                            Next charge: {new Date(deployment.nextChargeDate).toLocaleDateString()}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -292,6 +306,15 @@ export default function Deployments() {
                     >
                       <FileText className="w-4 h-4 mr-1" />
                       Logs
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setSelectedDeploymentForVariables(deployment)}
+                      data-testid={`button-variables-${deployment._id}`}
+                    >
+                      <Settings className="w-4 h-4 mr-1" />
+                      Variables
                     </Button>
                     <Button 
                       variant={deployment.status === "active" ? "destructive" : "default"}
@@ -344,6 +367,15 @@ export default function Deployments() {
           deploymentId={selectedDeploymentForLogs._id}
           deploymentName={selectedDeploymentForLogs.name}
           isAdmin={false}
+        />
+      )}
+
+      {selectedDeploymentForVariables && (
+        <DeploymentVariablesModal
+          isOpen={!!selectedDeploymentForVariables}
+          onClose={() => setSelectedDeploymentForVariables(null)}
+          deploymentId={selectedDeploymentForVariables._id}
+          deploymentName={selectedDeploymentForVariables.name}
         />
       )}
     </div>
