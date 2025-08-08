@@ -674,6 +674,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User GitHub deployment - uses admin GitHub settings
+  app.post('/api/deployments/github', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { branchName, sessionId, ownerNumber, prefix } = req.body;
+      
+      if (!branchName || !sessionId || !ownerNumber || !prefix) {
+        return res.status(400).json({ message: 'All fields are required' });
+      }
+
+      // Get deployment cost setting
+      const deploymentCostSetting = await storage.getAppSetting('deployment_cost');
+      const cost = deploymentCostSetting?.value || 25;
+
+      // Check if user has enough coins
+      const userBalance = user.coinBalance || 0;
+      if (userBalance < cost) {
+        return res.status(400).json({ message: "Insufficient coins" });
+      }
+
+      // Get GitHub settings configured by admin
+      const [githubToken, repoOwner, repoName, mainBranch, workflowFile] = await Promise.all([
+        storage.getAppSetting('github_token'),
+        storage.getAppSetting('github_repo_owner'),
+        storage.getAppSetting('github_repo_name'),
+        storage.getAppSetting('github_main_branch'),
+        storage.getAppSetting('github_workflow_file')
+      ]);
+
+      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
+        return res.status(400).json({ message: 'GitHub settings not configured by admin. Please contact administrator.' });
+      }
+
+      const GITHUB_TOKEN = githubToken.value;
+      const REPO_OWNER = repoOwner.value;
+      const REPO_NAME = repoName.value;
+      const MAIN_BRANCH = mainBranch?.value || 'main';
+      const WORKFLOW_FILE = workflowFile?.value || 'SUBZERO.yml';
+
+      // Sanitize branch name
+      const sanitizeBranchName = (name: string) => {
+        return name
+          .replace(/[^a-zA-Z0-9._-]/g, '-')
+          .replace(/^\.+|\.+$/g, '')
+          .replace(/\.\.+/g, '.')
+          .replace(/^-+|-+$/g, '')
+          .replace(/--+/g, '-')
+          .substring(0, 250);
+      };
+
+      let sanitizedBranchName = sanitizeBranchName(branchName.trim());
+      if (!sanitizedBranchName) {
+        const prefix = 'user-';
+        const randomChars = Math.random().toString(36).substring(2, 8);
+        sanitizedBranchName = prefix + randomChars;
+      }
+
+      // Deduct coins first
+      await storage.updateUserCoins(userId, -cost, `GitHub deployment: ${sanitizedBranchName}`, userId);
+
+      // GitHub API helper
+      const makeGitHubRequest = async (method: string, endpoint: string, data: any = null) => {
+        const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/${endpoint}`;
+        const config: any = {
+          method,
+          headers: {
+            'Authorization': `token ${GITHUB_TOKEN}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': 'SUBZERO-Deployment-Bot'
+          }
+        };
+        if (data) {
+          config.body = JSON.stringify(data);
+          config.headers['Content-Type'] = 'application/json';
+        }
+        
+        const response = await fetch(url, config);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`GitHub API error: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+        
+        if (response.status === 204) {
+          return {};
+        }
+        
+        return await response.json();
+      };
+
+      try {
+        // Create branch from main
+        const mainBranchData = await makeGitHubRequest('GET', `git/refs/heads/${MAIN_BRANCH}`);
+        const mainSha = mainBranchData.object.sha;
+        
+        await makeGitHubRequest('POST', 'git/refs', {
+          ref: `refs/heads/${sanitizedBranchName}`,
+          sha: mainSha
+        });
+
+        // Get creds.js content and update it
+        const credsFile = await makeGitHubRequest('GET', `contents/creds.js?ref=${sanitizedBranchName}`);
+        const originalContent = Buffer.from(credsFile.content, 'base64').toString('utf8');
+        
+        const updatedContent = originalContent
+          .replace(/global\.sessionId = ".*?";/, `global.sessionId = "${sessionId}";`)
+          .replace(/global\.owner = ".*?";/, `global.owner = "${ownerNumber}";`)
+          .replace(/global\.prefix = ".*?";/, `global.prefix = "${prefix}";`);
+
+        await makeGitHubRequest('PUT', `contents/creds.js`, {
+          message: `Update credentials for ${sanitizedBranchName} deployment`,
+          content: Buffer.from(updatedContent).toString('base64'),
+          sha: credsFile.sha,
+          branch: sanitizedBranchName
+        });
+
+        // Trigger GitHub Actions workflow
+        await makeGitHubRequest('POST', 'actions/workflows/SUBZERO.yml/dispatches', {
+          ref: sanitizedBranchName
+        });
+
+        // Create deployment record
+        const deploymentData = insertDeploymentSchema.parse({
+          userId,
+          name: sanitizedBranchName,
+          status: "deploying",
+          configuration: `GitHub: ${sanitizedBranchName}`,
+          cost
+        });
+
+        const deployment = await storage.createDeployment(deploymentData);
+
+        res.json({ 
+          success: true, 
+          message: 'Deployment started successfully!', 
+          branch: sanitizedBranchName,
+          deployment 
+        });
+
+      } catch (githubError) {
+        // Refund coins if GitHub deployment fails
+        await storage.updateUserCoins(userId, cost, `Refund for failed GitHub deployment: ${sanitizedBranchName}`, userId);
+        throw githubError;
+      }
+
+    } catch (error) {
+      console.error("Error creating GitHub deployment:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+
   app.patch('/api/deployments/:id/status', isAuthenticated, async (req: any, res) => {
     try {
       const deploymentId = req.params.id;
@@ -884,6 +1043,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching admin notifications:', error);
       res.status(500).json({ message: 'Failed to fetch notifications' });
+    }
+  });
+
+  // Admin deployments - get all deployments
+  app.get('/api/admin/deployments', requireAdmin, async (req, res) => {
+    try {
+      const deployments = await storage.getAllDeployments();
+      res.json(deployments);
+    } catch (error) {
+      console.error('Error fetching all deployments:', error);
+      res.status(500).json({ message: 'Failed to fetch deployments' });
     }
   });
 

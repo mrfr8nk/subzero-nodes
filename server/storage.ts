@@ -33,6 +33,7 @@ export interface IStorage {
   // Deployment operations
   createDeployment(deployment: InsertDeployment): Promise<Deployment>;
   getUserDeployments(userId: string): Promise<Deployment[]>;
+  getAllDeployments(): Promise<Deployment[]>;
   getDeployment(id: string): Promise<Deployment | undefined>;
   updateDeploymentStatus(id: string, status: string): Promise<void>;
   getDeploymentStats(userId: string): Promise<{
@@ -357,6 +358,13 @@ export class MongoStorage implements IStorage {
   async getUserDeployments(userId: string): Promise<Deployment[]> {
     return await this.deploymentsCollection
       .find({ userId: new ObjectId(userId) })
+      .sort({ createdAt: -1 })
+      .toArray();
+  }
+
+  async getAllDeployments(): Promise<Deployment[]> {
+    return await this.deploymentsCollection
+      .find({})
       .sort({ createdAt: -1 })
       .toArray();
   }

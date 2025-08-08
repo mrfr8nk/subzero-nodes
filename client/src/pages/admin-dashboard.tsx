@@ -135,6 +135,12 @@ export default function AdminDashboard() {
     staleTime: 60000,
   });
 
+  // Fetch all deployments for logs dropdown
+  const { data: allDeployments = [] } = useQuery<any[]>({
+    queryKey: ['/api/admin/deployments'],
+    staleTime: 30000,
+  });
+
   // GitHub settings state
   const [githubSettings, setGithubSettings] = useState({
     githubToken: '',
@@ -1241,30 +1247,60 @@ export default function AdminDashboard() {
                   )}
                 </div>
 
-                <div className="flex space-x-2">
-                  <Input
-                    placeholder="Enter app name (branch name) to view logs"
-                    value={selectedBranchForLogs}
-                    onChange={(e) => setSelectedBranchForLogs(e.target.value)}
-                    data-testid="input-branch-logs"
-                  />
-                  <Button
-                    onClick={() => fetchWorkflowRuns(selectedBranchForLogs)}
-                    disabled={isLoadingLogs || !selectedBranchForLogs.trim()}
-                    data-testid="button-fetch-logs"
-                  >
-                    {isLoadingLogs ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
-                    View Logs
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => startRealtimeMonitoring(selectedBranchForLogs)}
-                    disabled={!wsConnected || !selectedBranchForLogs.trim() || monitoredBranches.has(selectedBranchForLogs)}
-                    data-testid="button-monitor-realtime"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-1" />
-                    {monitoredBranches.has(selectedBranchForLogs) ? 'Monitoring...' : 'Monitor Live'}
-                  </Button>
+                <div className="space-y-4">
+                  <div className="flex space-x-2">
+                    <div className="flex-1">
+                      <Select 
+                        value={selectedBranchForLogs} 
+                        onValueChange={(value) => {
+                          setSelectedBranchForLogs(value);
+                          if (value) {
+                            fetchWorkflowRuns(value);
+                          }
+                        }}
+                      >
+                        <SelectTrigger data-testid="select-deployment-logs">
+                          <SelectValue placeholder="Select a deployed app to view logs" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {allDeployments.length === 0 ? (
+                            <SelectItem value="no-deployments" disabled>
+                              No deployments found
+                            </SelectItem>
+                          ) : (
+                            allDeployments.map((deployment) => (
+                              <SelectItem key={deployment._id} value={deployment.name}>
+                                <div className="flex items-center justify-between w-full">
+                                  <span>{deployment.name}</span>
+                                  <Badge 
+                                    variant={deployment.status === 'active' ? 'default' : 'secondary'} 
+                                    className="ml-2"
+                                  >
+                                    {deployment.status}
+                                  </Badge>
+                                </div>
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => startRealtimeMonitoring(selectedBranchForLogs)}
+                      disabled={!wsConnected || !selectedBranchForLogs.trim() || monitoredBranches.has(selectedBranchForLogs)}
+                      data-testid="button-monitor-realtime"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-1" />
+                      {monitoredBranches.has(selectedBranchForLogs) ? 'Monitoring...' : 'Monitor Live'}
+                    </Button>
+                  </div>
+                  
+                  {selectedBranchForLogs && (
+                    <div className="text-sm text-muted-foreground">
+                      Viewing logs for: <strong>{selectedBranchForLogs}</strong>
+                    </div>
+                  )}
                 </div>
 
                 {/* Real-time Updates Feed */}

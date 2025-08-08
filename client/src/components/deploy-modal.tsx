@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Rocket } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Rocket, Github } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 
@@ -22,6 +23,12 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
   const { toast } = useToast();
   const [botName, setBotName] = useState("");
   const [configuration, setConfiguration] = useState("standard");
+  const [githubForm, setGithubForm] = useState({
+    branchName: '',
+    sessionId: '',
+    ownerNumber: '',
+    prefix: '.'
+  });
 
   const deployMutation = useMutation({
     mutationFn: async (data: { name: string; configuration: string; cost: number }) => {
@@ -69,6 +76,57 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
     },
   });
 
+  const githubDeployMutation = useMutation({
+    mutationFn: async (data: { branchName: string; sessionId: string; ownerNumber: string; prefix: string }) => {
+      await apiRequest("POST", "/api/deployments/github", data);
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "GitHub Deployment Started!",
+        description: `Bot ${githubForm.branchName} is being deployed via GitHub Actions.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/deployments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/wallet/transactions"] });
+      onClose();
+      setGithubForm({ branchName: '', sessionId: '', ownerNumber: '', prefix: '.' });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      
+      if (error.message.includes("Insufficient coins")) {
+        toast({
+          title: "Insufficient Coins",
+          description: "You don't have enough coins to deploy this bot. Please add more coins to your wallet.",
+          variant: "destructive",
+        });
+      } else if (error.message.includes("GitHub settings not configured")) {
+        toast({
+          title: "GitHub Not Configured",
+          description: "GitHub deployment is not available. Please contact administrator.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Deployment Failed",
+          description: error.message || "Failed to start GitHub deployment. Please try again.",
+          variant: "destructive",
+        });
+      }
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -100,6 +158,32 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
     });
   };
 
+  const handleGithubSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!githubForm.branchName.trim() || !githubForm.sessionId.trim() || !githubForm.ownerNumber.trim()) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const userBalance = user?.coinBalance || 0;
+    const githubCost = 25; // Default deployment cost
+    if (userBalance < githubCost) {
+      toast({
+        title: "Insufficient Coins",
+        description: `You need ${githubCost} coins to deploy via GitHub. You currently have ${userBalance} coins.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    githubDeployMutation.mutate(githubForm);
+  };
+
   const getCost = (config: string) => {
     switch (config) {
       case "premium":
@@ -127,10 +211,20 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
             <Rocket className="w-8 h-8 text-blue-600" />
           </div>
           <DialogTitle className="text-2xl font-bold">Deploy New Bot</DialogTitle>
-          <p className="text-gray-600">Deploy a new SUBZERO-MD WhatsApp bot</p>
+          <p className="text-gray-600">Choose your deployment method</p>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <Tabs defaultValue="standard" className="mt-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="standard">Standard Deploy</TabsTrigger>
+            <TabsTrigger value="github">
+              <Github className="w-4 h-4 mr-1" />
+              GitHub Deploy
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="standard" className="mt-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <Label htmlFor="botName">Bot Name</Label>
             <Input
@@ -192,6 +286,104 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
             </Button>
           </div>
         </form>
+      </TabsContent>
+      
+      <TabsContent value="github" className="mt-6">
+        <form onSubmit={handleGithubSubmit} className="space-y-6">
+          <div className="bg-green-50 p-4 rounded-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <Github className="w-4 h-4 text-green-600" />
+              <span className="text-sm font-medium text-green-800">GitHub Deployment</span>
+            </div>
+            <p className="text-xs text-green-700">
+              Deploy using admin-configured GitHub settings. Your bot will be automatically deployed via GitHub Actions.
+            </p>
+          </div>
+          
+          <div>
+            <Label htmlFor="branch-name">App/Branch Name</Label>
+            <Input
+              id="branch-name"
+              type="text"
+              placeholder="Enter unique app name (e.g., my-bot-2024)"
+              value={githubForm.branchName}
+              onChange={(e) => setGithubForm(prev => ({ ...prev, branchName: e.target.value }))}
+              className="mt-2"
+              disabled={githubDeployMutation.isPending}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="session-id">Session ID</Label>
+            <Input
+              id="session-id"
+              type="text"
+              placeholder="Your WhatsApp session ID"
+              value={githubForm.sessionId}
+              onChange={(e) => setGithubForm(prev => ({ ...prev, sessionId: e.target.value }))}
+              className="mt-2"
+              disabled={githubDeployMutation.isPending}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="owner-number">Owner Number</Label>
+            <Input
+              id="owner-number"
+              type="text"
+              placeholder="Your WhatsApp number with country code"
+              value={githubForm.ownerNumber}
+              onChange={(e) => setGithubForm(prev => ({ ...prev, ownerNumber: e.target.value }))}
+              className="mt-2"
+              disabled={githubDeployMutation.isPending}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="prefix">Bot Prefix</Label>
+            <Input
+              id="prefix"
+              type="text"
+              placeholder="Bot command prefix (default: .)"
+              value={githubForm.prefix}
+              onChange={(e) => setGithubForm(prev => ({ ...prev, prefix: e.target.value }))}
+              className="mt-2"
+              disabled={githubDeployMutation.isPending}
+            />
+          </div>
+
+          <div className="bg-blue-50 p-4 rounded-xl">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-700">GitHub Deployment:</span>
+              <span className="font-bold text-blue-600">25 coins</span>
+            </div>
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-gray-700">Your Balance:</span>
+              <span className="font-bold text-gray-900">{user?.coinBalance || 0} coins</span>
+            </div>
+          </div>
+
+          <div className="flex space-x-4">
+            <Button 
+              type="button" 
+              onClick={handleClose}
+              variant="outline"
+              className="flex-1"
+              disabled={githubDeployMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit"
+              className="flex-1 bg-green-600 hover:bg-green-700"
+              disabled={githubDeployMutation.isPending || !githubForm.branchName.trim() || !githubForm.sessionId.trim() || !githubForm.ownerNumber.trim()}
+            >
+              {githubDeployMutation.isPending ? "Deploying via GitHub..." : "Deploy via GitHub"}
+            </Button>
+          </div>
+        </form>
+      </TabsContent>
+    </Tabs>
       </DialogContent>
     </Dialog>
   );
