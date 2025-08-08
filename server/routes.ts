@@ -1022,6 +1022,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return prefix + randomChars;
       };
 
+      const sanitizeBranchName = (name: string) => {
+        // Remove invalid characters and ensure it follows GitHub branch naming rules
+        return name
+          .replace(/[^a-zA-Z0-9._-]/g, '-') // Replace invalid chars with dash
+          .replace(/^\\.+|\\.+$/g, '') // Remove leading/trailing dots
+          .replace(/\\.\\.+/g, '.') // Replace multiple dots with single dot
+          .replace(/^-+|-+$/g, '') // Remove leading/trailing dashes
+          .replace(/--+/g, '-') // Replace multiple dashes with single dash
+          .substring(0, 250); // Limit length
+      };
+
       if (!branchName || branchName.toString().trim() === '') {
         const generatedName = generateBranchName();
         return res.json({ 
@@ -1031,8 +1042,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Check if branch exists
-      const url = `https://api.github.com/repos/${repoOwner.value}/${repoName.value}/git/ref/heads/${branchName}`;
+      // Sanitize the branch name
+      const originalName = branchName.toString().trim();
+      const sanitizedName = sanitizeBranchName(originalName);
+      
+      if (!sanitizedName) {
+        const generatedName = generateBranchName();
+        return res.json({ 
+          available: false, 
+          suggested: generatedName,
+          message: `Invalid name. Try: ${generatedName}`
+        });
+      }
+
+      // Use sanitized name for checking
+      const nameToCheck = sanitizedName;
+
+      // Check if branch exists using sanitized name
+      const url = `https://api.github.com/repos/${repoOwner.value}/${repoName.value}/git/ref/heads/${nameToCheck}`;
       try {
         const response = await fetch(url, {
           headers: {
@@ -1044,13 +1071,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (response.status === 404) {
           return res.json({ 
             available: true,
-            message: 'Name available!'
+            sanitized: originalName !== sanitizedName ? sanitizedName : undefined,
+            message: originalName !== sanitizedName ? 
+              `Name available! (Auto-corrected to: ${sanitizedName})` : 
+              'Name available!'
           });
         } else if (response.ok) {
-          const suggestedName = `${branchName}-${Math.floor(Math.random() * 1000)}`;
+          const suggestedName = `${sanitizedName}-${Math.floor(Math.random() * 1000)}`;
           return res.json({ 
             available: false, 
             suggested: suggestedName,
+            sanitized: originalName !== sanitizedName ? sanitizedName : undefined,
             message: `Name taken. Try: ${suggestedName}`
           });
         } else {
@@ -1089,10 +1120,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const MAIN_BRANCH = mainBranch?.value || 'main';
       const WORKFLOW_FILE = workflowFile?.value || 'SUBZERO.yml';
 
+      // Validate and sanitize branch name
+      const sanitizeBranchName = (name: string) => {
+        // Remove invalid characters and ensure it follows GitHub branch naming rules
+        return name
+          .replace(/[^a-zA-Z0-9._-]/g, '-') // Replace invalid chars with dash
+          .replace(/^\.+|\.+$/g, '') // Remove leading/trailing dots
+          .replace(/\.\.+/g, '.') // Replace multiple dots with single dot
+          .replace(/^-+|-+$/g, '') // Remove leading/trailing dashes
+          .replace(/--+/g, '-') // Replace multiple dashes with single dash
+          .substring(0, 250); // Limit length
+      };
+      
       if (!branchName || branchName.trim() === '') {
         const prefix = 'subzero-';
         const randomChars = Math.random().toString(36).substring(2, 8);
         branchName = prefix + randomChars;
+      } else {
+        branchName = sanitizeBranchName(branchName.trim());
+        
+        // If sanitization resulted in empty string, generate a name
+        if (!branchName) {
+          const prefix = 'subzero-';
+          const randomChars = Math.random().toString(36).substring(2, 8);
+          branchName = prefix + randomChars;
+        }
       }
 
       if (!sessionId || !ownerNumber || !prefix) {
@@ -1109,14 +1161,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         };
         
-        if (data) config.body = JSON.stringify(data);
+        if (data) {
+          config.headers['Content-Type'] = 'application/json';
+          config.body = JSON.stringify(data);
+        }
         
         const response = await fetch(url, config);
         if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-          throw new Error(errorData?.message || `GitHub API error: ${response.statusText}`);
+          let errorMessage = `GitHub API error: ${response.status} ${response.statusText}`;
+          try {
+            const responseText = await response.text();
+            if (responseText) {
+              const errorData = JSON.parse(responseText);
+              errorMessage = errorData?.message || errorMessage;
+            }
+          } catch (parseError) {
+            // If we can't parse the error response, use the status text
+            console.error('Failed to parse GitHub error response:', parseError);
+          }
+          throw new Error(errorMessage);
         }
-        return response.json();
+        
+        const responseText = await response.text();
+        if (!responseText) {
+          return {}; // Return empty object for empty responses
+        }
+        
+        try {
+          return JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('Failed to parse GitHub response:', parseError);
+          throw new Error('Invalid JSON response from GitHub API');
+        }
       };
 
       // 1. Create branch

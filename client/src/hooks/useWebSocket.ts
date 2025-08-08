@@ -23,13 +23,19 @@ export function useWebSocket(): UseWebSocketReturn {
 
   const connect = () => {
     try {
+      // Close existing connection if any
+      if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
+        wsRef.current.close();
+      }
+
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const wsUrl = `${protocol}//${window.location.host}/ws`;
       
+      console.log('Attempting WebSocket connection to:', wsUrl);
       wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('WebSocket connected successfully');
         setIsConnected(true);
         setConnectionError(null);
         reconnectAttempts.current = 0;
@@ -38,24 +44,33 @@ export function useWebSocket(): UseWebSocketReturn {
       wsRef.current.onmessage = (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
+          console.log('WebSocket message received:', message);
           setLastMessage(message);
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
         }
       };
 
-      wsRef.current.onclose = () => {
-        console.log('WebSocket disconnected');
+      wsRef.current.onclose = (event) => {
+        console.log('WebSocket disconnected, code:', event.code, 'reason:', event.reason);
         setIsConnected(false);
+        
+        // Don't attempt to reconnect if it was a normal closure
+        if (event.code === 1000) {
+          console.log('WebSocket closed normally, not reconnecting');
+          return;
+        }
         
         // Attempt to reconnect with exponential backoff
         if (reconnectAttempts.current < 5) {
           const delay = Math.pow(2, reconnectAttempts.current) * 1000; // 1s, 2s, 4s, 8s, 16s
+          console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts.current + 1}/5)`);
           reconnectTimeoutRef.current = setTimeout(() => {
             reconnectAttempts.current++;
             connect();
           }, delay);
         } else {
+          console.error('Max reconnection attempts reached');
           setConnectionError('Unable to connect to real-time updates');
         }
       };
