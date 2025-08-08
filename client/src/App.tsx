@@ -19,6 +19,7 @@ import Dashboard from "@/pages/dashboard";
 import Wallet from "@/pages/wallet";
 import Referrals from "@/pages/referrals";
 import Deployments from "@/pages/deployments";
+import DeploymentDetails from "@/pages/deployment-details";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
 import Maintenance from "@/pages/maintenance";
@@ -67,6 +68,7 @@ function Router() {
         <Route path="/wallet" component={Wallet} />
         <Route path="/referrals" component={Referrals} />
         <Route path="/deployments" component={Deployments} />
+        <Route path="/deployments/:id" component={DeploymentDetails} />
         {isAdmin && <Route path="/admin/dashboard" component={AdminDashboard} />}
         <Route component={NotFound} />
       </Switch>

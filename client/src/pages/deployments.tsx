@@ -1,23 +1,21 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Plus, CheckCircle, PauseCircle, Calendar, Eye, Square, Play, Trash2, FileText, Settings, AlertTriangle } from "lucide-react";
+import { MessageSquare, Plus, CheckCircle, PauseCircle, Calendar, AlertTriangle, ArrowRight, Square } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import DeployModal from "@/components/deploy-modal";
-import DeploymentLogsModal from "@/components/deployment-logs-modal";
-import DeploymentVariablesModal from "@/components/deployment-variables-modal";
 
 export default function Deployments() {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [showDeployModal, setShowDeployModal] = useState(false);
-  const [selectedDeploymentForLogs, setSelectedDeploymentForLogs] = useState<any>(null);
-  const [selectedDeploymentForVariables, setSelectedDeploymentForVariables] = useState<any>(null);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -44,69 +42,6 @@ export default function Deployments() {
     retry: false,
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      await apiRequest("PATCH", `/api/deployments/${id}/status`, { status });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Deployment status updated successfully!",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/deployments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Error",
-        description: "Failed to update deployment status",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deleteDeploymentMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/deployments/${id}`);
-    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Deployment deleted successfully!",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/deployments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Error",
-        description: "Failed to delete deployment",
-        variant: "destructive",
-      });
-    },
-  });
 
   if (!isAuthenticated || isLoading) {
     return null;
@@ -142,10 +77,6 @@ export default function Deployments() {
     }
   };
 
-  const handleStatusChange = (deploymentId: string, currentStatus: string) => {
-    const newStatus = currentStatus === "active" ? "stopped" : "active";
-    updateStatusMutation.mutate({ id: deploymentId, status: newStatus });
-  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -297,51 +228,13 @@ export default function Deployments() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex space-x-2">
+                  <div className="flex justify-end">
                     <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setSelectedDeploymentForLogs(deployment)}
-                      data-testid={`button-view-logs-${deployment._id}`}
+                      onClick={() => setLocation(`/deployments/${deployment._id}`)}
+                      className="bg-blue-600 hover:bg-blue-700"
                     >
-                      <FileText className="w-4 h-4 mr-1" />
-                      Logs
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setSelectedDeploymentForVariables(deployment)}
-                      data-testid={`button-variables-${deployment._id}`}
-                    >
-                      <Settings className="w-4 h-4 mr-1" />
-                      Variables
-                    </Button>
-                    <Button 
-                      variant={deployment.status === "active" ? "destructive" : "default"}
-                      size="sm"
-                      onClick={() => handleStatusChange(deployment._id, deployment.status)}
-                      disabled={updateStatusMutation.isPending}
-                    >
-                      {deployment.status === "active" ? (
-                        <>
-                          <Square className="w-4 h-4 mr-1" />
-                          Stop
-                        </>
-                      ) : (
-                        <>
-                          <Play className="w-4 h-4 mr-1" />
-                          Start
-                        </>
-                      )}
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteDeploymentMutation.mutate(deployment._id)}
-                      disabled={deleteDeploymentMutation.isPending}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
+                      Manage Bot
+                      <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
                   </div>
                 </div>
@@ -359,25 +252,6 @@ export default function Deployments() {
         isOpen={showDeployModal}
         onClose={() => setShowDeployModal(false)}
       />
-
-      {selectedDeploymentForLogs && (
-        <DeploymentLogsModal
-          isOpen={!!selectedDeploymentForLogs}
-          onClose={() => setSelectedDeploymentForLogs(null)}
-          deploymentId={selectedDeploymentForLogs._id}
-          deploymentName={selectedDeploymentForLogs.name}
-          isAdmin={false}
-        />
-      )}
-
-      {selectedDeploymentForVariables && (
-        <DeploymentVariablesModal
-          isOpen={!!selectedDeploymentForVariables}
-          onClose={() => setSelectedDeploymentForVariables(null)}
-          deploymentId={selectedDeploymentForVariables._id}
-          deploymentName={selectedDeploymentForVariables.name}
-        />
-      )}
     </div>
   );
 }
