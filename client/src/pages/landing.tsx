@@ -21,7 +21,7 @@ export default function Landing() {
     {
       icon: Rocket,
       title: "Lightning Fast Deployment",
-      description: "Deploy your SUBZERO-MD bots in under 60 seconds with our advanced one-click system.",
+      description: "Deploy your SUBZERO-MD bots in under 60 seconds with SUBZERO NODES!",
       gradient: "from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900",
       iconColor: "text-blue-600 dark:text-blue-400",
       bgColor: "bg-gradient-to-r from-blue-500 to-blue-600",
@@ -231,7 +231,7 @@ export default function Landing() {
             <div className="text-center">
               <div className="text-blue-100 text-sm">
                 <CheckCircle className="w-4 h-4 inline mr-2" />
-                100 free coins included • No setup fees • Cancel anytime
+                10 free coins included • No setup fees • Cancel anytime
               </div>
             </div>
           </div>
@@ -253,10 +253,10 @@ export default function Landing() {
             </div>
             <div className="text-center md:text-right">
               <div className="text-gray-400 text-sm">
-                © 2025 SUBZERO-MD. All rights reserved.
+                © 2025 SUBZERO-NODEZ. All rights reserved.
               </div>
               <div className="text-gray-500 text-xs mt-1">
-                Built with ❤️ for the developer community
+                Built with ❤️ by Team Subzero
               </div>
             </div>
           </div>
