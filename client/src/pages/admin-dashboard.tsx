@@ -33,7 +33,8 @@ import {
   RefreshCw,
   FileText,
   Gift,
-  Clock
+  Clock,
+  Trash2
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -393,6 +394,36 @@ export default function AdminDashboard() {
     },
     onError: (error: any) => {
       toast({ title: "Failed to delete user", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Mark notification as read mutation
+  const markNotificationReadMutation = useMutation({
+    mutationFn: async (notificationId: string) => {
+      return await apiRequest('PATCH', `/api/admin/notifications/${notificationId}/read`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/notifications'] });
+      toast({ title: "Notification marked as read" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to mark notification as read", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Delete deployment mutation
+  const deleteDeploymentMutation = useMutation({
+    mutationFn: async (deploymentId: string) => {
+      return await apiRequest('DELETE', `/api/admin/deployments/${deploymentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/deployments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/notifications'] });
+      toast({ title: "Deployment deleted successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to delete deployment", description: error.message, variant: "destructive" });
     }
   });
 
@@ -974,16 +1005,29 @@ export default function AdminDashboard() {
                       <AlertTriangle className="h-4 w-4" />
                       <AlertDescription>
                         <div className="flex justify-between items-start">
-                          <div>
+                          <div className="flex-1">
                             <strong>{notification.title}</strong>
                             <p>{notification.message}</p>
                             <p className="text-xs text-muted-foreground mt-1">
                               {new Date(notification.createdAt).toLocaleDateString()}
                             </p>
                           </div>
-                          <Badge variant={notification.read ? "secondary" : "destructive"}>
-                            {notification.read ? "Read" : "Unread"}
-                          </Badge>
+                          <div className="flex items-center space-x-2 ml-4">
+                            <Badge variant={notification.read ? "secondary" : "destructive"}>
+                              {notification.read ? "Read" : "Unread"}
+                            </Badge>
+                            {!notification.read && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => markNotificationReadMutation.mutate(notification._id)}
+                                disabled={markNotificationReadMutation.isPending}
+                                data-testid={`button-mark-read-${notification._id}`}
+                              >
+                                Mark as Read
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </AlertDescription>
                     </Alert>
@@ -1797,6 +1841,20 @@ export default function AdminDashboard() {
                               >
                                 <Eye className="w-4 h-4 mr-1" />
                                 Logs
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm(`Are you sure you want to delete deployment "${deployment.name}"? This action cannot be undone.`)) {
+                                    deleteDeploymentMutation.mutate(deployment._id);
+                                  }
+                                }}
+                                disabled={deleteDeploymentMutation.isPending}
+                                data-testid={`button-admin-delete-${deployment._id}`}
+                              >
+                                <Trash2 className="w-4 h-4 mr-1" />
+                                Delete
                               </Button>
                             </div>
                           </TableCell>

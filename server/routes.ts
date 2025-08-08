@@ -1396,6 +1396,34 @@ jobs:
     }
   });
 
+  // Admin delete deployment
+  app.delete('/api/admin/deployments/:id', requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+      const deployment = await storage.getDeployment(id);
+      if (!deployment) {
+        return res.status(404).json({ message: 'Deployment not found' });
+      }
+
+      await storage.deleteDeployment(id);
+      
+      // Log admin action
+      await storage.createAdminNotification({
+        type: 'admin_action',
+        title: 'Deployment Deleted',
+        message: `Admin deleted deployment: ${deployment.name}`,
+        read: false,
+        data: { deploymentId: id, deploymentName: deployment.name }
+      });
+      
+      res.json({ message: 'Deployment deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting deployment:', error);
+      res.status(500).json({ message: 'Failed to delete deployment' });
+    }
+  });
+
   // App settings management
   app.get('/api/admin/settings', requireAdmin, async (req, res) => {
     try {
