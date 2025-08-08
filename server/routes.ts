@@ -690,6 +690,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single deployment by ID
+  app.get('/api/deployments/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const deploymentId = req.params.id;
+      
+      const deployment = await storage.getDeployment(deploymentId);
+      if (!deployment) {
+        return res.status(404).json({ message: "Deployment not found" });
+      }
+      
+      // Ensure user owns the deployment (unless admin)
+      if (deployment.userId !== userId && !req.user.isAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      res.json(deployment);
+    } catch (error) {
+      console.error("Error fetching deployment:", error);
+      res.status(500).json({ message: "Failed to fetch deployment" });
+    }
+  });
+
   app.post('/api/deployments', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user._id.toString();
