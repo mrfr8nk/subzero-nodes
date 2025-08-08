@@ -1283,6 +1283,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User deployment branch checking
+  app.get('/api/deployments/check-branch', isAuthenticated, async (req, res) => {
+    try {
+      const { branchName } = req.query;
+      const [githubToken, repoOwner, repoName] = await Promise.all([
+        storage.getAppSetting('github_token'),
+        storage.getAppSetting('github_repo_owner'),
+        storage.getAppSetting('github_repo_name')
+      ]);
+
+      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
+        return res.status(400).json({ message: 'GitHub settings not configured by admin. Please contact administrator.' });
+      }
+
+      const generateBranchName = () => {
+        const prefix = 'user-';
+        const randomChars = Math.random().toString(36).substring(2, 8);
+        return prefix + randomChars;
+      };
+
+      const sanitizeBranchName = (name: string) => {
+        // Remove invalid characters and ensure it follows GitHub branch naming rules
+        return name
+          .replace(/[^a-zA-Z0-9._-]/g, '-') // Replace invalid chars with dash
+          .replace(/^\.+|\.+$/g, '') // Remove leading/trailing dots
+          .replace(/\.\.+/g, '.') // Replace multiple dots with single dot
+          .replace(/^-+|-+$/g, '') // Remove leading/trailing dashes
+          .replace(/--+/g, '-') // Replace multiple dashes with single dash
+          .substring(0, 250); // Limit length
+      };
+
+      if (!branchName || branchName.toString().trim() === '') {
+        const generatedName = generateBranchName();
+        return res.json({ 
+          available: true, 
+          suggested: generatedName,
+          message: `Try this available name: ${generatedName}`
+        });
+      }
+
+      // Sanitize the branch name
+      const originalName = branchName.toString().trim();
+      const sanitizedName = sanitizeBranchName(originalName);
+      
+      if (!sanitizedName) {
+        const generatedName = generateBranchName();
+        return res.json({ 
+          available: false, 
+          suggested: generatedName,
+          message: `Invalid name. Try: ${generatedName}`
+        });
+      }
+
+      // Use sanitized name for checking
+      const nameToCheck = sanitizedName;
+
+      // Check if branch exists using sanitized name
+      const url = `https://api.github.com/repos/${repoOwner.value}/${repoName.value}/git/ref/heads/${nameToCheck}`;
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'Authorization': `token ${githubToken.value}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        });
+
+        if (response.status === 404) {
+          return res.json({ 
+            available: true,
+            sanitized: originalName !== sanitizedName ? sanitizedName : undefined,
+            message: originalName !== sanitizedName ? 
+              `Name available! (Auto-corrected to: ${sanitizedName})` : 
+              'Name available!'
+          });
+        } else if (response.ok) {
+          const suggestedName = `${sanitizedName}-${Math.floor(Math.random() * 1000)}`;
+          return res.json({ 
+            available: false, 
+            suggested: suggestedName,
+            sanitized: originalName !== sanitizedName ? sanitizedName : undefined,
+            message: `Name taken. Try: ${suggestedName}`
+          });
+        } else {
+          throw new Error(`GitHub API error: ${response.statusText}`);
+        }
+      } catch (error) {
+        console.error('Branch check error:', error);
+        res.status(500).json({ message: 'Failed to check branch availability' });
+      }
+    } catch (error) {
+      console.error('Error checking branch:', error);
+      res.status(500).json({ message: 'Failed to check branch' });
+    }
+  });
+
   // Delete deployment
   app.delete('/api/deployments/:id', isAuthenticated, async (req: any, res) => {
     try {

@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Rocket } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Rocket, RefreshCw, CheckCircle, AlertTriangle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 
@@ -26,6 +27,13 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
     ownerNumber: '',
     prefix: '.'
   });
+  const [branchCheckResult, setBranchCheckResult] = useState<{
+    available: boolean;
+    message: string;
+    suggested?: string;
+    sanitized?: string;
+  } | null>(null);
+  const [isCheckingBranch, setIsCheckingBranch] = useState(false);
 
 
   const githubDeployMutation = useMutation({
@@ -106,10 +114,36 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
     githubDeployMutation.mutate(githubForm);
   };
 
+  const checkBranchAvailability = async (branchName: string) => {
+    if (!branchName.trim()) {
+      setBranchCheckResult(null);
+      return;
+    }
+
+    setIsCheckingBranch(true);
+    try {
+      const response = await fetch(`/api/deployments/check-branch?branchName=${encodeURIComponent(branchName)}`);
+      if (!response.ok) {
+        throw new Error('Failed to check branch availability');
+      }
+      const result = await response.json();
+      setBranchCheckResult(result);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to check branch availability",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCheckingBranch(false);
+    }
+  };
+
   const handleClose = () => {
     if (!githubDeployMutation.isPending) {
       onClose();
       setGithubForm({ branchName: '', sessionId: '', ownerNumber: '', prefix: '.' });
+      setBranchCheckResult(null);
     }
   };
 
@@ -128,15 +162,58 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
           <form onSubmit={handleGithubSubmit} className="space-y-6">
           <div>
             <Label htmlFor="bot-name">Bot Name</Label>
-            <Input
-              id="bot-name"
-              type="text"
-              placeholder="Enter unique bot name (e.g., my-bot-2024)"
-              value={githubForm.branchName}
-              onChange={(e) => setGithubForm(prev => ({ ...prev, branchName: e.target.value }))}
-              className="mt-2"
-              disabled={githubDeployMutation.isPending}
-            />
+            <div className="flex space-x-2 mt-2">
+              <Input
+                id="bot-name"
+                type="text"
+                placeholder="Enter unique bot name (e.g., my-bot-2024)"
+                value={githubForm.branchName}
+                onChange={(e) => {
+                  setGithubForm(prev => ({ ...prev, branchName: e.target.value }));
+                  // Auto-check availability after typing stops
+                  setTimeout(() => checkBranchAvailability(e.target.value), 500);
+                }}
+                disabled={githubDeployMutation.isPending}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => checkBranchAvailability(githubForm.branchName)}
+                disabled={isCheckingBranch || !githubForm.branchName.trim() || githubDeployMutation.isPending}
+                className="px-3"
+              >
+                {isCheckingBranch ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Check"}
+              </Button>
+            </div>
+            {branchCheckResult && (
+              <Alert variant={branchCheckResult.available ? "default" : "destructive"} className="mt-2">
+                <div className="flex items-center">
+                  {branchCheckResult.available ? (
+                    <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4 text-red-600 mr-2" />
+                  )}
+                  <AlertDescription className="flex-1">
+                    {branchCheckResult.message}
+                    {branchCheckResult.suggested && (
+                      <div className="mt-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setGithubForm(prev => ({ ...prev, branchName: branchCheckResult.suggested || '' }));
+                            setBranchCheckResult({ ...branchCheckResult, available: true, message: 'Name available!' });
+                          }}
+                        >
+                          Use "{branchCheckResult.suggested}"
+                        </Button>
+                      </div>
+                    )}
+                  </AlertDescription>
+                </div>
+              </Alert>
+            )}
           </div>
 
           <div>
@@ -202,7 +279,13 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
             <Button 
               type="submit"
               className="flex-1 bg-blue-600 hover:bg-blue-700"
-              disabled={githubDeployMutation.isPending || !githubForm.branchName.trim() || !githubForm.sessionId.trim() || !githubForm.ownerNumber.trim()}
+              disabled={
+                githubDeployMutation.isPending || 
+                !githubForm.branchName.trim() || 
+                !githubForm.sessionId.trim() || 
+                !githubForm.ownerNumber.trim() ||
+                (branchCheckResult && !branchCheckResult.available)
+              }
             >
               {githubDeployMutation.isPending ? "Deploying..." : "Deploy Bot"}
             </Button>
