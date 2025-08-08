@@ -422,15 +422,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'User with this email already exists' });
       }
 
+      // Get user IP for registration tracking and duplicate account prevention
+      const registrationIp = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || req.headers['x-forwarded-for'];
+      
+      // Check for existing accounts from same IP address
+      if (registrationIp) {
+        const existingAccountsFromIP = await storage.getUsersByIp(registrationIp as string);
+        
+        // Get configurable max accounts per IP from admin settings (default to 1)
+        const maxAccountsSetting = await storage.getAppSetting('max_accounts_per_ip');
+        const maxAccountsPerIP = maxAccountsSetting?.value || 1;
+        
+        const activeAccounts = existingAccountsFromIP.filter(user => 
+          user.status !== 'banned' && user.status !== 'restricted'
+        );
+        
+        if (activeAccounts.length >= maxAccountsPerIP) {
+          return res.status(400).json({ 
+            message: `Multiple accounts detected from this IP address. Only ${maxAccountsPerIP} account(s) allowed per IP. Contact support if you believe this is an error.`
+          });
+        }
+      }
+
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
       // Generate verification token
       const verificationToken = crypto.randomBytes(32).toString('hex');
       const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-      // Get user IP for registration tracking
-      const registrationIp = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
       
       // Create user with unverified status
       const newUser = await storage.createLocalUser({
@@ -1702,6 +1721,31 @@ jobs:
     } catch (error) {
       console.error('Error updating app setting:', error);
       res.status(500).json({ message: 'Failed to update app setting' });
+    }
+  });
+
+  // Initialize default IP restriction setting if it doesn't exist
+  app.post('/api/admin/settings/init-ip-restriction', requireAdmin, async (req, res) => {
+    try {
+      const existingSetting = await storage.getAppSetting('max_accounts_per_ip');
+      
+      if (!existingSetting) {
+        const adminId = (req.user as any)?._id?.toString();
+        const settingData = insertAppSettingsSchema.parse({
+          key: 'max_accounts_per_ip',
+          value: 1,
+          description: 'Maximum number of accounts allowed per IP address',
+          updatedBy: adminId
+        });
+        
+        const setting = await storage.setAppSetting(settingData);
+        res.json({ message: 'IP restriction setting initialized', setting });
+      } else {
+        res.json({ message: 'IP restriction setting already exists', setting: existingSetting });
+      }
+    } catch (error) {
+      console.error('Error initializing IP restriction setting:', error);
+      res.status(500).json({ message: 'Failed to initialize IP restriction setting' });
     }
   });
 

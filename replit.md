@@ -50,6 +50,7 @@ Preferred communication style: Simple, everyday language.
 - **Admin Controls**: Comprehensive admin dashboard with user management, cost settings, and super admin capabilities
 - **User Management**: Account settings with self-deletion functionality and admin controls for user management
 - **Configurable Costs**: Admin-controlled deployment and daily charge rates instead of hardcoded values
+- **IP-Based Security**: Comprehensive IP tracking system with configurable account limits per IP address to prevent abuse
 
 ## External Dependencies
 
@@ -99,6 +100,12 @@ For production deployment, add the base domain URL to Google Cloud Console:
 - **Configurable Cost System**: Deployment costs and daily charges are now configurable through admin settings
 - **Improved Error Handling**: Added ObjectId validation to prevent MongoDB BSON errors
 - **Security Enhancements**: Admins cannot self-delete through user interface for security
+- **IP-Based Duplicate Account Prevention**: Implemented comprehensive IP tracking system to prevent users from creating multiple accounts
+  - Tracks user IP addresses during registration and login
+  - Configurable maximum accounts per IP address (default: 1)
+  - Admin notifications for duplicate IP detections
+  - Error handling for both Google OAuth and local signup flows
+  - Admin controls for IP restriction configuration
 
 ### Deployment Notes
 - Update `FRONTEND_URL` and `BACKEND_URL` in production environment

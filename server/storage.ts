@@ -30,7 +30,7 @@ export interface IStorage {
   setPasswordResetToken(email: string, token: string, expiry: Date): Promise<void>;
   resetPassword(userId: string, newPassword: string): Promise<void>;
   updateVerificationToken(email: string, token: string, expiry: Date): Promise<void>;
-  upsertUser(user: InsertUser): Promise<User>;
+  upsertUser(user: InsertUser, registrationIp?: string): Promise<User>;
   
   // Deployment operations
   createDeployment(deployment: InsertDeployment): Promise<Deployment>;
@@ -287,7 +287,7 @@ export class MongoStorage implements IStorage {
     );
   }
 
-  async upsertUser(userData: InsertUser): Promise<User> {
+  async upsertUser(userData: InsertUser, registrationIp?: string): Promise<User> {
     const now = new Date();
     
     // Check if user exists by Google ID or email
@@ -313,6 +313,28 @@ export class MongoStorage implements IStorage {
       
       return { ...existingUser, ...updatedData };
     } else {
+      // Check for existing accounts from same IP address before creating new user
+      if (registrationIp) {
+        const existingAccountsFromIP = await this.getUsersByIp(registrationIp);
+        
+        // Get configurable max accounts per IP from admin settings (default to 1)
+        const maxAccountsSetting = await this.getAppSetting('max_accounts_per_ip');
+        const maxAccountsPerIP = maxAccountsSetting?.value || 1;
+        
+        // Check if any of the existing accounts are active (not banned)
+        const activeAccounts = existingAccountsFromIP.filter(user => 
+          user.status !== 'banned' && user.status !== 'restricted'
+        );
+        
+        if (activeAccounts.length >= maxAccountsPerIP) {
+          throw new Error(`Multiple accounts detected from this IP address. Only ${maxAccountsPerIP} account(s) allowed per IP. Contact support if you believe this is an error.`);
+        }
+        
+        // Set registration IP in user data
+        userData.registrationIp = registrationIp;
+        userData.lastLoginIp = registrationIp;
+        userData.ipHistory = [registrationIp];
+      }
       // Create new user
       if (!userData.referralCode) {
         userData.referralCode = await this.generateReferralCode();

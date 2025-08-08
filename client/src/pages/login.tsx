@@ -41,6 +41,12 @@ export default function Login() {
         description: "There was an error signing you in with Google. Please try again.",
         variant: "destructive",
       });
+    } else if (authError === 'multiple_accounts') {
+      toast({
+        title: "Multiple Accounts Detected",
+        description: "Only one account is allowed per IP address. If you believe this is an error, please contact support.",
+        variant: "destructive",
+      });
     }
   }, [authError, toast]);
 

@@ -68,9 +68,16 @@ export async function setupAuth(app: Express) {
         authProvider: 'google' as const,
         emailVerified: true,
         coinBalance: 100,
+        // Required fields for InsertUser type
+        status: 'active' as const,
+        role: 'user' as const,
+        isAdmin: false,
+        restrictions: [],
+        ipHistory: [],
       };
 
-      // Upsert user in database (referral handling is done inside upsertUser)
+      // Note: We can't access req object here in the strategy callback
+      // IP tracking will be handled in the callback route
       const user = await storage.upsertUser(userData);
       return done(null, user);
     } catch (error) {
@@ -98,7 +105,57 @@ export async function setupAuth(app: Express) {
 
   app.get('/api/auth/google/callback',
     passport.authenticate('google', { failureRedirect: '/login' }),
-    (req, res) => {
+    async (req, res) => {
+      try {
+        // Get user IP for tracking
+        const userIp = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || req.headers['x-forwarded-for'];
+        
+        if (userIp && req.user) {
+          // Check if this is a new user and apply IP restrictions
+          const user = req.user as any;
+          if (user && !user.lastLoginIp) {
+            // This is a new user, check for duplicate accounts
+            const existingAccountsFromIP = await storage.getUsersByIp(userIp as string);
+            
+            // Get configurable max accounts per IP from admin settings (default to 1)
+            const maxAccountsSetting = await storage.getAppSetting('max_accounts_per_ip');
+            const maxAccountsPerIP = maxAccountsSetting?.value || 1;
+            
+            const activeAccounts = existingAccountsFromIP.filter(existingUser => 
+              existingUser.status !== 'banned' && 
+              existingUser.status !== 'restricted' &&
+              existingUser._id.toString() !== user._id.toString() // Exclude current user
+            );
+            
+            if (activeAccounts.length >= maxAccountsPerIP) {
+              // Delete the newly created user account
+              await storage.deleteUser(user._id.toString(), 'system');
+              
+              // Log out and redirect with error
+              req.logout((err) => {
+                if (err) console.error('Logout error:', err);
+                res.redirect('/login?error=multiple_accounts');
+              });
+              return;
+            }
+          }
+          
+          // Update user IP tracking for valid users
+          await storage.updateUserIp(user._id.toString(), userIp as string);
+        }
+      } catch (error) {
+        console.error('Error in Google OAuth callback:', error);
+        
+        // If IP check failed due to multiple accounts, redirect with error
+        if (error instanceof Error && error.message.includes('Multiple accounts detected')) {
+          req.logout((err) => {
+            if (err) console.error('Logout error:', err);
+            res.redirect('/login?error=multiple_accounts');
+          });
+          return;
+        }
+      }
+      
       // Successful authentication, redirect to dashboard
       res.redirect('/');
     }
