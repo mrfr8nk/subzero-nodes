@@ -719,6 +719,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const MAIN_BRANCH = mainBranch?.value || 'main';
       const WORKFLOW_FILE = workflowFile?.value || 'SUBZERO.yml';
 
+      // Validate GitHub repository access before proceeding
+      try {
+        const testUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
+        const testResponse = await fetch(testUrl, {
+          headers: {
+            'Authorization': `token ${GITHUB_TOKEN}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        });
+        
+        if (!testResponse.ok) {
+          console.error('GitHub repository validation failed:', {
+            url: testUrl,
+            status: testResponse.status,
+            statusText: testResponse.statusText
+          });
+          
+          if (testResponse.status === 404) {
+            return res.status(400).json({ 
+              message: 'GitHub repository not found. Please contact administrator to verify repository settings.' 
+            });
+          } else if (testResponse.status === 401) {
+            return res.status(400).json({ 
+              message: 'GitHub access denied. Please contact administrator to verify token permissions.' 
+            });
+          } else {
+            return res.status(400).json({ 
+              message: 'GitHub repository access failed. Please contact administrator.' 
+            });
+          }
+        }
+      } catch (error) {
+        console.error('GitHub repository validation error:', error);
+        return res.status(500).json({ 
+          message: 'Failed to validate GitHub repository access. Please try again later.' 
+        });
+      }
+
       // Sanitize branch name
       const sanitizeBranchName = (name: string) => {
         return name
@@ -763,6 +801,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const response = await fetch(url, config);
         if (!response.ok) {
           const errorText = await response.text();
+          console.error(`GitHub API Error Details:`, {
+            url,
+            status: response.status,
+            statusText: response.statusText,
+            errorText,
+            method: config.method || 'GET'
+          });
           throw new Error(`GitHub API error: ${response.status} ${response.statusText} - ${errorText}`);
         }
         

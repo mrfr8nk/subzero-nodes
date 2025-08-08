@@ -74,7 +74,25 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
       } else if (error.message.includes("GitHub settings not configured")) {
         toast({
           title: "Deployment Unavailable",
-          description: "Deployment service is not available. Please contact administrator.",
+          description: "Deployment service is not configured. Please contact administrator.",
+          variant: "destructive",
+        });
+      } else if (error.message.includes("GitHub repository not found")) {
+        toast({
+          title: "Repository Error",
+          description: "The deployment repository is not accessible. Please contact administrator.",
+          variant: "destructive",
+        });
+      } else if (error.message.includes("GitHub access denied")) {
+        toast({
+          title: "Access Error", 
+          description: "GitHub access permissions are invalid. Please contact administrator.",
+          variant: "destructive",
+        });
+      } else if (error.message.includes("GitHub repository access failed")) {
+        toast({
+          title: "Repository Access Failed",
+          description: "Cannot access the deployment repository. Please contact administrator.",
           variant: "destructive",
         });
       } else {
@@ -158,7 +176,7 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
           <p className="text-gray-600">Deploy a new SUBZERO-MD WhatsApp bot</p>
         </DialogHeader>
 
-        <div className="mt-6 max-h-[500px] overflow-y-auto pr-2">
+        <div className="mt-6 max-h-[60vh] overflow-y-auto pr-2">
           <form onSubmit={handleGithubSubmit} className="space-y-6">
           <div>
             <Label htmlFor="bot-name">Bot Name</Label>
@@ -284,7 +302,7 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
                 !githubForm.branchName.trim() || 
                 !githubForm.sessionId.trim() || 
                 !githubForm.ownerNumber.trim() ||
-                (branchCheckResult && !branchCheckResult.available)
+                (branchCheckResult !== null && !branchCheckResult.available)
               }
             >
               {githubDeployMutation.isPending ? "Deploying..." : "Deploy Bot"}
