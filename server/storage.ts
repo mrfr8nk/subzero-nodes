@@ -73,6 +73,7 @@ export interface IStorage {
   updateUserStatus(userId: string, status: string, restrictions?: string[]): Promise<void>;
   updateUserRole(userId: string, role: string): Promise<void>;
   updateUserCoins(userId: string, amount: number, reason: string, adminId: string): Promise<void>;
+  updateUserClaimDate(userId: string, claimDate: Date): Promise<void>;
   promoteToAdmin(userId: string, adminId: string): Promise<void>;
   getUsersByIp(ip: string): Promise<User[]>;
   updateUserIp(userId: string, ip: string): Promise<void>;
@@ -604,6 +605,18 @@ export class MongoStorage implements IStorage {
       description: `Admin adjustment: ${reason}`,
       relatedId: adminId,
     });
+  }
+
+  async updateUserClaimDate(userId: string, claimDate: Date): Promise<void> {
+    await this.usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $set: { 
+          lastClaimDate: claimDate,
+          updatedAt: new Date()
+        }
+      }
+    );
   }
 
   async promoteToAdmin(userId: string, adminId: string): Promise<void> {

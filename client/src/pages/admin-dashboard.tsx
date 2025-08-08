@@ -31,7 +31,9 @@ import {
   Rocket,
   Eye,
   RefreshCw,
-  FileText
+  FileText,
+  Gift,
+  Clock
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -721,6 +723,12 @@ export default function AdminDashboard() {
                     Currency
                   </div>
                 </SelectItem>
+                <SelectItem value="coin-management">
+                  <div className="flex items-center">
+                    <Coins className="w-4 h-4 mr-2" />
+                    Coin Management
+                  </div>
+                </SelectItem>
                 <SelectItem value="github">
                   <div className="flex items-center">
                     <Github className="w-4 h-4 mr-2" />
@@ -1217,6 +1225,12 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
+          </div>
+        )}
+
+        {selectedSection === "coin-management" && (
+          <div className="space-y-4">
+            <CoinClaimManagement />
           </div>
         )}
 
@@ -1957,6 +1971,150 @@ export default function AdminDashboard() {
           isAdmin={true}
         />
       )}
+    </div>
+  );
+}
+
+// Coin Claim Management Component
+function CoinClaimManagement() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [claimAmount, setClaimAmount] = useState(50);
+
+  const { data: claimConfig, isLoading } = useQuery<{dailyClaimAmount: number}>({
+    queryKey: ["/api/admin/coins/claim-config"],
+  });
+
+  const updateClaimConfigMutation = useMutation({
+    mutationFn: async (data: { dailyClaimAmount: number }) => {
+      return await apiRequest("POST", "/api/admin/coins/claim-config", data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Settings Updated",
+        description: "Daily claim amount has been updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/coins/claim-config"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update claim settings",
+        variant: "destructive",
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (claimConfig) {
+      setClaimAmount(claimConfig.dailyClaimAmount);
+    }
+  }, [claimConfig]);
+
+  const handleSave = () => {
+    if (claimAmount < 1 || claimAmount > 1000) {
+      toast({
+        title: "Invalid Amount",
+        description: "Daily claim amount must be between 1 and 1000 coins",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    updateClaimConfigMutation.mutate({ dailyClaimAmount: claimAmount });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="animate-pulse space-y-4">
+        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+        <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+        <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Gift className="w-5 h-5 mr-2" />
+              Daily Claim Configuration
+            </CardTitle>
+            <CardDescription>
+              Set the amount of coins users can claim every 24 hours
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="claim-amount">Daily Claim Amount (1-1000 coins)</Label>
+              <Input
+                id="claim-amount"
+                type="number"
+                min="1"
+                max="1000"
+                value={claimAmount}
+                onChange={(e) => setClaimAmount(parseInt(e.target.value) || 1)}
+                className="mt-1"
+                data-testid="input-claim-amount"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between pt-4">
+              <div className="text-sm text-muted-foreground">
+                Current setting: {claimConfig?.dailyClaimAmount || 50} coins per day
+              </div>
+              <Button 
+                onClick={handleSave}
+                disabled={updateClaimConfigMutation.isPending}
+                data-testid="button-save-claim-config"
+              >
+                {updateClaimConfigMutation.isPending ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Clock className="w-5 h-5 mr-2" />
+              Claim System Info
+            </CardTitle>
+            <CardDescription>
+              Information about the coin claiming system
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-3 bg-muted rounded-lg">
+                <div className="text-2xl font-bold text-primary">24h</div>
+                <div className="text-sm text-muted-foreground">Cooldown Period</div>
+              </div>
+              <div className="text-center p-3 bg-muted rounded-lg">
+                <div className="text-2xl font-bold text-primary">{claimConfig?.dailyClaimAmount || 50}</div>
+                <div className="text-sm text-muted-foreground">Coins per Claim</div>
+              </div>
+            </div>
+            
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p>• Users can claim coins once every 24 hours</p>
+              <p>• Countdown timer shows time until next claim</p>
+              <p>• Transactions are automatically recorded</p>
+              <p>• Admins can adjust claim amounts anytime</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

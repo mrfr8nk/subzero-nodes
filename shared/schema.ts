@@ -20,6 +20,7 @@ export interface User {
   isVerified?: boolean;
   resetPasswordToken?: string;
   resetPasswordExpiry?: Date;
+  lastClaimDate?: Date;
   // Admin fields
   isAdmin?: boolean;
   role?: string; // 'user', 'admin', 'super_admin'
@@ -108,6 +109,7 @@ export const insertUserSchema = z.object({
   isVerified: z.boolean().optional(),
   resetPasswordToken: z.string().optional(),
   resetPasswordExpiry: z.date().optional(),
+  lastClaimDate: z.date().optional(),
   // Admin fields
   isAdmin: z.boolean().default(false),
   role: z.string().default("user"),

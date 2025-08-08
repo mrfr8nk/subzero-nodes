@@ -1087,6 +1087,90 @@ jobs:
     }
   });
 
+  // Coin claiming routes
+  app.get('/api/coins/claim-status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const now = new Date();
+      const lastClaim = user.lastClaimDate;
+      const canClaim = !lastClaim || (now.getTime() - lastClaim.getTime()) >= 24 * 60 * 60 * 1000; // 24 hours
+      
+      let timeUntilNextClaim = 0;
+      if (!canClaim && lastClaim) {
+        const nextClaimTime = new Date(lastClaim.getTime() + 24 * 60 * 60 * 1000);
+        timeUntilNextClaim = Math.max(0, nextClaimTime.getTime() - now.getTime());
+      }
+
+      // Get admin-configured claim amount
+      const claimAmountSetting = await storage.getAppSetting('daily_claim_amount');
+      const claimAmount = claimAmountSetting?.value || 50; // Default 50 coins
+
+      res.json({
+        canClaim,
+        timeUntilNextClaim,
+        claimAmount,
+        lastClaimDate: lastClaim
+      });
+    } catch (error) {
+      console.error('Error getting claim status:', error);
+      res.status(500).json({ message: 'Failed to get claim status' });
+    }
+  });
+
+  app.post('/api/coins/claim', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const now = new Date();
+      const lastClaim = user.lastClaimDate;
+      
+      // Check if 24 hours have passed
+      if (lastClaim && (now.getTime() - lastClaim.getTime()) < 24 * 60 * 60 * 1000) {
+        const nextClaimTime = new Date(lastClaim.getTime() + 24 * 60 * 60 * 1000);
+        return res.status(400).json({ 
+          message: 'Daily claim not available yet',
+          nextClaimTime
+        });
+      }
+
+      // Get admin-configured claim amount
+      const claimAmountSetting = await storage.getAppSetting('daily_claim_amount');
+      const claimAmount = claimAmountSetting?.value || 50;
+
+      // Update user's last claim date and coin balance
+      await storage.updateUserClaimDate(userId, now);
+      await storage.updateUserBalance(userId, claimAmount);
+      
+      // Create transaction record
+      await storage.createTransaction({
+        userId,
+        type: 'daily_claim',
+        amount: claimAmount,
+        description: 'Daily coin claim reward'
+      });
+
+      res.json({
+        message: 'Coins claimed successfully',
+        amount: claimAmount,
+        newBalance: user.coinBalance + claimAmount
+      });
+    } catch (error) {
+      console.error('Error claiming coins:', error);
+      res.status(500).json({ message: 'Failed to claim coins' });
+    }
+  });
+
   // Admin authentication routes
   app.post('/api/admin/login', adminLogin);
 
@@ -2161,6 +2245,47 @@ jobs:
     } catch (error) {
       console.error('Error toggling maintenance mode:', error);
       res.status(500).json({ error: 'Failed to toggle maintenance mode' });
+    }
+  });
+
+  // Admin coin claim configuration
+  app.get('/api/admin/coins/claim-config', requireAdmin, async (req, res) => {
+    try {
+      const claimAmountSetting = await storage.getAppSetting('daily_claim_amount');
+      const claimAmount = claimAmountSetting?.value || 50;
+      
+      res.json({
+        dailyClaimAmount: claimAmount
+      });
+    } catch (error) {
+      console.error('Error getting coin claim config:', error);
+      res.status(500).json({ error: 'Failed to get coin claim config' });
+    }
+  });
+
+  app.post('/api/admin/coins/claim-config', requireAdmin, async (req, res) => {
+    try {
+      const { dailyClaimAmount } = req.body;
+      const adminId = (req.user as any)?._id?.toString();
+      
+      if (!dailyClaimAmount || dailyClaimAmount < 1 || dailyClaimAmount > 1000) {
+        return res.status(400).json({ error: 'Daily claim amount must be between 1 and 1000 coins' });
+      }
+
+      await storage.setAppSetting({
+        key: 'daily_claim_amount',
+        value: parseInt(dailyClaimAmount),
+        description: 'Daily coin claim reward amount',
+        updatedBy: adminId
+      });
+
+      res.json({
+        message: 'Daily claim amount updated successfully',
+        dailyClaimAmount: parseInt(dailyClaimAmount)
+      });
+    } catch (error) {
+      console.error('Error updating coin claim config:', error);
+      res.status(500).json({ error: 'Failed to update coin claim config' });
     }
   });
 
