@@ -146,8 +146,19 @@ export class MongoStorage implements IStorage {
   }
 
   async getUser(id: string): Promise<User | undefined> {
-    const user = await this.usersCollection.findOne({ _id: new ObjectId(id) });
-    return user || undefined;
+    try {
+      // Validate ObjectId format before creating ObjectId
+      if (!id || typeof id !== 'string' || id.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(id)) {
+        console.warn(`Invalid ObjectId format: ${id}`);
+        return undefined;
+      }
+      
+      const user = await this.usersCollection.findOne({ _id: new ObjectId(id) });
+      return user || undefined;
+    } catch (error) {
+      console.error(`Error getting user with id ${id}:`, error);
+      return undefined;
+    }
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
@@ -399,19 +410,50 @@ export class MongoStorage implements IStorage {
   }
 
   async getDeployment(id: string): Promise<Deployment | undefined> {
-    const deployment = await this.deploymentsCollection.findOne({ _id: new ObjectId(id) });
-    return deployment || undefined;
+    try {
+      // Validate ObjectId format before creating ObjectId
+      if (!id || typeof id !== 'string' || id.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(id)) {
+        console.warn(`Invalid ObjectId format: ${id}`);
+        return undefined;
+      }
+      
+      const deployment = await this.deploymentsCollection.findOne({ _id: new ObjectId(id) });
+      return deployment || undefined;
+    } catch (error) {
+      console.error(`Error getting deployment with id ${id}:`, error);
+      return undefined;
+    }
   }
 
   async updateDeploymentStatus(id: string, status: string): Promise<void> {
-    await this.deploymentsCollection.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: { status, updatedAt: new Date() } }
-    );
+    try {
+      // Validate ObjectId format before creating ObjectId
+      if (!id || typeof id !== 'string' || id.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(id)) {
+        throw new Error(`Invalid ObjectId format: ${id}`);
+      }
+      
+      await this.deploymentsCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { status, updatedAt: new Date() } }
+      );
+    } catch (error) {
+      console.error(`Error updating deployment status for id ${id}:`, error);
+      throw error;
+    }
   }
 
   async deleteDeployment(id: string): Promise<void> {
-    await this.deploymentsCollection.deleteOne({ _id: new ObjectId(id) });
+    try {
+      // Validate ObjectId format before creating ObjectId
+      if (!id || typeof id !== 'string' || id.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(id)) {
+        throw new Error(`Invalid ObjectId format: ${id}`);
+      }
+      
+      await this.deploymentsCollection.deleteOne({ _id: new ObjectId(id) });
+    } catch (error) {
+      console.error(`Error deleting deployment with id ${id}:`, error);
+      throw error;
+    }
   }
 
   async getDeploymentStats(userId: string): Promise<{

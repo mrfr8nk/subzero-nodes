@@ -47,6 +47,9 @@ Preferred communication style: Simple, everyday language.
 - **Referral System**: User referral tracking with automatic reward distribution
 - **Dashboard Analytics**: Real-time statistics for deployments, transactions, and referral performance
 - **Mobile Responsive**: Fully responsive design optimized for mobile devices
+- **Admin Controls**: Comprehensive admin dashboard with user management, cost settings, and super admin capabilities
+- **User Management**: Account settings with self-deletion functionality and admin controls for user management
+- **Configurable Costs**: Admin-controlled deployment and daily charge rates instead of hardcoded values
 
 ## External Dependencies
 
@@ -89,6 +92,13 @@ For production deployment, add the base domain URL to Google Cloud Console:
 - **Authorized domain**: `https://subzero-deploy.onrender.com`
 - **NOT the auth route**: The OAuth callback route is automatically handled by the application
 - The callback URL pattern is: `{DOMAIN}/api/auth/google/callback`
+
+### Recent Changes (January 2025)
+- **Enhanced Admin Controls**: Super admins can now demote and delete other existing admins
+- **User Account Management**: Users can delete their own accounts through account settings page
+- **Configurable Cost System**: Deployment costs and daily charges are now configurable through admin settings
+- **Improved Error Handling**: Added ObjectId validation to prevent MongoDB BSON errors
+- **Security Enhancements**: Admins cannot self-delete through user interface for security
 
 ### Deployment Notes
 - Update `FRONTEND_URL` and `BACKEND_URL` in production environment
