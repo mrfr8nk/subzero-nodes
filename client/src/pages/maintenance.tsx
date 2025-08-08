@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,60 @@ import { Settings, Clock } from "lucide-react";
 interface MaintenanceInfo {
   message?: string;
   estimatedTime?: string;
+  endTime?: string;
+}
+
+// Maintenance countdown component
+function MaintenanceCountdown({ endTime }: { endTime: string }) {
+  const [timeLeft, setTimeLeft] = useState<string>('');
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date().getTime();
+      const end = new Date(endTime).getTime();
+      const distance = end - now;
+
+      if (distance > 0) {
+        const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+        let countdown = '';
+        if (days > 0) countdown += `${days}d `;
+        if (hours > 0) countdown += `${hours}h `;
+        if (minutes > 0) countdown += `${minutes}m `;
+        countdown += `${seconds}s`;
+
+        setTimeLeft(countdown);
+      } else {
+        setTimeLeft('Maintenance completed');
+        // Auto-refresh when countdown reaches zero
+        setTimeout(() => window.location.reload(), 2000);
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [endTime]);
+
+  return (
+    <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+      <div className="text-center">
+        <p className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">
+          ⏱️ Estimated time remaining
+        </p>
+        <p className="text-2xl font-mono font-bold text-blue-900 dark:text-blue-100">
+          {timeLeft}
+        </p>
+        <p className="text-sm text-blue-600 dark:text-blue-300 mt-2">
+          Auto-refresh at completion time
+        </p>
+      </div>
+    </div>
+  );
 }
 
 export default function Maintenance() {
@@ -62,6 +117,19 @@ export default function Maintenance() {
                 {displayMessage}
               </AlertDescription>
             </Alert>
+
+            {maintenanceInfo?.endTime && (
+              <MaintenanceCountdown endTime={maintenanceInfo.endTime} />
+            )}
+            
+            {maintenanceInfo?.estimatedTime && !maintenanceInfo?.endTime && (
+              <Alert>
+                <Clock className="h-4 w-4" />
+                <AlertDescription>
+                  Estimated completion: {maintenanceInfo.estimatedTime}
+                </AlertDescription>
+              </Alert>
+            )}
 
             <div className="text-center space-y-4">
               <div className="text-sm text-muted-foreground">

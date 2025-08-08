@@ -1,6 +1,41 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { storage } from "./storage";
+
+// Function to check if maintenance mode should end
+async function checkMaintenanceEndTime(storage: any) {
+  try {
+    const isMaintenanceMode = await storage.isMaintenanceModeEnabled();
+    if (!isMaintenanceMode) return;
+
+    const endTimeSetting = await storage.getAppSetting('maintenance_end_time');
+    if (!endTimeSetting || !endTimeSetting.value) return;
+
+    const endTime = new Date(endTimeSetting.value);
+    const now = new Date();
+
+    if (now >= endTime) {
+      // Maintenance time has expired, disable maintenance mode
+      await storage.setMaintenanceMode(false, 'system', 'Maintenance completed automatically');
+      await storage.deleteAppSetting('maintenance_end_time');
+      await storage.deleteAppSetting('maintenance_estimated_time');
+      
+      console.log('Maintenance mode automatically disabled at', now.toISOString());
+      
+      // Create admin notification
+      await storage.createAdminNotification({
+        type: 'maintenance_auto_end',
+        title: 'Maintenance Mode Auto-Disabled',
+        message: 'Maintenance mode was automatically disabled as the countdown reached zero.',
+        data: { endTime: endTime.toISOString(), disabledAt: now.toISOString() },
+        read: false
+      });
+    }
+  } catch (error) {
+    console.error('Error in maintenance countdown checker:', error);
+  }
+}
 
 const app = express();
 app.use(express.json());
@@ -38,6 +73,15 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = await registerRoutes(app);
+
+  // Start maintenance countdown checker
+  setInterval(async () => {
+    try {
+      await checkMaintenanceEndTime(storage);
+    } catch (error) {
+      console.error('Error checking maintenance end time:', error);
+    }
+  }, 30000); // Check every 30 seconds
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

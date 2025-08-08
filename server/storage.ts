@@ -753,6 +753,10 @@ export class MongoStorage implements IStorage {
       .toArray();
   }
 
+  async deleteAppSetting(key: string): Promise<void> {
+    await this.appSettingsCollection.deleteOne({ key });
+  }
+
   // Maintenance mode operations
   async isMaintenanceModeEnabled(): Promise<boolean> {
     const setting = await this.getAppSetting('maintenance_mode');

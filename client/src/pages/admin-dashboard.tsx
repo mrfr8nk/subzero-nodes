@@ -38,6 +38,52 @@ import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import DeploymentLogsModal from "@/components/deployment-logs-modal";
 
+// Maintenance countdown component
+function MaintenanceCountdown({ endTime }: { endTime: string }) {
+  const [timeLeft, setTimeLeft] = useState<string>('');
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date().getTime();
+      const end = new Date(endTime).getTime();
+      const distance = end - now;
+
+      if (distance > 0) {
+        const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+        let countdown = '';
+        if (days > 0) countdown += `${days}d `;
+        if (hours > 0) countdown += `${hours}h `;
+        if (minutes > 0) countdown += `${minutes}m `;
+        countdown += `${seconds}s`;
+
+        setTimeLeft(countdown);
+      } else {
+        setTimeLeft('Countdown expired');
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [endTime]);
+
+  return (
+    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/20 rounded border">
+      <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+        Auto-disable countdown: <span className="font-mono">{timeLeft}</span>
+      </p>
+      <p className="text-xs text-blue-600 dark:text-blue-300">
+        Site will automatically exit maintenance at {new Date(endTime).toLocaleString()}
+      </p>
+    </div>
+  );
+}
+
 interface AdminStats {
   totalUsers: number;
   totalDeployments: number;
@@ -84,6 +130,7 @@ interface MaintenanceStatus {
   enabled: boolean;
   message: string;
   estimatedTime: string;
+  endTime?: string;
 }
 
 interface CurrencySettings {
@@ -96,7 +143,12 @@ export default function AdminDashboard() {
   const [selectedSection, setSelectedSection] = useState("users");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [coinAdjustment, setCoinAdjustment] = useState({ amount: 0, reason: "" });
-  const [maintenanceForm, setMaintenanceForm] = useState({ message: '', estimatedTime: '' });
+  const [maintenanceForm, setMaintenanceForm] = useState({ 
+    message: '', 
+    estimatedTime: '',
+    endTime: '',
+    enableCountdown: false
+  });
   const [currencyForm, setCurrencyForm] = useState({ currency: 'USD', rate: 0.1, symbol: '$' });
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -391,8 +443,8 @@ export default function AdminDashboard() {
 
   // Toggle maintenance mode mutation
   const toggleMaintenanceMutation = useMutation({
-    mutationFn: async ({ enabled, message, estimatedTime }: { enabled: boolean; message?: string; estimatedTime?: string }) => {
-      return await apiRequest('POST', '/api/admin/maintenance/toggle', { enabled, message, estimatedTime });
+    mutationFn: async ({ enabled, message, estimatedTime, endTime }: { enabled: boolean; message?: string; estimatedTime?: string; endTime?: string }) => {
+      return await apiRequest('POST', '/api/admin/maintenance/toggle', { enabled, message, estimatedTime, endTime });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/maintenance/status'] });
@@ -401,7 +453,7 @@ export default function AdminDashboard() {
         title: maintenanceStatus?.enabled ? "Maintenance mode disabled" : "Maintenance mode enabled",
         description: maintenanceStatus?.enabled ? "Site is now operational" : "Site is now in maintenance mode"
       });
-      setMaintenanceForm({ message: '', estimatedTime: '' });
+      setMaintenanceForm({ message: '', estimatedTime: '', endTime: '', enableCountdown: false });
     },
     onError: (error: any) => {
       toast({ title: "Failed to toggle maintenance mode", description: error.message, variant: "destructive" });
@@ -969,10 +1021,15 @@ export default function AdminDashboard() {
                   onCheckedChange={(enabled) => {
                     if (enabled) {
                       // When enabling, use form data
+                      const endTime = maintenanceForm.enableCountdown && maintenanceForm.endTime 
+                        ? new Date(maintenanceForm.endTime).toISOString()
+                        : undefined;
+                      
                       toggleMaintenanceMutation.mutate({
                         enabled: true,
                         message: maintenanceForm.message || 'Site is under maintenance. We\'ll be back shortly.',
-                        estimatedTime: maintenanceForm.estimatedTime
+                        estimatedTime: maintenanceForm.estimatedTime,
+                        endTime
                       });
                     } else {
                       // When disabling, just turn off
@@ -1013,6 +1070,37 @@ export default function AdminDashboard() {
                       Let users know how long the maintenance is expected to last
                     </p>
                   </div>
+
+                  <div className="space-y-4 p-4 border rounded-lg bg-blue-50/50 dark:bg-blue-950/20">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={maintenanceForm.enableCountdown}
+                        onCheckedChange={(enabled) => setMaintenanceForm(prev => ({ ...prev, enableCountdown: enabled }))}
+                        data-testid="switch-enable-countdown"
+                      />
+                      <Label className="text-sm font-medium">Enable Auto-Countdown</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Automatically disable maintenance mode when countdown reaches zero
+                    </p>
+                    
+                    {maintenanceForm.enableCountdown && (
+                      <div className="space-y-2">
+                        <Label htmlFor="end-time">Maintenance End Time</Label>
+                        <Input
+                          id="end-time"
+                          type="datetime-local"
+                          value={maintenanceForm.endTime}
+                          onChange={(e) => setMaintenanceForm(prev => ({ ...prev, endTime: e.target.value }))}
+                          min={new Date().toISOString().slice(0, 16)}
+                          data-testid="input-end-time"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Site will automatically exit maintenance mode at this time
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1024,6 +1112,9 @@ export default function AdminDashboard() {
                     <p className="mt-1">{maintenanceStatus.message || 'Site is under maintenance.'}</p>
                     {maintenanceStatus.estimatedTime && (
                       <p className="text-sm mt-1">Estimated completion: {maintenanceStatus.estimatedTime}</p>
+                    )}
+                    {maintenanceStatus.endTime && (
+                      <MaintenanceCountdown endTime={maintenanceStatus.endTime} />
                     )}
                   </AlertDescription>
                 </Alert>

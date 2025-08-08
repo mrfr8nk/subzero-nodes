@@ -295,14 +295,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Maintenance mode routes (available to all)
   app.get('/api/maintenance/info', async (req, res) => {
     try {
-      const [maintenanceMessage, estimatedTime] = await Promise.all([
+      const [maintenanceMessage, estimatedTime, endTime] = await Promise.all([
         storage.getAppSetting('maintenance_message'),
-        storage.getAppSetting('maintenance_estimated_time')
+        storage.getAppSetting('maintenance_estimated_time'),
+        storage.getAppSetting('maintenance_end_time')
       ]);
 
       res.json({
         message: maintenanceMessage?.value,
-        estimatedTime: estimatedTime?.value
+        estimatedTime: estimatedTime?.value,
+        endTime: endTime?.value
       });
     } catch (error) {
       console.error('Error getting maintenance info:', error);
@@ -2105,15 +2107,17 @@ jobs:
   app.get('/api/admin/maintenance/status', requireAdmin, async (req, res) => {
     try {
       const isEnabled = await storage.isMaintenanceModeEnabled();
-      const [message, estimatedTime] = await Promise.all([
+      const [message, estimatedTime, endTime] = await Promise.all([
         storage.getAppSetting('maintenance_message'),
-        storage.getAppSetting('maintenance_estimated_time')
+        storage.getAppSetting('maintenance_estimated_time'),
+        storage.getAppSetting('maintenance_end_time')
       ]);
 
       res.json({
         enabled: isEnabled,
         message: message?.value || '',
-        estimatedTime: estimatedTime?.value || ''
+        estimatedTime: estimatedTime?.value || '',
+        endTime: endTime?.value || null
       });
     } catch (error) {
       console.error('Error getting maintenance status:', error);
@@ -2123,7 +2127,7 @@ jobs:
 
   app.post('/api/admin/maintenance/toggle', requireAdmin, async (req, res) => {
     try {
-      const { enabled, message, estimatedTime } = req.body;
+      const { enabled, message, estimatedTime, endTime } = req.body;
       const adminId = (req.user as any)?._id?.toString();
 
       await storage.setMaintenanceMode(enabled, adminId, message);
@@ -2135,6 +2139,19 @@ jobs:
           description: 'Estimated maintenance completion time',
           updatedBy: adminId
         });
+      }
+
+      // Set maintenance end time for countdown
+      if (enabled && endTime) {
+        await storage.setAppSetting({
+          key: 'maintenance_end_time',
+          value: endTime,
+          description: 'Maintenance mode automatic end time',
+          updatedBy: adminId
+        });
+      } else if (!enabled) {
+        // Clear end time when maintenance is disabled
+        await storage.deleteAppSetting('maintenance_end_time');
       }
 
       res.json({ 
@@ -2254,3 +2271,6 @@ jobs:
   
   return httpServer;
 }
+
+// Export storage for use in other modules
+export { storage };
