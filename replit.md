@@ -98,7 +98,7 @@ For production deployment, add the base domain URL to Google Cloud Console:
 - **Enhanced Admin Controls**: Super admins can now demote and delete other existing admins
 - **User Account Management**: Users can delete their own accounts through account settings page
 - **Configurable Cost System**: Deployment costs and daily charges are now configurable through admin settings
-- **Improved Error Handling**: Added ObjectId validation to prevent MongoDB BSON errors
+- **Improved Error Handling**: Added ObjectId validation to prevent MongoDB BSON errors and WebSocket connection validation
 - **Security Enhancements**: Admins cannot self-delete through user interface for security
 - **IP-Based Duplicate Account Prevention**: Implemented comprehensive IP tracking system to prevent users from creating multiple accounts
   - Tracks user IP addresses during registration and login
@@ -106,6 +106,8 @@ For production deployment, add the base domain URL to Google Cloud Console:
   - Admin notifications for duplicate IP detections
   - Error handling for both Google OAuth and local signup flows
   - Admin controls for IP restriction configuration
+  - Fixed unhandled promise rejections with global error handlers
+  - Enhanced WebSocket connection stability with better error handling
 
 ### Deployment Notes
 - Update `FRONTEND_URL` and `BACKEND_URL` in production environment

@@ -28,8 +28,23 @@ export function useWebSocket(): UseWebSocketReturn {
         wsRef.current.close();
       }
 
+      // Build WebSocket URL more robustly
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const hostname = window.location.hostname;
+      const port = window.location.port;
+      
+      // Construct URL based on environment
+      let wsUrl: string;
+      if (port && port !== 'undefined' && port !== '') {
+        wsUrl = `${protocol}//${hostname}:${port}/ws`;
+      } else {
+        wsUrl = `${protocol}//${hostname}/ws`;
+      }
+      
+      // Validate URL before creating WebSocket
+      if (!hostname || hostname === 'undefined' || hostname === '') {
+        throw new Error('Invalid hostname for WebSocket connection');
+      }
       
       console.log('Attempting WebSocket connection to:', wsUrl);
       wsRef.current = new WebSocket(wsUrl);
@@ -78,11 +93,14 @@ export function useWebSocket(): UseWebSocketReturn {
       wsRef.current.onerror = (error) => {
         console.error('WebSocket error:', error);
         setConnectionError('WebSocket connection error');
+        // Don't log as unhandled rejection since we're handling it
       };
 
     } catch (error) {
       console.error('Failed to create WebSocket connection:', error);
       setConnectionError('Failed to create WebSocket connection');
+      // Silently handle this error to prevent unhandled rejections
+      setIsConnected(false);
     }
   };
 
