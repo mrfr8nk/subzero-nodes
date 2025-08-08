@@ -837,6 +837,275 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GitHub deployment settings
+  app.get('/api/admin/github/settings', requireAdmin, async (req, res) => {
+    try {
+      const [githubToken, repoOwner, repoName, mainBranch, workflowFile] = await Promise.all([
+        storage.getAppSetting('github_token'),
+        storage.getAppSetting('github_repo_owner'),
+        storage.getAppSetting('github_repo_name'),
+        storage.getAppSetting('github_main_branch'),
+        storage.getAppSetting('github_workflow_file')
+      ]);
+
+      res.json({
+        githubToken: githubToken?.value || '',
+        repoOwner: repoOwner?.value || '',
+        repoName: repoName?.value || '',
+        mainBranch: mainBranch?.value || 'main',
+        workflowFile: workflowFile?.value || 'SUBZERO.yml'
+      });
+    } catch (error) {
+      console.error('Error fetching GitHub settings:', error);
+      res.status(500).json({ message: 'Failed to fetch GitHub settings' });
+    }
+  });
+
+  app.put('/api/admin/github/settings', requireAdmin, async (req, res) => {
+    try {
+      const { githubToken, repoOwner, repoName, mainBranch, workflowFile } = req.body;
+      const adminId = (req.user as any)?._id?.toString();
+
+      // Update all GitHub settings
+      const settings = [
+        { key: 'github_token', value: githubToken, description: 'GitHub Personal Access Token for deployments' },
+        { key: 'github_repo_owner', value: repoOwner, description: 'GitHub repository owner/organization' },
+        { key: 'github_repo_name', value: repoName, description: 'GitHub repository name' },
+        { key: 'github_main_branch', value: mainBranch || 'main', description: 'Main branch name' },
+        { key: 'github_workflow_file', value: workflowFile || 'SUBZERO.yml', description: 'GitHub Actions workflow file name' }
+      ];
+
+      for (const setting of settings) {
+        const settingData = insertAppSettingsSchema.parse({
+          ...setting,
+          updatedBy: adminId
+        });
+        await storage.setAppSetting(settingData);
+      }
+
+      res.json({ message: 'GitHub settings updated successfully' });
+    } catch (error) {
+      console.error('Error updating GitHub settings:', error);
+      res.status(500).json({ message: 'Failed to update GitHub settings' });
+    }
+  });
+
+  // Deployment endpoints using admin-configured GitHub settings
+  app.get('/api/admin/deployment/check-branch', requireAdmin, async (req, res) => {
+    try {
+      const { branchName } = req.query;
+      const [githubToken, repoOwner, repoName] = await Promise.all([
+        storage.getAppSetting('github_token'),
+        storage.getAppSetting('github_repo_owner'),
+        storage.getAppSetting('github_repo_name')
+      ]);
+
+      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
+        return res.status(400).json({ message: 'GitHub settings not configured. Please configure GitHub settings first.' });
+      }
+
+      const generateBranchName = () => {
+        const prefix = 'subzero-';
+        const randomChars = Math.random().toString(36).substring(2, 8);
+        return prefix + randomChars;
+      };
+
+      if (!branchName || branchName.toString().trim() === '') {
+        const generatedName = generateBranchName();
+        return res.json({ 
+          available: true, 
+          suggested: generatedName,
+          message: `Try this available name: ${generatedName}`
+        });
+      }
+
+      // Check if branch exists
+      const url = `https://api.github.com/repos/${repoOwner.value}/${repoName.value}/git/ref/heads/${branchName}`;
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'Authorization': `token ${githubToken.value}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        });
+
+        if (response.status === 404) {
+          return res.json({ 
+            available: true,
+            message: 'Name available!'
+          });
+        } else if (response.ok) {
+          const suggestedName = `${branchName}-${Math.floor(Math.random() * 1000)}`;
+          return res.json({ 
+            available: false, 
+            suggested: suggestedName,
+            message: `Name taken. Try: ${suggestedName}`
+          });
+        } else {
+          throw new Error(`GitHub API error: ${response.statusText}`);
+        }
+      } catch (error) {
+        console.error('Branch check error:', error);
+        res.status(500).json({ message: 'Failed to check branch availability' });
+      }
+    } catch (error) {
+      console.error('Error checking branch:', error);
+      res.status(500).json({ message: 'Failed to check branch' });
+    }
+  });
+
+  app.post('/api/admin/deployment/deploy', requireAdmin, async (req, res) => {
+    try {
+      let { branchName, sessionId, ownerNumber, prefix } = req.body;
+      
+      // Get GitHub settings
+      const [githubToken, repoOwner, repoName, mainBranch, workflowFile] = await Promise.all([
+        storage.getAppSetting('github_token'),
+        storage.getAppSetting('github_repo_owner'),
+        storage.getAppSetting('github_repo_name'),
+        storage.getAppSetting('github_main_branch'),
+        storage.getAppSetting('github_workflow_file')
+      ]);
+
+      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
+        return res.status(400).json({ message: 'GitHub settings not configured. Please configure GitHub settings first.' });
+      }
+
+      const GITHUB_TOKEN = githubToken.value;
+      const REPO_OWNER = repoOwner.value;
+      const REPO_NAME = repoName.value;
+      const MAIN_BRANCH = mainBranch?.value || 'main';
+      const WORKFLOW_FILE = workflowFile?.value || 'SUBZERO.yml';
+
+      if (!branchName || branchName.trim() === '') {
+        const prefix = 'subzero-';
+        const randomChars = Math.random().toString(36).substring(2, 8);
+        branchName = prefix + randomChars;
+      }
+
+      if (!sessionId || !ownerNumber || !prefix) {
+        throw new Error('All fields are required');
+      }
+
+      const makeGitHubRequest = async (method: string, endpoint: string, data: any = null) => {
+        const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/${endpoint}`;
+        const config: any = {
+          method,
+          headers: {
+            'Authorization': `token ${GITHUB_TOKEN}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        };
+        
+        if (data) config.body = JSON.stringify(data);
+        
+        const response = await fetch(url, config);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          throw new Error(errorData?.message || `GitHub API error: ${response.statusText}`);
+        }
+        return response.json();
+      };
+
+      // 1. Create branch
+      const mainRef = await makeGitHubRequest('GET', `git/ref/heads/${MAIN_BRANCH}`);
+      await makeGitHubRequest('POST', 'git/refs', {
+        ref: `refs/heads/${branchName}`,
+        sha: mainRef.object.sha
+      });
+      
+      // 2. Update settings.js
+      const fileData = await makeGitHubRequest('GET', `contents/settings.js?ref=${branchName}`);
+      const newContent = `module.exports = {
+  SESSION_ID: "${sessionId}",
+  OWNER_NUMBER: "${ownerNumber}", 
+  PREFIX: "${prefix}"
+};`;
+      
+      await makeGitHubRequest('PUT', 'contents/settings.js', {
+        message: `Update settings.js for ${branchName}`,
+        content: Buffer.from(newContent).toString('base64'),
+        sha: fileData.sha,
+        branch: branchName
+      });
+      
+      // 3. Update workflow file
+      const workflowContent = `name: SUBZERO-MD-X-MR-FRANK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  loop-task:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Bot (loop & auto-restart if crash)
+        run: |
+          echo "Running SUBZERO-MD in auto-restart mode..."
+          timeout 18000 bash -c 'while true; do npm start || echo "Bot crashed, restarting..."; sleep 2; done'
+
+      - name: Re-Trigger Workflow
+        if: always()
+        run: |
+          echo "Re-running workflow..."
+          curl -X POST \\
+            -H "Authorization: Bearer \${{ secrets.SUBZERO }}" \\
+            -H "Accept: application/vnd.github.v3+json" \\
+            https://api.github.com/repos/\${{ github.repository }}/actions/workflows/${WORKFLOW_FILE}/dispatches \\
+            -d '{"ref":"${branchName}"}'`;
+
+      try {
+        const existingFile = await makeGitHubRequest('GET', `contents/.github/workflows/${WORKFLOW_FILE}?ref=${branchName}`);
+        
+        // Update existing file
+        await makeGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
+          message: `Update workflow to use ${branchName} branch`,
+          content: Buffer.from(workflowContent).toString('base64'),
+          sha: existingFile.sha,
+          branch: branchName
+        });
+      } catch (error) {
+        // Create new file if it doesn't exist
+        await makeGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
+          message: `Create workflow for ${branchName} branch`,
+          content: Buffer.from(workflowContent).toString('base64'),
+          branch: branchName
+        });
+      }
+      
+      // 4. Trigger workflow
+      await makeGitHubRequest('POST', `actions/workflows/${WORKFLOW_FILE}/dispatches`, {
+        ref: branchName
+      });
+      
+      res.json({ 
+        success: true, 
+        message: 'Deployment successful!',
+        branch: branchName,
+        workflowUpdated: true
+      });
+    } catch (error) {
+      console.error('Deployment error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        details: null
+      });
+    }
+  });
+
   // Admin maintenance mode routes
   app.get('/api/admin/maintenance/status', requireAdmin, async (req, res) => {
     try {

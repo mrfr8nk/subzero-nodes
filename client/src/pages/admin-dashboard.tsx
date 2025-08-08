@@ -26,7 +26,8 @@ import {
   TrendingUp,
   Power,
   Wrench,
-  CreditCard
+  CreditCard,
+  Github
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -129,6 +130,32 @@ export default function AdminDashboard() {
     staleTime: 60000,
   });
 
+  // GitHub settings state
+  const [githubSettings, setGithubSettings] = useState({
+    githubToken: '',
+    repoOwner: '',
+    repoName: '',
+    mainBranch: 'main',
+    workflowFile: 'SUBZERO.yml'
+  });
+
+  // Fetch GitHub settings
+  const { data: githubData, refetch: refetchGithub } = useQuery({
+    queryKey: ['/api/admin/github/settings'],
+    staleTime: 60000,
+    onSuccess: (data: any) => {
+      if (data) {
+        setGithubSettings({
+          githubToken: data.githubToken || '',
+          repoOwner: data.repoOwner || '',
+          repoName: data.repoName || '',
+          mainBranch: data.mainBranch || 'main',
+          workflowFile: data.workflowFile || 'SUBZERO.yml'
+        });
+      }
+    }
+  });
+
   // Update user status mutation
   const updateUserStatusMutation = useMutation({
     mutationFn: async ({ userId, status, restrictions }: { userId: string; status: string; restrictions?: string[] }) => {
@@ -225,6 +252,20 @@ export default function AdminDashboard() {
     }
   });
 
+  // GitHub settings mutation
+  const updateGithubSettingsMutation = useMutation({
+    mutationFn: async (settings: typeof githubSettings) => {
+      return await apiRequest('PUT', '/api/admin/github/settings', settings);
+    },
+    onSuccess: () => {
+      refetchGithub();
+      toast({ title: "GitHub settings updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to update GitHub settings", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleUserStatusChange = (userId: string, status: string) => {
     updateUserStatusMutation.mutate({ userId, status });
   };
@@ -312,6 +353,10 @@ export default function AdminDashboard() {
           <TabsTrigger value="currency" data-testid="tab-currency">
             <CreditCard className="w-4 h-4 mr-1" />
             Currency
+          </TabsTrigger>
+          <TabsTrigger value="github" data-testid="tab-github">
+            <Github className="w-4 h-4 mr-1" />
+            GitHub
           </TabsTrigger>
           <TabsTrigger value="settings" data-testid="tab-settings">Settings</TabsTrigger>
         </TabsList>
@@ -756,6 +801,99 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="github" className="space-y-4">
+          <Card data-testid="card-github-settings">
+            <CardHeader>
+              <CardTitle>GitHub Deployment Settings</CardTitle>
+              <CardDescription>Configure GitHub repository settings for automated deployments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="github-token">GitHub Personal Access Token</Label>
+                  <Input
+                    id="github-token"
+                    type="password"
+                    placeholder="Enter your GitHub token"
+                    value={githubSettings.githubToken}
+                    onChange={(e) => setGithubSettings(prev => ({ ...prev, githubToken: e.target.value }))}
+                    data-testid="input-github-token"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Required for GitHub API access. Must have repo and workflow permissions.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="repo-owner">Repository Owner</Label>
+                    <Input
+                      id="repo-owner"
+                      placeholder="e.g., d33l"
+                      value={githubSettings.repoOwner}
+                      onChange={(e) => setGithubSettings(prev => ({ ...prev, repoOwner: e.target.value }))}
+                      data-testid="input-repo-owner"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="repo-name">Repository Name</Label>
+                    <Input
+                      id="repo-name"
+                      placeholder="e.g., SUBZERO-MD"
+                      value={githubSettings.repoName}
+                      onChange={(e) => setGithubSettings(prev => ({ ...prev, repoName: e.target.value }))}
+                      data-testid="input-repo-name"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="main-branch">Main Branch</Label>
+                    <Input
+                      id="main-branch"
+                      placeholder="main"
+                      value={githubSettings.mainBranch}
+                      onChange={(e) => setGithubSettings(prev => ({ ...prev, mainBranch: e.target.value }))}
+                      data-testid="input-main-branch"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="workflow-file">Workflow File</Label>
+                    <Input
+                      id="workflow-file"
+                      placeholder="SUBZERO.yml"
+                      value={githubSettings.workflowFile}
+                      onChange={(e) => setGithubSettings(prev => ({ ...prev, workflowFile: e.target.value }))}
+                      data-testid="input-workflow-file"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  onClick={() => updateGithubSettingsMutation.mutate(githubSettings)}
+                  disabled={updateGithubSettingsMutation.isPending}
+                  className="w-full"
+                  data-testid="button-save-github-settings"
+                >
+                  {updateGithubSettingsMutation.isPending ? "Saving..." : "Save GitHub Settings"}
+                </Button>
+
+                {githubData && (
+                  <Alert>
+                    <Github className="h-4 w-4" />
+                    <AlertDescription>
+                      Settings configured for: <strong>{githubData.repoOwner}/{githubData.repoName}</strong>
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
             </CardContent>
           </Card>
