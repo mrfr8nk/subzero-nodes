@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -26,6 +26,7 @@ import Navbar from "@/components/navbar";
 
 function Router() {
   const { isAuthenticated, isLoading, isAdmin } = useAuth();
+  const [location] = useLocation();
   
   // Check maintenance mode status
   const { data: maintenanceStatus } = useQuery<{maintenanceMode: boolean; canBypass: boolean}>({
@@ -35,7 +36,8 @@ function Router() {
   });
 
   // Show maintenance page if maintenance mode is enabled and user cannot bypass
-  if (maintenanceStatus?.maintenanceMode && !maintenanceStatus?.canBypass) {
+  // BUT allow access to admin login page during maintenance
+  if (maintenanceStatus?.maintenanceMode && !maintenanceStatus?.canBypass && location !== '/admin/login') {
     return <Maintenance />;
   }
 
