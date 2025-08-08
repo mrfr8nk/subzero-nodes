@@ -736,6 +736,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const randomChars = Math.random().toString(36).substring(2, 8);
         sanitizedBranchName = prefix + randomChars;
       }
+      
+      // Add timestamp to ensure uniqueness
+      const timestamp = Date.now().toString();
+      sanitizedBranchName = `${sanitizedBranchName}-${timestamp}`;
 
       // Deduct coins first
       await storage.updateUserCoins(userId, -cost, `GitHub deployment: ${sanitizedBranchName}`, userId);
@@ -770,6 +774,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       try {
+        // Check if branch already exists, if so, delete it first
+        try {
+          await makeGitHubRequest('GET', `git/refs/heads/${sanitizedBranchName}`);
+          // Branch exists, delete it first
+          await makeGitHubRequest('DELETE', `git/refs/heads/${sanitizedBranchName}`);
+        } catch (error) {
+          // Branch doesn't exist, which is what we want
+        }
+        
         // Create branch from main
         const mainBranchData = await makeGitHubRequest('GET', `git/refs/heads/${MAIN_BRANCH}`);
         const mainSha = mainBranchData.object.sha;
@@ -779,7 +792,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sha: mainSha
         });
 
-        // Get creds.js content from main branch first, then update it in new branch
+        // Get creds.js content from main branch
         const credsFile = await makeGitHubRequest('GET', `contents/creds.js?ref=${MAIN_BRANCH}`);
         const originalContent = Buffer.from(credsFile.content, 'base64').toString('utf8');
         
@@ -788,10 +801,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .replace(/global\.owner = ".*?";/, `global.owner = "${ownerNumber}";`)
           .replace(/global\.prefix = ".*?";/, `global.prefix = "${prefix}";`);
 
+        // Get the file info from the new branch to get the correct SHA
+        const newBranchFile = await makeGitHubRequest('GET', `contents/creds.js?ref=${sanitizedBranchName}`);
+        
         await makeGitHubRequest('PUT', `contents/creds.js`, {
           message: `Update credentials for ${sanitizedBranchName} deployment`,
           content: Buffer.from(updatedContent).toString('base64'),
-          sha: credsFile.sha,
+          sha: newBranchFile.sha,
           branch: sanitizedBranchName
         });
 

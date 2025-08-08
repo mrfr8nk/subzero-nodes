@@ -159,7 +159,7 @@ export default function Deployments() {
       </div>
 
       {/* Floating Deploy Button for Mobile */}
-      <div className="fixed bottom-6 right-6 z-50 md:hidden">
+      <div className="fixed bottom-20 right-6 z-50 md:hidden">
         <Button 
           onClick={() => setShowDeployModal(true)}
           className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg rounded-full w-14 h-14 p-0"
