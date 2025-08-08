@@ -1106,6 +1106,109 @@ jobs:
     }
   });
 
+  // Get workflow runs for a specific branch
+  app.get('/api/admin/deployment/:branchName/logs', requireAdmin, async (req, res) => {
+    try {
+      const { branchName } = req.params;
+      const [githubToken, repoOwner, repoName, workflowFile] = await Promise.all([
+        storage.getAppSetting('github_token'),
+        storage.getAppSetting('github_repo_owner'),
+        storage.getAppSetting('github_repo_name'),
+        storage.getAppSetting('github_workflow_file')
+      ]);
+
+      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
+        return res.status(400).json({ message: 'GitHub settings not configured' });
+      }
+
+      const GITHUB_TOKEN = githubToken.value;
+      const REPO_OWNER = repoOwner.value;
+      const REPO_NAME = repoName.value;
+      const WORKFLOW_FILE = workflowFile?.value || 'SUBZERO.yml';
+
+      // Get workflow runs for the specific branch
+      const runsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/runs?branch=${branchName}&per_page=10`;
+      const runsResponse = await fetch(runsUrl, {
+        headers: {
+          'Authorization': `token ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+
+      if (!runsResponse.ok) {
+        throw new Error(`GitHub API error: ${runsResponse.statusText}`);
+      }
+
+      const runsData = await runsResponse.json();
+      res.json(runsData.workflow_runs || []);
+    } catch (error) {
+      console.error('Error fetching workflow logs:', error);
+      res.status(500).json({ message: 'Failed to fetch workflow logs' });
+    }
+  });
+
+  // Get specific workflow run logs
+  app.get('/api/admin/deployment/run/:runId/logs', requireAdmin, async (req, res) => {
+    try {
+      const { runId } = req.params;
+      const [githubToken, repoOwner, repoName] = await Promise.all([
+        storage.getAppSetting('github_token'),
+        storage.getAppSetting('github_repo_owner'),
+        storage.getAppSetting('github_repo_name')
+      ]);
+
+      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
+        return res.status(400).json({ message: 'GitHub settings not configured' });
+      }
+
+      const GITHUB_TOKEN = githubToken.value;
+      const REPO_OWNER = repoOwner.value;
+      const REPO_NAME = repoName.value;
+
+      // Get jobs for the workflow run
+      const jobsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs/${runId}/jobs`;
+      const jobsResponse = await fetch(jobsUrl, {
+        headers: {
+          'Authorization': `token ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+
+      if (!jobsResponse.ok) {
+        throw new Error(`GitHub API error: ${jobsResponse.statusText}`);
+      }
+
+      const jobsData = await jobsResponse.json();
+      
+      // Get logs for each job
+      const logsPromises = jobsData.jobs.map(async (job: any) => {
+        try {
+          const logsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/jobs/${job.id}/logs`;
+          const logsResponse = await fetch(logsUrl, {
+            headers: {
+              'Authorization': `token ${GITHUB_TOKEN}`,
+              'Accept': 'application/vnd.github.v3+json'
+            }
+          });
+          
+          if (logsResponse.ok) {
+            const logs = await logsResponse.text();
+            return { jobId: job.id, jobName: job.name, logs };
+          }
+          return { jobId: job.id, jobName: job.name, logs: 'No logs available' };
+        } catch (error) {
+          return { jobId: job.id, jobName: job.name, logs: 'Error fetching logs' };
+        }
+      });
+
+      const allLogs = await Promise.all(logsPromises);
+      res.json({ jobs: jobsData.jobs, logs: allLogs });
+    } catch (error) {
+      console.error('Error fetching specific workflow logs:', error);
+      res.status(500).json({ message: 'Failed to fetch workflow logs' });
+    }
+  });
+
   // Admin maintenance mode routes
   app.get('/api/admin/maintenance/status', requireAdmin, async (req, res) => {
     try {

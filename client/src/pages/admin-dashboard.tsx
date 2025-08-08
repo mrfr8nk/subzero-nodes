@@ -27,7 +27,10 @@ import {
   Power,
   Wrench,
   CreditCard,
-  Github
+  Github,
+  Rocket,
+  Eye,
+  RefreshCw
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -139,20 +142,36 @@ export default function AdminDashboard() {
     workflowFile: 'SUBZERO.yml'
   });
 
+  // Deployment form state
+  const [deploymentForm, setDeploymentForm] = useState({
+    appName: '',
+    sessionId: '',
+    ownerNumber: '',
+    prefix: ''
+  });
+  const [branchCheckResult, setBranchCheckResult] = useState<any>(null);
+  const [isCheckingBranch, setIsCheckingBranch] = useState(false);
+  const [selectedBranchForLogs, setSelectedBranchForLogs] = useState('');
+  const [workflowRuns, setWorkflowRuns] = useState<any[]>([]);
+  const [selectedRunLogs, setSelectedRunLogs] = useState<any>(null);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+
   // Fetch GitHub settings
   const { data: githubData, refetch: refetchGithub } = useQuery({
     queryKey: ['/api/admin/github/settings'],
     staleTime: 60000,
-    onSuccess: (data: any) => {
-      if (data) {
-        setGithubSettings({
-          githubToken: data.githubToken || '',
-          repoOwner: data.repoOwner || '',
-          repoName: data.repoName || '',
-          mainBranch: data.mainBranch || 'main',
-          workflowFile: data.workflowFile || 'SUBZERO.yml'
-        });
-      }
+  });
+
+  // Update GitHub settings when data changes
+  useState(() => {
+    if (githubData) {
+      setGithubSettings({
+        githubToken: (githubData as any).githubToken || '',
+        repoOwner: (githubData as any).repoOwner || '',
+        repoName: (githubData as any).repoName || '',
+        mainBranch: (githubData as any).mainBranch || 'main',
+        workflowFile: (githubData as any).workflowFile || 'SUBZERO.yml'
+      });
     }
   });
 
@@ -266,12 +285,107 @@ export default function AdminDashboard() {
     },
   });
 
+  // Branch checking mutation
+  const checkBranchMutation = useMutation({
+    mutationFn: async (branchName: string) => {
+      const response = await fetch(`/api/admin/deployment/check-branch?branchName=${encodeURIComponent(branchName)}`);
+      if (!response.ok) throw new Error('Failed to check branch');
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setBranchCheckResult(data);
+      setIsCheckingBranch(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to check branch availability", description: error.message, variant: "destructive" });
+      setIsCheckingBranch(false);
+    },
+  });
+
+  // Deployment creation mutation
+  const createDeploymentMutation = useMutation({
+    mutationFn: async (deploymentData: typeof deploymentForm) => {
+      return await apiRequest('POST', '/api/admin/deployment/deploy', {
+        branchName: deploymentData.appName,
+        sessionId: deploymentData.sessionId,
+        ownerNumber: deploymentData.ownerNumber,
+        prefix: deploymentData.prefix
+      });
+    },
+    onSuccess: async (response) => {
+      const data = await response.json();
+      toast({ title: "Deployment created successfully!", description: `Branch: ${data.branch}` });
+      setDeploymentForm({ appName: '', sessionId: '', ownerNumber: '', prefix: '' });
+      setBranchCheckResult(null);
+      // Optionally refresh deployments list here
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create deployment", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleUserStatusChange = (userId: string, status: string) => {
     updateUserStatusMutation.mutate({ userId, status });
   };
 
   const handlePromoteUser = (userId: string) => {
     promoteUserMutation.mutate(userId);
+  };
+
+  const checkBranchAvailability = async (branchName: string) => {
+    if (!branchName.trim()) {
+      setBranchCheckResult(null);
+      return;
+    }
+    setIsCheckingBranch(true);
+    checkBranchMutation.mutate(branchName);
+  };
+
+  const handleCreateDeployment = () => {
+    if (!deploymentForm.appName || !deploymentForm.sessionId || !deploymentForm.ownerNumber || !deploymentForm.prefix) {
+      toast({ title: "Please fill in all fields", variant: "destructive" });
+      return;
+    }
+    if (branchCheckResult && !branchCheckResult.available) {
+      toast({ title: "Branch name not available", description: "Please choose a different app name", variant: "destructive" });
+      return;
+    }
+    createDeploymentMutation.mutate(deploymentForm);
+  };
+
+  const fetchWorkflowRuns = async (branchName: string) => {
+    if (!branchName.trim()) return;
+    setIsLoadingLogs(true);
+    try {
+      const response = await fetch(`/api/admin/deployment/${encodeURIComponent(branchName)}/logs`);
+      if (response.ok) {
+        const runs = await response.json();
+        setWorkflowRuns(runs);
+      } else {
+        toast({ title: "Failed to fetch workflow runs", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error fetching logs", variant: "destructive" });
+    } finally {
+      setIsLoadingLogs(false);
+    }
+  };
+
+  const fetchRunLogs = async (runId: string) => {
+    setIsLoadingLogs(true);
+    try {
+      const response = await fetch(`/api/admin/deployment/run/${runId}/logs`);
+      if (response.ok) {
+        const logs = await response.json();
+        setSelectedRunLogs(logs);
+      } else {
+        toast({ title: "Failed to fetch run logs", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error fetching run logs", variant: "destructive" });
+    } finally {
+      setIsLoadingLogs(false);
+    }
   };
 
   const handleCoinAdjustment = () => {
@@ -357,6 +471,10 @@ export default function AdminDashboard() {
           <TabsTrigger value="github" data-testid="tab-github">
             <Github className="w-4 h-4 mr-1" />
             GitHub
+          </TabsTrigger>
+          <TabsTrigger value="deployments-mgmt" data-testid="tab-deployments-mgmt">
+            <Rocket className="w-4 h-4 mr-1" />
+            Deployments
           </TabsTrigger>
           <TabsTrigger value="settings" data-testid="tab-settings">Settings</TabsTrigger>
         </TabsList>
@@ -806,6 +924,270 @@ export default function AdminDashboard() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="deployments-mgmt" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Deployment Creation Form */}
+            <Card data-testid="card-create-deployment">
+              <CardHeader>
+                <CardTitle>Create New Deployment</CardTitle>
+                <CardDescription>Deploy a new bot instance with custom configuration</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="app-name">App Name (Branch Name)</Label>
+                    <div className="flex space-x-2">
+                      <Input
+                        id="app-name"
+                        placeholder="e.g., my-bot-app"
+                        value={deploymentForm.appName}
+                        onChange={(e) => {
+                          setDeploymentForm(prev => ({ ...prev, appName: e.target.value }));
+                          // Auto-check availability after typing stops
+                          setTimeout(() => checkBranchAvailability(e.target.value), 500);
+                        }}
+                        data-testid="input-app-name"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => checkBranchAvailability(deploymentForm.appName)}
+                        disabled={isCheckingBranch || !deploymentForm.appName.trim()}
+                        data-testid="button-check-branch"
+                      >
+                        {isCheckingBranch ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Check"}
+                      </Button>
+                    </div>
+                    {branchCheckResult && (
+                      <Alert variant={branchCheckResult.available ? "default" : "destructive"}>
+                        <AlertDescription>
+                          {branchCheckResult.message}
+                          {branchCheckResult.suggested && (
+                            <div className="mt-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setDeploymentForm(prev => ({ ...prev, appName: branchCheckResult.suggested }));
+                                  setBranchCheckResult({ ...branchCheckResult, available: true, message: 'Name available!' });
+                                }}
+                                data-testid="button-use-suggested"
+                              >
+                                Use "{branchCheckResult.suggested}"
+                              </Button>
+                            </div>
+                          )}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="session-id">Session ID</Label>
+                    <Input
+                      id="session-id"
+                      placeholder="Enter bot session ID"
+                      value={deploymentForm.sessionId}
+                      onChange={(e) => setDeploymentForm(prev => ({ ...prev, sessionId: e.target.value }))}
+                      data-testid="input-session-id"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="owner-number">Owner Number</Label>
+                    <Input
+                      id="owner-number"
+                      placeholder="Enter owner phone number"
+                      value={deploymentForm.ownerNumber}
+                      onChange={(e) => setDeploymentForm(prev => ({ ...prev, ownerNumber: e.target.value }))}
+                      data-testid="input-owner-number"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="prefix">Command Prefix</Label>
+                    <Input
+                      id="prefix"
+                      placeholder="e.g., ."
+                      value={deploymentForm.prefix}
+                      onChange={(e) => setDeploymentForm(prev => ({ ...prev, prefix: e.target.value }))}
+                      data-testid="input-prefix"
+                    />
+                  </div>
+
+                  <Button
+                    onClick={handleCreateDeployment}
+                    disabled={createDeploymentMutation.isPending || !branchCheckResult?.available}
+                    className="w-full"
+                    data-testid="button-create-deployment"
+                  >
+                    {createDeploymentMutation.isPending ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                        Creating Deployment...
+                      </>
+                    ) : (
+                      <>
+                        <Rocket className="h-4 w-4 mr-2" />
+                        Create Deployment
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* GitHub Configuration Status */}
+            <Card data-testid="card-github-status">
+              <CardHeader>
+                <CardTitle>GitHub Configuration</CardTitle>
+                <CardDescription>Current GitHub repository settings</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {githubData && (githubData as any).repoOwner ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Repository:</span>
+                      <Badge variant="secondary">
+                        {(githubData as any).repoOwner}/{(githubData as any).repoName}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Main Branch:</span>
+                      <Badge variant="outline">{(githubData as any).mainBranch}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Workflow File:</span>
+                      <Badge variant="outline">{(githubData as any).workflowFile}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Token Status:</span>
+                      <Badge variant={githubSettings.githubToken ? "default" : "destructive"}>
+                        {githubSettings.githubToken ? "Configured" : "Missing"}
+                      </Badge>
+                    </div>
+                  </div>
+                ) : (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      GitHub settings not configured. Please configure GitHub settings in the GitHub tab before creating deployments.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Logs Viewer Section */}
+          <Card data-testid="card-logs-viewer">
+            <CardHeader>
+              <CardTitle>App Logs Viewer</CardTitle>
+              <CardDescription>View GitHub Actions workflow logs for deployed apps</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex space-x-2">
+                  <Input
+                    placeholder="Enter app name (branch name) to view logs"
+                    value={selectedBranchForLogs}
+                    onChange={(e) => setSelectedBranchForLogs(e.target.value)}
+                    data-testid="input-branch-logs"
+                  />
+                  <Button
+                    onClick={() => fetchWorkflowRuns(selectedBranchForLogs)}
+                    disabled={isLoadingLogs || !selectedBranchForLogs.trim()}
+                    data-testid="button-fetch-logs"
+                  >
+                    {isLoadingLogs ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                    View Logs
+                  </Button>
+                </div>
+
+                {workflowRuns.length > 0 && (
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Workflow Runs for {selectedBranchForLogs}</h4>
+                    <div className="space-y-2">
+                      {workflowRuns.map((run) => (
+                        <div key={run.id} className="border rounded-lg p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center space-x-2">
+                                <Badge variant={run.status === 'completed' ? 'default' : run.status === 'in_progress' ? 'secondary' : 'destructive'}>
+                                  {run.status}
+                                </Badge>
+                                {run.conclusion && (
+                                  <Badge variant={run.conclusion === 'success' ? 'default' : 'destructive'}>
+                                    {run.conclusion}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                Started: {new Date(run.created_at).toLocaleString()}
+                              </p>
+                              {run.updated_at && (
+                                <p className="text-sm text-muted-foreground">
+                                  Updated: {new Date(run.updated_at).toLocaleString()}
+                                </p>
+                              )}
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => fetchRunLogs(run.id.toString())}
+                              disabled={isLoadingLogs}
+                              data-testid={`button-view-run-${run.id}`}
+                            >
+                              View Logs
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedRunLogs && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium">Workflow Logs</h4>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedRunLogs(null)}
+                        data-testid="button-close-logs"
+                      >
+                        Close
+                      </Button>
+                    </div>
+                    <div className="space-y-3">
+                      {selectedRunLogs.logs?.map((jobLog: any, index: number) => (
+                        <div key={index} className="border rounded-lg">
+                          <div className="bg-muted p-3 border-b">
+                            <h5 className="font-medium">{jobLog.jobName}</h5>
+                          </div>
+                          <div className="p-3">
+                            <pre className="text-sm bg-black text-green-400 p-3 rounded overflow-auto max-h-96 whitespace-pre-wrap">
+                              {jobLog.logs || 'No logs available'}
+                            </pre>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {workflowRuns.length === 0 && selectedBranchForLogs && !isLoadingLogs && (
+                  <Alert>
+                    <AlertDescription>
+                      No workflow runs found for "{selectedBranchForLogs}". Make sure the app name is correct and has been deployed.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="github" className="space-y-4">
           <Card data-testid="card-github-settings">
             <CardHeader>
@@ -886,11 +1268,11 @@ export default function AdminDashboard() {
                   {updateGithubSettingsMutation.isPending ? "Saving..." : "Save GitHub Settings"}
                 </Button>
 
-                {githubData && (
+                {githubData && (githubData as any).repoOwner && (
                   <Alert>
                     <Github className="h-4 w-4" />
                     <AlertDescription>
-                      Settings configured for: <strong>{githubData.repoOwner}/{githubData.repoName}</strong>
+                      Settings configured for: <strong>{(githubData as any).repoOwner}/{(githubData as any).repoName}</strong>
                     </AlertDescription>
                   </Alert>
                 )}
