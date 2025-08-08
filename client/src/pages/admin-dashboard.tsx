@@ -91,6 +91,7 @@ interface CurrencySettings {
 }
 
 export default function AdminDashboard() {
+  const [selectedSection, setSelectedSection] = useState("users");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [coinAdjustment, setCoinAdjustment] = useState({ amount: 0, reason: "" });
   const [maintenanceForm, setMaintenanceForm] = useState({ message: '', estimatedTime: '' });
@@ -243,7 +244,7 @@ export default function AdminDashboard() {
           
           // Remove from monitored branches
           setMonitoredBranches(prev => {
-            const newSet = new Set(prev);
+            const newSet = new Set(Array.from(prev));
             newSet.delete(data.branch);
             return newSet;
           });
@@ -446,7 +447,7 @@ export default function AdminDashboard() {
         type: 'monitor_deployment',
         branch: branchName
       });
-      setMonitoredBranches(prev => new Set([...prev, branchName]));
+      setMonitoredBranches(prev => new Set([...Array.from(prev), branchName]));
       toast({ title: "Real-time monitoring started", description: `Monitoring ${branchName}` });
     }
   };
@@ -551,33 +552,66 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      <Tabs defaultValue="users" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="users" data-testid="tab-users">User Management</TabsTrigger>
-          <TabsTrigger value="notifications" data-testid="tab-notifications">
-            Notifications {unreadNotifications > 0 && <Badge className="ml-1">{unreadNotifications}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="maintenance" data-testid="tab-maintenance">
-            <Wrench className="w-4 h-4 mr-1" />
-            Maintenance
-            {maintenanceStatus?.enabled && <Badge variant="destructive" className="ml-1">ON</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="currency" data-testid="tab-currency">
-            <CreditCard className="w-4 h-4 mr-1" />
-            Currency
-          </TabsTrigger>
-          <TabsTrigger value="github" data-testid="tab-github">
-            <Github className="w-4 h-4 mr-1" />
-            GitHub
-          </TabsTrigger>
-          <TabsTrigger value="deployments-mgmt" data-testid="tab-deployments-mgmt">
-            <Rocket className="w-4 h-4 mr-1" />
-            Deployments
-          </TabsTrigger>
-          <TabsTrigger value="settings" data-testid="tab-settings">Settings</TabsTrigger>
-        </TabsList>
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <h2 className="text-xl font-semibold">Admin Controls</h2>
+          <div className="w-full sm:w-auto">
+            <Select value={selectedSection} onValueChange={setSelectedSection}>
+              <SelectTrigger className="w-full sm:w-[280px]" data-testid="dropdown-admin-sections">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="users">
+                  <div className="flex items-center">
+                    <Users className="w-4 h-4 mr-2" />
+                    User Management
+                  </div>
+                </SelectItem>
+                <SelectItem value="notifications">
+                  <div className="flex items-center">
+                    <Bell className="w-4 h-4 mr-2" />
+                    Notifications
+                    {unreadNotifications > 0 && <Badge className="ml-2" variant="secondary">{unreadNotifications}</Badge>}
+                  </div>
+                </SelectItem>
+                <SelectItem value="maintenance">
+                  <div className="flex items-center">
+                    <Wrench className="w-4 h-4 mr-2" />
+                    Maintenance
+                    {maintenanceStatus?.enabled && <Badge variant="destructive" className="ml-2">ON</Badge>}
+                  </div>
+                </SelectItem>
+                <SelectItem value="currency">
+                  <div className="flex items-center">
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    Currency
+                  </div>
+                </SelectItem>
+                <SelectItem value="github">
+                  <div className="flex items-center">
+                    <Github className="w-4 h-4 mr-2" />
+                    GitHub
+                  </div>
+                </SelectItem>
+                <SelectItem value="deployments-mgmt">
+                  <div className="flex items-center">
+                    <Rocket className="w-4 h-4 mr-2" />
+                    Deployments
+                  </div>
+                </SelectItem>
+                <SelectItem value="settings">
+                  <div className="flex items-center">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Settings
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
-        <TabsContent value="users" className="space-y-4">
+        {selectedSection === "users" && (
+          <div className="space-y-4">
           <Card data-testid="card-user-management">
             <CardHeader>
               <CardTitle>User Management</CardTitle>
@@ -726,9 +760,11 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+          </div>
+        )}
 
-        <TabsContent value="notifications" className="space-y-4">
+        {selectedSection === "notifications" && (
+          <div className="space-y-4">
           <Card data-testid="card-notifications">
             <CardHeader>
               <CardTitle>Admin Notifications</CardTitle>
@@ -762,9 +798,11 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+          </div>
+        )}
 
-        <TabsContent value="maintenance" className="space-y-4">
+        {selectedSection === "maintenance" && (
+          <div className="space-y-4">
           <Card data-testid="card-maintenance">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -858,9 +896,11 @@ export default function AdminDashboard() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+          </div>
+        )}
 
-        <TabsContent value="currency" className="space-y-4">
+        {selectedSection === "currency" && (
+          <div className="space-y-4">
           <Card data-testid="card-currency">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -952,9 +992,11 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+          </div>
+        )}
 
-        <TabsContent value="settings" className="space-y-4">
+        {selectedSection === "settings" && (
+          <div className="space-y-4">
           <Card data-testid="card-settings">
             <CardHeader>
               <CardTitle>Application Settings</CardTitle>
@@ -1020,9 +1062,11 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+          </div>
+        )}
 
-        <TabsContent value="deployments-mgmt" className="space-y-4">
+        {selectedSection === "deployments-mgmt" && (
+          <div className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Deployment Creation Form */}
             <Card data-testid="card-create-deployment">
@@ -1354,9 +1398,11 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+          </div>
+        )}
 
-        <TabsContent value="github" className="space-y-4">
+        {selectedSection === "github" && (
+          <div className="space-y-4">
           <Card data-testid="card-github-settings">
             <CardHeader>
               <CardTitle>GitHub Deployment Settings</CardTitle>
@@ -1447,8 +1493,9 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
