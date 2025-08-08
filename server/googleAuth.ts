@@ -45,9 +45,12 @@ export async function setupAuth(app: Express) {
     callbackURL = `https://${process.env.REPLIT_DEV_DOMAIN}/api/auth/google/callback`;
   } else if (process.env.KOYEB_PUBLIC_DOMAIN) {
     callbackURL = `https://${process.env.KOYEB_PUBLIC_DOMAIN}/api/auth/google/callback`;
+  } else if (process.env.RENDER_EXTERNAL_URL) {
+    // For Render.com deployments
+    callbackURL = `${process.env.RENDER_EXTERNAL_URL}/api/auth/google/callback`;
   } else if (process.env.NODE_ENV === 'production') {
-    // For production deployments, try to detect the domain
-    callbackURL = `https://subzero-deploy.koyeb.app/api/auth/google/callback`;
+    // For production deployments, use environment variable or fallback
+    callbackURL = process.env.CALLBACK_URL || `https://subzero-deploy.onrender.com/api/auth/google/callback`;
   }
 
   console.log('Google OAuth callback URL:', callbackURL);
