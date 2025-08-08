@@ -815,14 +815,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let sanitizedBranchName = sanitizeBranchName(branchName.trim());
       if (!sanitizedBranchName) {
-        const prefix = 'user-';
-        const randomChars = Math.random().toString(36).substring(2, 8);
-        sanitizedBranchName = prefix + randomChars;
+        return res.status(400).json({ message: 'Invalid branch name. Please provide a valid app name.' });
       }
       
-      // Add timestamp to ensure uniqueness
-      const timestamp = Date.now().toString();
-      sanitizedBranchName = `${sanitizedBranchName}-${timestamp}`;
+      // Use the exact sanitized name without modifications
+      // The frontend should have already validated availability
 
       // Deduct coins first
       await storage.updateUserBalance(userId, -cost);
@@ -864,13 +861,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       try {
-        // Check if branch already exists, if so, delete it first
+        // Check if branch already exists - if it does, reject the deployment
         try {
           await makeGitHubRequest('GET', `git/refs/heads/${sanitizedBranchName}`);
-          // Branch exists, delete it first
-          await makeGitHubRequest('DELETE', `git/refs/heads/${sanitizedBranchName}`);
+          // Branch exists, return error
+          return res.status(400).json({ message: `Branch name '${sanitizedBranchName}' is already taken. Please choose a different name.` });
         } catch (error) {
-          // Branch doesn't exist, which is what we want
+          // Branch doesn't exist, which is what we want - continue with deployment
         }
         
         // Create branch from main
@@ -1574,12 +1571,43 @@ jobs:
               'Name available!'
           });
         } else if (response.ok) {
-          const suggestedName = `${sanitizedName}-${Math.floor(Math.random() * 1000)}`;
+          // Generate better suggestions when name is taken
+          const generateSuggestions = async (baseName: string) => {
+            const suggestions = [
+              `${baseName}-2`,
+              `${baseName}-new`,
+              `${baseName}-v2`,
+              `${baseName}-${new Date().getFullYear()}`,
+              `${baseName}-${Math.floor(Math.random() * 100)}`
+            ];
+            
+            // Check which suggestions are available
+            for (const suggestion of suggestions) {
+              try {
+                const checkUrl = `https://api.github.com/repos/${repoOwner.value}/${repoName.value}/git/ref/heads/${suggestion}`;
+                const checkResponse = await fetch(checkUrl, {
+                  headers: {
+                    'Authorization': `token ${githubToken.value}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                  }
+                });
+                if (checkResponse.status === 404) {
+                  return suggestion; // This name is available
+                }
+              } catch (error) {
+                return suggestion; // Assume available if check fails
+              }
+            }
+            // Fallback if all suggestions are taken
+            return `${baseName}-${Date.now().toString().slice(-6)}`;
+          };
+          
+          const suggestedName = await generateSuggestions(sanitizedName);
           return res.json({ 
             available: false, 
             suggested: suggestedName,
             sanitized: originalName !== sanitizedName ? sanitizedName : undefined,
-            message: `Name taken. Try: ${suggestedName}`
+            message: `Name '${sanitizedName}' is already taken. Try: ${suggestedName}`
           });
         } else {
           throw new Error(`GitHub API error: ${response.statusText}`);
