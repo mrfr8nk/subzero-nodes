@@ -181,7 +181,7 @@ export default function Signup() {
                           <FormControl>
                             <Input
                               {...field}
-                              placeholder="John"
+                              placeholder="Darrell"
                               disabled={isLoading}
                               className="h-11"
                             />
@@ -200,7 +200,7 @@ export default function Signup() {
                           <FormControl>
                             <Input
                               {...field}
-                              placeholder="Doe"
+                              placeholder="Mucheri"
                               disabled={isLoading}
                               className="h-11"
                             />
@@ -221,7 +221,7 @@ export default function Signup() {
                           <Input
                             {...field}
                             type="email"
-                            placeholder="john@example.com"
+                            placeholder="subzero@example.com"
                             disabled={isLoading}
                             className="h-11"
                           />
