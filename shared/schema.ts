@@ -111,6 +111,8 @@ export interface ChatMessage {
   message: string;
   isAdmin: boolean;
   role?: string; // 'user', 'admin', 'super_admin'
+  tags?: string[]; // '@issue', '@request', '@query', etc.
+  isTagged?: boolean; // Quick check for admin notifications
   createdAt: Date;
   updatedAt: Date;
 }
@@ -224,6 +226,16 @@ export const insertAppSettingsSchema = z.object({
   updatedBy: z.string().optional(),
 });
 
+export const insertChatMessageSchema = z.object({
+  userId: z.string(),
+  username: z.string(),
+  message: z.string(),
+  isAdmin: z.boolean().default(false),
+  role: z.string().optional(),
+  tags: z.string().array().optional(),
+  isTagged: z.boolean().optional(),
+});
+
 // Insert types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertDeployment = z.infer<typeof insertDeploymentSchema>;
@@ -233,6 +245,7 @@ export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type InsertAdminNotification = z.infer<typeof insertAdminNotificationSchema>;
 export type InsertAppSettings = z.infer<typeof insertAppSettingsSchema>;
 export type InsertDeploymentVariable = z.infer<typeof insertDeploymentVariableSchema>;
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 
 // For backward compatibility
 export type UpsertUser = InsertUser;

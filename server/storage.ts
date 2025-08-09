@@ -16,6 +16,7 @@ import {
   InsertAdminNotification,
   InsertAppSettings,
   InsertDeploymentVariable,
+  InsertChatMessage,
 } from "@shared/schema";
 import { getDb } from "./db";
 import { ObjectId } from "mongodb";
@@ -119,13 +120,7 @@ export interface IStorage {
   processDeploymentDailyCharges(): Promise<void>;
   
   // Chat operations
-  createChatMessage(message: {
-    userId: string;
-    username: string;
-    message: string;
-    isAdmin: boolean;
-    role?: string;
-  }): Promise<ChatMessage>;
+  createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessages(limit?: number): Promise<ChatMessage[]>;
   restrictUserFromChat(userId: string, restrictedBy: string, reason?: string): Promise<void>;
   unrestrictUserFromChat(userId: string): Promise<void>;
@@ -1246,14 +1241,24 @@ export class MongoStorage implements IStorage {
   }
 
   // Chat operations
-  async createChatMessage(message: {
-    userId: string;
-    username: string;
-    message: string;
-    isAdmin: boolean;
-    role?: string;
-  }): Promise<ChatMessage> {
+  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
     const now = new Date();
+    
+    // Extract tags from message content
+    const tagRegex = /@(issue|request|query)\b/gi;
+    const tags: string[] = [];
+    let messageContent = message.message;
+    
+    // Find all tags in the message
+    const matches = messageContent.match(tagRegex);
+    if (matches) {
+      matches.forEach(match => {
+        tags.push(match.toLowerCase());
+      });
+    }
+    
+    const isTagged = tags.length > 0;
+    
     const chatMessage: ChatMessage = {
       _id: new ObjectId(),
       userId: new ObjectId(message.userId),
@@ -1261,11 +1266,32 @@ export class MongoStorage implements IStorage {
       message: message.message,
       isAdmin: message.isAdmin,
       role: message.role,
+      tags: tags.length > 0 ? tags : undefined,
+      isTagged,
       createdAt: now,
       updatedAt: now,
     };
 
     await this.chatMessagesCollection.insertOne(chatMessage);
+    
+    // Create admin notification for tagged messages
+    if (isTagged && !message.isAdmin) {
+      const tagString = tags.join(', ');
+      await this.createAdminNotification({
+        type: 'tagged_message',
+        title: `User Message Tagged: ${tagString}`,
+        message: `${message.username} sent a tagged message: "${message.message}"`,
+        data: {
+          messageId: chatMessage._id.toString(),
+          userId: message.userId,
+          username: message.username,
+          tags: tags,
+          originalMessage: message.message
+        },
+        read: false
+      });
+    }
+    
     return chatMessage;
   }
 

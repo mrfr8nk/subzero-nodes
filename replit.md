@@ -125,6 +125,14 @@ Add your domain's callback URL to Google Cloud Console OAuth settings:
   - Updated all page headers and navigation with Bot icon from Lucide React
   - Maintained consistent blue gradient styling across all logo instances
   - Updated website manifest with proper app name and theme colors
+- **Chat Message Tagging System**: Implemented comprehensive tagging system for admin notifications
+  - Added support for @issue, @request, and @query tags in chat messages
+  - Persistent message storage in MongoDB with tag metadata
+  - Automatic admin notifications when users send tagged messages
+  - Visual indicators for tagged messages with color-coded badges
+  - Tag highlighting in message content with special styling
+  - Message history preserved across server restarts and reboots
+  - Enhanced chat UI with tag instructions and feedback indicators
 
 ### Deployment Notes
 - Update `FRONTEND_URL` and `BACKEND_URL` in production environment

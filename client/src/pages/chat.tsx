@@ -21,6 +21,8 @@ interface ChatMessage {
   message: string;
   isAdmin: boolean;
   role?: string;
+  tags?: string[];
+  isTagged?: boolean;
   createdAt: string;
 }
 
@@ -218,6 +220,45 @@ export default function Chat() {
     return null;
   };
 
+  const getTagBadge = (tag: string) => {
+    const tagColors: Record<string, string> = {
+      '@issue': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+      '@request': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+      '@query': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+    };
+    
+    return (
+      <Badge 
+        className={`text-xs ${tagColors[tag] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'}`}
+        variant="outline"
+      >
+        {tag}
+      </Badge>
+    );
+  };
+
+  const highlightTags = (message: string) => {
+    const tagRegex = /@(issue|request|query)\b/gi;
+    const parts = message.split(tagRegex);
+    const result = [];
+    
+    for (let i = 0; i < parts.length; i++) {
+      if (i % 2 === 0) {
+        // Regular text
+        result.push(parts[i]);
+      } else {
+        // Tag text
+        result.push(
+          <span key={i} className="font-medium text-blue-600 dark:text-blue-400">
+            @{parts[i]}
+          </span>
+        );
+      }
+    }
+    
+    return result;
+  };
+
   return (
     <div className="h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
       <div className="flex-1 flex flex-col">
@@ -308,15 +349,27 @@ export default function Chat() {
               
               {messages.map((msg) => (
                 <div key={msg._id} className="flex flex-col space-y-1">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 flex-wrap">
                     <span className="font-medium text-sm">{msg.username}</span>
                     {getRoleBadge(msg.role, msg.isAdmin)}
+                    {msg.tags && msg.tags.map((tag, index) => (
+                      <span key={index}>{getTagBadge(tag)}</span>
+                    ))}
                     <span className="text-xs text-gray-500">
                       {formatTime(msg.createdAt)}
                     </span>
                   </div>
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm">
-                    <p className="text-sm">{msg.message}</p>
+                  <div className={`rounded-lg p-3 shadow-sm ${
+                    msg.isTagged 
+                      ? 'bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800' 
+                      : 'bg-white dark:bg-gray-800'
+                  }`}>
+                    <p className="text-sm">{highlightTags(msg.message)}</p>
+                    {msg.isTagged && !msg.isAdmin && (
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 italic">
+                        ✓ This message has been sent to admins for review
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
@@ -333,22 +386,27 @@ export default function Chat() {
                   </AlertDescription>
                 </Alert>
               ) : (
-                <div className="flex space-x-2">
-                  <Input
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="Type your message..."
-                    className="flex-1"
-                    maxLength={500}
+                <div className="space-y-2">
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    💡 Use <span className="font-medium text-blue-600 dark:text-blue-400">@issue</span>, <span className="font-medium text-yellow-600 dark:text-yellow-400">@request</span>, or <span className="font-medium text-green-600 dark:text-green-400">@query</span> to notify admins
+                  </div>
+                  <div className="flex space-x-2">
+                    <Input
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      placeholder="Type your message... (use @issue, @request, or @query to tag admins)"
+                      className="flex-1"
+                      maxLength={500}
                   />
-                  <Button 
-                    onClick={sendMessage} 
-                    disabled={!message.trim() || !isConnected}
-                    size="sm"
-                  >
-                    <Send className="w-4 h-4" />
-                  </Button>
+                    <Button 
+                      onClick={sendMessage} 
+                      disabled={!message.trim() || !isConnected}
+                      size="sm"
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
