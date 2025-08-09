@@ -85,8 +85,8 @@ export default function Dashboard() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Dashboard Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
-        <p className="text-gray-600">Welcome back! Here's your bot deployment overview.</p>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
+        <p className="text-muted-foreground">Welcome back! Here's your bot deployment overview.</p>
       </div>
 
       {/* Stats Cards */}
@@ -95,8 +95,8 @@ export default function Dashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Active Bots</p>
-                <p className="text-3xl font-bold text-gray-900">
+                <p className="text-sm font-medium text-muted-foreground mb-1">Active Bots</p>
+                <p className="text-3xl font-bold text-foreground">
                   {statsLoading ? "..." : stats?.active || 0}
                 </p>
               </div>
@@ -106,7 +106,7 @@ export default function Dashboard() {
             </div>
             <div className="mt-4 flex items-center text-sm">
               <span className="text-green-600 font-medium">+2.5%</span>
-              <span className="text-gray-600 ml-1">from last month</span>
+              <span className="text-muted-foreground ml-1">from last month</span>
             </div>
           </CardContent>
         </Card>
@@ -115,8 +115,8 @@ export default function Dashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Coin Balance</p>
-                <p className="text-3xl font-bold text-gray-900">
+                <p className="text-sm font-medium text-muted-foreground mb-1">Coin Balance</p>
+                <p className="text-3xl font-bold text-foreground">
                   {statsLoading ? "..." : stats?.coinBalance || 0}
                 </p>
               </div>
@@ -126,7 +126,7 @@ export default function Dashboard() {
             </div>
             <div className="mt-4 flex items-center text-sm">
               <span className="text-green-600 font-medium">+150</span>
-              <span className="text-gray-600 ml-1">this week</span>
+              <span className="text-muted-foreground ml-1">this week</span>
             </div>
           </CardContent>
         </Card>
@@ -135,8 +135,8 @@ export default function Dashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Referrals</p>
-                <p className="text-3xl font-bold text-gray-900">
+                <p className="text-sm font-medium text-muted-foreground mb-1">Referrals</p>
+                <p className="text-3xl font-bold text-foreground">
                   {statsLoading ? "..." : stats?.totalReferrals || 0}
                 </p>
               </div>
@@ -146,7 +146,7 @@ export default function Dashboard() {
             </div>
             <div className="mt-4 flex items-center text-sm">
               <span className="text-green-600 font-medium">+3</span>
-              <span className="text-gray-600 ml-1">this month</span>
+              <span className="text-muted-foreground ml-1">this month</span>
             </div>
           </CardContent>
         </Card>
@@ -155,8 +155,8 @@ export default function Dashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Total Deployments</p>
-                <p className="text-3xl font-bold text-gray-900">
+                <p className="text-sm font-medium text-muted-foreground mb-1">Total Deployments</p>
+                <p className="text-3xl font-bold text-foreground">
                   {statsLoading ? "..." : stats?.total || 0}
                 </p>
               </div>
@@ -166,7 +166,7 @@ export default function Dashboard() {
             </div>
             <div className="mt-4 flex items-center text-sm">
               <span className="text-green-600 font-medium">+12</span>
-              <span className="text-gray-600 ml-1">this month</span>
+              <span className="text-muted-foreground ml-1">this month</span>
             </div>
           </CardContent>
         </Card>
@@ -183,29 +183,29 @@ export default function Dashboard() {
             <CardContent>
               <div className="space-y-4">
                 {activityLoading ? (
-                  <div className="text-gray-500">Loading activity...</div>
+                  <div className="text-muted-foreground">Loading activity...</div>
                 ) : activity && activity.length > 0 ? (
                   activity.map((transaction: any) => (
-                    <div key={transaction._id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl">
+                    <div key={transaction._id} className="flex items-center space-x-4 p-4 bg-muted rounded-xl">
                       <div className={`w-10 h-10 ${getActivityColor(transaction.type)} rounded-full flex items-center justify-center`}>
                         {getActivityIcon(transaction.type)}
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-gray-900">{transaction.description}</p>
-                        <p className="text-sm text-gray-600">{transaction.type.replace('_', ' ')}</p>
+                        <p className="font-medium text-foreground">{transaction.description}</p>
+                        <p className="text-sm text-muted-foreground">{transaction.type.replace('_', ' ')}</p>
                       </div>
                       <div className="text-right">
                         <span className={`font-semibold ${getAmountColor(transaction.amount)}`}>
                           {formatAmount(transaction.amount)} coins
                         </span>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-muted-foreground">
                           {new Date(transaction.createdAt).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="text-gray-500 text-center py-8">No recent activity</div>
+                  <div className="text-muted-foreground text-center py-8">No recent activity</div>
                 )}
               </div>
             </CardContent>
