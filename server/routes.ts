@@ -934,7 +934,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Ensure user owns the deployment (unless admin)
-      if (deployment.userId !== userId && !req.user.isAdmin) {
+      if (deployment.userId.toString() !== userId && !req.user.isAdmin) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -1974,9 +1974,33 @@ jobs:
       }
 
       const runsData = await runsResponse.json();
+      
+      // If no runs found, try to get the latest runs regardless of branch
+      let workflowRuns = runsData.workflow_runs || [];
+      if (workflowRuns.length === 0) {
+        // Try to get any runs for this workflow
+        const allRunsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/runs?per_page=5`;
+        const allRunsResponse = await fetch(allRunsUrl, {
+          headers: {
+            'Authorization': `token ${GITHUB_TOKEN}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        });
+        
+        if (allRunsResponse.ok) {
+          const allRunsData = await allRunsResponse.json();
+          // Filter runs that might be related to this deployment
+          workflowRuns = (allRunsData.workflow_runs || []).filter((run: any) => 
+            run.head_branch === deployment.branchName || 
+            run.display_title?.includes(deployment.branchName) ||
+            run.display_title?.includes(deployment.name)
+          );
+        }
+      }
+      
       res.json({
         deployment,
-        workflowRuns: runsData.workflow_runs || []
+        workflowRuns
       });
     } catch (error) {
       console.error('Error fetching deployment logs:', error);
@@ -2385,38 +2409,29 @@ jobs:
         return response.json();
       };
 
-      // Update settings.js with new variables
-      const settingsContent = `const fs = require('fs');
-if (fs.existsSync('config.env')) require('dotenv').config({ path: './config.env' });
+      // Update settings.js with new variables - create a proper content map
+      const variableMap = new Map<string, string>();
+      
+      // Add deployment variables first
+      variables.forEach(v => {
+        variableMap.set(v.key.toUpperCase(), v.value);
+      });
+      
+      // Add default variables if not overridden
+      const defaultVariables = {
+        'SESSION_ID': 'default_session',
+        'OWNER_NUMBER': '1234567890',
+        'PREFIX': '.'
+      };
+      
+      Object.entries(defaultVariables).forEach(([key, value]) => {
+        if (!variableMap.has(key)) {
+          variableMap.set(key, value);
+        }
+      });
 
-function convertToBool(text, fault = 'true') {
-    return text === fault ? true : false;
-}
-
-module.exports = {
-${variables.map(v => `    ${v.key.toUpperCase()}: process.env.${v.key.toUpperCase()} || "${v.value}",`).join('\n')}
-    ALIVE_MSG: process.env.ALIVE_MSG || "Hello, I am alive!",
-    LANG: process.env.THEME || "SUBZERO-MD",
-    HANDLERS: process.env.PREFIX || ".",
-    BRANCH: "main",
-    STICKER_DATA: process.env.STICKER_DATA || "Subzero;M.D",
-    ALWAYS_ONLINE: convertToBool(process.env.ALWAYS_ONLINE) || false,
-    AUTO_READ: convertToBool(process.env.AUTO_READ) || false,
-    PM_BLOCKER: convertToBool(process.env.PM_BLOCKER) || false,
-    READ_MESSAGES: convertToBool(process.env.READ_MESSAGES) || false,
-    AUTO_STATUS_READ: convertToBool(process.env.AUTO_STATUS_READ) || false,
-    MODE: process.env.MODE || "private",
-    AUTO_VOICE: convertToBool(process.env.AUTO_VOICE) || false,
-    AUTO_STICKER: convertToBool(process.env.AUTO_STICKER) || false,
-    AUTO_REPLY: convertToBool(process.env.AUTO_REPLY) || false,
-    ANTI_BOT: convertToBool(process.env.ANTI_BOT) || false,
-    ANTI_CALL: convertToBool(process.env.ANTI_CALL) || false,
-    ANTI_DELETE: convertToBool(process.env.ANTI_DELETE) || false,
-    ANTI_LINK: convertToBool(process.env.ANTI_LINK) || false,
-    ANTI_BAD: convertToBool(process.env.ANTI_BAD) || false,
-    LOGS: convertToBool(process.env.LOGS) || true,
-    HEROKU_APP_NAME: process.env.HEROKU_APP_NAME || "",
-    HEROKU_API_KEY: process.env.HEROKU_API_KEY || "",
+      const settingsContent = `module.exports = {
+${Array.from(variableMap.entries()).map(([key, value]) => `  ${key}: "${value}",`).join('\n')}
 };`;
 
       // Update settings.js in the branch
@@ -2433,7 +2448,8 @@ ${variables.map(v => `    ${v.key.toUpperCase()}: process.env.${v.key.toUpperCas
         });
 
         // Trigger workflow to redeploy
-        const WORKFLOW_FILE = 'main.yml'; // Default workflow file
+        const workflowFile = await storage.getAppSetting('github_workflow_file');
+        const WORKFLOW_FILE = workflowFile?.value || 'main.yml';
         await makeGitHubRequest('POST', `actions/workflows/${WORKFLOW_FILE}/dispatches`, {
           ref: deployment.branchName
         });
