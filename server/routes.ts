@@ -250,6 +250,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(ipBanMiddleware);
 
+  // User status check middleware - auto logout banned users
+  const userStatusMiddleware = async (req: any, res: any, next: any) => {
+    // Skip for non-authenticated endpoints and admin endpoints
+    const url = req.originalUrl || req.url;
+    if (!req.user || 
+        url.startsWith('/api/auth') || 
+        url.startsWith('/api/admin') ||
+        url.startsWith('/favicon.ico') ||
+        url.includes('vite') ||
+        url.includes('@')) {
+      return next();
+    }
+
+    try {
+      // Check if user is banned or has restricted status
+      const currentUser = await storage.getUser(req.user._id.toString());
+      if (currentUser && (currentUser.status === 'banned' || currentUser.status === 'restricted')) {
+        // Destroy session and force logout
+        req.session.destroy((err: any) => {
+          if (err) {
+            console.error('Error destroying session:', err);
+          }
+        });
+        
+        // For API requests, return JSON response
+        if (url.startsWith('/api/')) {
+          return res.status(403).json({ 
+            error: 'Account Banned', 
+            message: 'Your account has been banned. Please contact support.',
+            forceLogout: true
+          });
+        }
+        
+        // For regular requests, redirect to login
+        return res.redirect('/login?error=account_banned');
+      }
+    } catch (error) {
+      console.error('Error checking user status:', error);
+    }
+    
+    next();
+  };
+
+  app.use(userStatusMiddleware);
+
   // Google OAuth routes
   app.get('/api/auth/google', (req, res, next) => {
     // Store referral code in session if provided
@@ -982,24 +1027,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get GitHub settings configured by admin
-      const [githubToken, repoOwner, repoName, mainBranch, workflowFile] = await Promise.all([
-        storage.getAppSetting('github_token'),
-        storage.getAppSetting('github_repo_owner'),
-        storage.getAppSetting('github_repo_name'),
-        storage.getAppSetting('github_main_branch'),
-        storage.getAppSetting('github_workflow_file')
-      ]);
-
-      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
-        return res.status(400).json({ message: 'GitHub settings not configured by admin. Please contact administrator.' });
+      // Get the best available GitHub account
+      const githubAccount = await storage.getBestGitHubAccount();
+      
+      if (!githubAccount) {
+        return res.status(400).json({ message: 'No GitHub accounts configured by admin. Please contact administrator.' });
       }
 
-      const GITHUB_TOKEN = githubToken.value;
-      const REPO_OWNER = repoOwner.value;
-      const REPO_NAME = repoName.value;
-      const MAIN_BRANCH = mainBranch?.value || 'main';
-      const WORKFLOW_FILE = workflowFile?.value || 'SUBZERO.yml';
+      const GITHUB_TOKEN = githubAccount.token;
+      const REPO_OWNER = githubAccount.owner;
+      const REPO_NAME = githubAccount.repo;
+      const MAIN_BRANCH = 'main';
+      const WORKFLOW_FILE = githubAccount.workflowFile;
 
       // Validate GitHub repository access before proceeding
       try {
@@ -1795,7 +1834,7 @@ jobs:
   // Create GitHub account
   app.post('/api/admin/github/accounts', requireAdmin, async (req, res) => {
     try {
-      const { name, token, owner, repo, workflowFile, priority, maxQueueLength } = req.body;
+      const { name, token, owner, repo, workflowFile } = req.body;
       
       if (!name || !token || !owner || !repo || !workflowFile) {
         return res.status(400).json({ message: 'All fields are required' });
@@ -1806,9 +1845,7 @@ jobs:
         token,
         owner,
         repo,
-        workflowFile,
-        priority: priority || 1,
-        maxQueueLength: maxQueueLength || 5
+        workflowFile
       });
 
       res.status(201).json({
@@ -2434,24 +2471,18 @@ ${variables.map(v => `    ${v.key.toUpperCase()}: process.env.${v.key.toUpperCas
     try {
       let { branchName, sessionId, ownerNumber, prefix } = req.body;
       
-      // Get GitHub settings
-      const [githubToken, repoOwner, repoName, mainBranch, workflowFile] = await Promise.all([
-        storage.getAppSetting('github_token'),
-        storage.getAppSetting('github_repo_owner'),
-        storage.getAppSetting('github_repo_name'),
-        storage.getAppSetting('github_main_branch'),
-        storage.getAppSetting('github_workflow_file')
-      ]);
-
-      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
-        return res.status(400).json({ message: 'GitHub settings not configured. Please configure GitHub settings first.' });
+      // Get the best available GitHub account
+      const githubAccount = await storage.getBestGitHubAccount();
+      
+      if (!githubAccount) {
+        return res.status(400).json({ message: 'No GitHub accounts configured. Please add GitHub accounts first.' });
       }
 
-      const GITHUB_TOKEN = githubToken.value;
-      const REPO_OWNER = repoOwner.value;
-      const REPO_NAME = repoName.value;
-      const MAIN_BRANCH = mainBranch?.value || 'main';
-      const WORKFLOW_FILE = workflowFile?.value || 'SUBZERO.yml';
+      const GITHUB_TOKEN = githubAccount.token;
+      const REPO_OWNER = githubAccount.owner;
+      const REPO_NAME = githubAccount.repo;
+      const MAIN_BRANCH = 'main';
+      const WORKFLOW_FILE = githubAccount.workflowFile;
 
       // Validate and sanitize branch name
       const sanitizeBranchName = (name: string) => {

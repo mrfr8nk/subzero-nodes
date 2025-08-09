@@ -14,9 +14,7 @@ import {
   Eye, 
   EyeOff,
   CheckCircle,
-  XCircle,
-  ArrowUp,
-  ArrowDown
+  XCircle
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -47,9 +45,6 @@ interface GitHubAccount {
   repo: string;
   workflowFile: string;
   isActive: boolean;
-  priority: number;
-  currentQueueLength: number;
-  maxQueueLength: number;
   lastUsed?: string;
   createdAt: string;
   updatedAt: string;
@@ -69,8 +64,6 @@ export default function AdminGitHub() {
     owner: "",
     repo: "",
     workflowFile: "deploy.yml",
-    priority: 1,
-    maxQueueLength: 5,
   });
 
   const { data: githubAccounts = [], isLoading } = useQuery<GitHubAccount[]>({
@@ -144,8 +137,6 @@ export default function AdminGitHub() {
       owner: "",
       repo: "",
       workflowFile: "deploy.yml",
-      priority: 1,
-      maxQueueLength: 5,
     });
     setEditingAccount(null);
   };
@@ -171,8 +162,6 @@ export default function AdminGitHub() {
       owner: account.owner,
       repo: account.repo,
       workflowFile: account.workflowFile,
-      priority: account.priority,
-      maxQueueLength: account.maxQueueLength,
     });
     setIsDialogOpen(true);
   };
@@ -190,12 +179,7 @@ export default function AdminGitHub() {
     });
   };
 
-  const adjustPriority = (id: string, newPriority: number) => {
-    updateAccountMutation.mutate({
-      id,
-      data: { priority: newPriority }
-    });
-  };
+
 
   const toggleTokenVisibility = (accountId: string) => {
     setShowTokens(prev => ({
@@ -308,31 +292,7 @@ export default function AdminGitHub() {
                     />
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="priority">Priority (1 = highest)</Label>
-                      <Input
-                        id="priority"
-                        type="number"
-                        min="1"
-                        value={formData.priority}
-                        onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) })}
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="maxQueueLength">Max Queue Length</Label>
-                      <Input
-                        id="maxQueueLength"
-                        type="number"
-                        min="1"
-                        value={formData.maxQueueLength}
-                        onChange={(e) => setFormData({ ...formData, maxQueueLength: parseInt(e.target.value) })}
-                        required
-                      />
-                    </div>
-                  </div>
+
                   
                   <div className="flex justify-end space-x-2 pt-4">
                     <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
@@ -373,8 +333,6 @@ export default function AdminGitHub() {
                     <TableHead>Name</TableHead>
                     <TableHead>Repository</TableHead>
                     <TableHead>Token</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Queue</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Last Used</TableHead>
                     <TableHead>Actions</TableHead>
@@ -404,34 +362,7 @@ export default function AdminGitHub() {
                           </Button>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-1">
-                          <span>{account.priority}</span>
-                          <div className="flex flex-col">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-4 p-0"
-                              onClick={() => adjustPriority(account._id, Math.max(1, account.priority - 1))}
-                            >
-                              <ArrowUp className="w-3 h-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-4 p-0"
-                              onClick={() => adjustPriority(account._id, account.priority + 1)}
-                            >
-                              <ArrowDown className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={account.currentQueueLength >= account.maxQueueLength ? "destructive" : "secondary"}>
-                          {account.currentQueueLength}/{account.maxQueueLength}
-                        </Badge>
-                      </TableCell>
+
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           <Switch

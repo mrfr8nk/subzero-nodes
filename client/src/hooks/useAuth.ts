@@ -13,6 +13,15 @@ export function useAuth() {
           if (response.status === 401) {
             return null; // Not authenticated
           }
+          if (response.status === 403) {
+            // Check if it's a forced logout due to banned account
+            const errorData = await response.json();
+            if (errorData.forceLogout) {
+              queryClient.setQueryData(["/api/auth/user"], null);
+              window.location.href = "/login?error=account_banned";
+              return null;
+            }
+          }
           throw new Error("Failed to fetch user");
         }
         return response.json();
@@ -23,8 +32,8 @@ export function useAuth() {
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: (failureCount, error: any) => {
-      // Don't retry on 401 (unauthorized)
-      if (error?.status === 401) return false;
+      // Don't retry on 401 (unauthorized) or 403 (banned)
+      if (error?.status === 401 || error?.status === 403) return false;
       return failureCount < 3;
     },
   });

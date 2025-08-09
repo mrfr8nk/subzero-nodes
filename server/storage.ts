@@ -133,15 +133,14 @@ export interface IStorage {
     owner: string;
     repo: string;
     workflowFile: string;
-    priority: number;
-    maxQueueLength: number;
   }): Promise<GitHubAccount>;
   getAllGitHubAccounts(): Promise<GitHubAccount[]>;
   getActiveGitHubAccounts(): Promise<GitHubAccount[]>;
   updateGitHubAccount(id: string, updates: Partial<GitHubAccount>): Promise<void>;
   deleteGitHubAccount(id: string): Promise<void>;
   getAvailableGitHubAccount(): Promise<GitHubAccount | null>;
-  updateGitHubAccountQueue(id: string, queueLength: number): Promise<void>;
+  getBestGitHubAccount(): Promise<GitHubAccount | null>;
+  updateGitHubAccountUsage(id: string): Promise<void>;
   setGitHubAccountActive(id: string, active: boolean): Promise<void>;
 }
 
@@ -1337,8 +1336,6 @@ export class MongoStorage implements IStorage {
     owner: string;
     repo: string;
     workflowFile: string;
-    priority: number;
-    maxQueueLength: number;
   }): Promise<GitHubAccount> {
     const now = new Date();
     const githubAccount: GitHubAccount = {
@@ -1349,9 +1346,7 @@ export class MongoStorage implements IStorage {
       repo: account.repo,
       workflowFile: account.workflowFile,
       isActive: true,
-      priority: account.priority,
       currentQueueLength: 0,
-      maxQueueLength: account.maxQueueLength,
       createdAt: now,
       updatedAt: now,
     };
@@ -1363,14 +1358,14 @@ export class MongoStorage implements IStorage {
   async getAllGitHubAccounts(): Promise<GitHubAccount[]> {
     return await this.githubAccountsCollection
       .find({})
-      .sort({ priority: 1 })
+      .sort({ createdAt: -1 })
       .toArray();
   }
 
   async getActiveGitHubAccounts(): Promise<GitHubAccount[]> {
     return await this.githubAccountsCollection
       .find({ isActive: true })
-      .sort({ priority: 1 })
+      .sort({ createdAt: -1 })
       .toArray();
   }
 
@@ -1391,26 +1386,67 @@ export class MongoStorage implements IStorage {
   }
 
   async getAvailableGitHubAccount(): Promise<GitHubAccount | null> {
-    // Get active accounts sorted by priority
+    // Get active accounts
     const activeAccounts = await this.getActiveGitHubAccounts();
-    
-    // Find first account that's not at max queue capacity
-    for (const account of activeAccounts) {
-      if (account.currentQueueLength < account.maxQueueLength) {
-        return account;
-      }
-    }
-    
-    // If all are at capacity, return the highest priority one anyway
     return activeAccounts.length > 0 ? activeAccounts[0] : null;
   }
 
-  async updateGitHubAccountQueue(id: string, queueLength: number): Promise<void> {
+  async getBestGitHubAccount(): Promise<GitHubAccount | null> {
+    const activeAccounts = await this.getActiveGitHubAccounts();
+    
+    if (activeAccounts.length === 0) {
+      return null;
+    }
+    
+    // Try to find an account with available capacity by checking GitHub API
+    for (const account of activeAccounts) {
+      try {
+        // Check current workflow runs to see if account is busy
+        const response = await fetch(
+          `https://api.github.com/repos/${account.owner}/${account.repo}/actions/runs?status=queued&status=in_progress`,
+          {
+            headers: {
+              'Authorization': `token ${account.token}`,
+              'Accept': 'application/vnd.github.v3+json'
+            }
+          }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          const runningWorkflows = data.total_count || 0;
+          
+          // If this account has fewer than 5 running workflows, use it
+          if (runningWorkflows < 5) {
+            await this.updateGitHubAccountUsage(account._id.toString());
+            return account;
+          }
+        }
+      } catch (error) {
+        console.error(`Error checking GitHub account ${account.name}:`, error);
+        // Continue to next account if there's an error
+      }
+    }
+    
+    // If all accounts are busy, return the least recently used one
+    const leastRecentlyUsed = activeAccounts.sort((a, b) => {
+      const dateA = a.lastUsed?.getTime() || 0;
+      const dateB = b.lastUsed?.getTime() || 0;
+      return dateA - dateB;
+    })[0];
+    
+    if (leastRecentlyUsed) {
+      await this.updateGitHubAccountUsage(leastRecentlyUsed._id.toString());
+    }
+    
+    return leastRecentlyUsed;
+  }
+
+  async updateGitHubAccountUsage(id: string): Promise<void> {
     await this.githubAccountsCollection.updateOne(
       { _id: new ObjectId(id) },
       { 
         $set: { 
-          currentQueueLength: queueLength,
           lastUsed: new Date(),
           updatedAt: new Date()
         }

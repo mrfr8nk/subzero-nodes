@@ -133,6 +133,16 @@ Add your domain's callback URL to Google Cloud Console OAuth settings:
   - Tag highlighting in message content with special styling
   - Message history preserved across server restarts and reboots
   - Enhanced chat UI with tag instructions and feedback indicators
+- **Smart GitHub Account Management**: Overhauled GitHub deployment system for improved reliability
+  - Removed priority-based queue system in favor of intelligent account selection
+  - Implemented real-time GitHub API checks to determine account availability
+  - Automatic switching between GitHub accounts based on current workload
+  - Simplified admin interface with removal of priority and queue length controls
+  - Enhanced deployment reliability through smart load balancing across multiple GitHub accounts
+- **Auto-Logout for Banned Users**: Implemented immediate logout system for account security
+  - Banned users are automatically logged out when accessing protected routes
+  - Enhanced security middleware with forceLogout flag detection
+  - Improved user experience with proper error messaging for banned accounts
 
 ### Deployment Notes
 - Update `FRONTEND_URL` and `BACKEND_URL` in production environment

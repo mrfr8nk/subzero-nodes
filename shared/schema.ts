@@ -134,9 +134,7 @@ export interface GitHubAccount {
   repo: string; // Repository name
   workflowFile: string; // Workflow file name (e.g., 'deploy.yml')
   isActive: boolean; // Whether this account is currently active
-  priority: number; // Lower number = higher priority (1 = highest)
-  currentQueueLength: number; // Current number of queued deployments
-  maxQueueLength: number; // Maximum allowed queue length before switching
+  currentQueueLength?: number; // Current number of queued deployments (optional for backward compatibility)
   lastUsed?: Date; // When this account was last used for deployment
   createdAt: Date;
   updatedAt: Date;
