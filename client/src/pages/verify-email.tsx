@@ -199,9 +199,9 @@ export default function VerifyEmail() {
           <div className="inline-flex items-center space-x-3 mb-4">
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center p-1">
               <img 
-                src="/robot-icon.jpg" 
+                src="/icon.svg" 
                 alt="SUBZERO-MD Bot" 
-                className="w-full h-full rounded object-cover"
+                className="w-full h-full rounded object-contain"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                   const botIcon = e.currentTarget.nextElementSibling as HTMLElement;

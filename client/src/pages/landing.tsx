@@ -87,9 +87,9 @@ export default function Landing() {
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg p-1">
                 <img 
-                  src="/robot-icon.jpg" 
+                  src="/icon.svg" 
                   alt="SUBZERO-MD Bot" 
-                  className="w-full h-full rounded object-cover"
+                  className="w-full h-full rounded object-contain"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
                     const botIcon = e.currentTarget.nextElementSibling as HTMLElement;

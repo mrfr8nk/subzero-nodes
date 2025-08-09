@@ -44,9 +44,9 @@ export default function Navbar() {
             <Link href="/" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center p-1">
                 <img 
-                  src="/robot-icon.jpg" 
+                  src="/icon.svg" 
                   alt="SUBZERO-MD Bot" 
-                  className="w-full h-full rounded object-cover"
+                  className="w-full h-full rounded object-contain"
                   onError={(e) => {
                     // Fallback to Bot icon if image fails to load
                     e.currentTarget.style.display = 'none';
