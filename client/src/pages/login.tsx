@@ -13,6 +13,7 @@ import { SiGoogle } from "react-icons/si";
 import { ArrowRight, CheckCircle, ArrowLeft, Mail, Eye, EyeOff, Lock, Bot } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
+import { getDeviceFingerprint } from "@/lib/deviceFingerprint";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -65,6 +66,24 @@ export default function Login() {
     },
   });
 
+  // Set device fingerprint on component mount
+  useEffect(() => {
+    const setDeviceFingerprint = async () => {
+      try {
+        const fingerprint = await getDeviceFingerprint();
+        await fetch('/api/auth/set-device-fingerprint', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deviceFingerprint: fingerprint })
+        });
+      } catch (error) {
+        console.error('Error setting device fingerprint:', error);
+      }
+    };
+    
+    setDeviceFingerprint();
+  }, []);
+
   const handleGoogleLogin = () => {
     window.location.href = "/api/auth/google";
   };
@@ -72,12 +91,15 @@ export default function Login() {
   const onSubmit = async (data: LoginFormData) => {
     setIsSubmitting(true);
     try {
+      // Get and set device fingerprint before login
+      const deviceFingerprint = await getDeviceFingerprint();
+      
       const response = await fetch("/api/auth/local/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, deviceFingerprint }),
       });
 
       const result = await response.json();

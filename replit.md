@@ -50,7 +50,7 @@ Preferred communication style: Simple, everyday language.
 - **Admin Controls**: Comprehensive admin dashboard with user management, cost settings, and super admin capabilities
 - **User Management**: Account settings with self-deletion functionality and admin controls for user management
 - **Configurable Costs**: Admin-controlled deployment and daily charge rates instead of hardcoded values
-- **IP-Based Security**: Comprehensive IP tracking system with configurable account limits per IP address to prevent abuse
+- **Device-Based Security**: Advanced device fingerprinting system with configurable account limits per device to prevent abuse
 
 ## External Dependencies
 
@@ -108,19 +108,31 @@ Add your domain's callback URL to Google Cloud Console OAuth settings:
 - The application will log the detected URL on startup for verification
 
 ### Recent Changes (January 2025)
+
+#### Device Fingerprinting Migration (January 2025)
+- **Replaced IP-Based with Device Fingerprinting**: Complete overhaul of duplicate account prevention system
+  - Removed all IP tracking, storage, and validation logic from authentication flows  
+  - Implemented advanced device fingerprinting using multiple browser characteristics
+  - Device fingerprints generated using canvas rendering, WebGL info, audio context, screen properties, and browser settings
+  - Updated Google OAuth and local authentication to use device fingerprints instead of IP addresses
+  - Admin notifications now track device-based instead of IP-based duplicate account attempts
+  - Configurable max accounts per device setting (replaces max accounts per IP)
+  - Enhanced privacy through cryptographic hashing of device characteristics
+  - More reliable duplicate detection that works across network changes and VPNs
 - **Enhanced Admin Controls**: Super admins can now demote and delete other existing admins
 - **User Account Management**: Users can delete their own accounts through account settings page
 - **Configurable Cost System**: Deployment costs and daily charges are now configurable through admin settings
 - **Improved Error Handling**: Added ObjectId validation to prevent MongoDB BSON errors and WebSocket connection validation
 - **Security Enhancements**: Admins cannot self-delete through user interface for security
-- **IP-Based Duplicate Account Prevention**: Implemented comprehensive IP tracking system to prevent users from creating multiple accounts
-  - Tracks user IP addresses during registration and login
-  - Configurable maximum accounts per IP address (default: 1)
-  - Admin notifications for duplicate IP detections
+- **Device Fingerprint-Based Duplicate Account Prevention**: Implemented comprehensive device fingerprinting system to prevent users from creating multiple accounts
+  - Advanced device fingerprinting using canvas, WebGL, audio context, and browser characteristics
+  - Configurable maximum accounts per device (default: 1)
+  - Admin notifications for duplicate device detections  
   - Error handling for both Google OAuth and local signup flows
-  - Admin controls for IP restriction configuration
+  - Admin controls for device restriction configuration
   - Fixed unhandled promise rejections with global error handlers
   - Enhanced WebSocket connection stability with better error handling
+  - Removed legacy IP-based tracking and restrictions in favor of more reliable device fingerprinting
 - **Branding Update**: Replaced WhatsApp logos throughout the application with robot/bot icons to better represent the bot platform branding
   - Updated all page headers and navigation with Bot icon from Lucide React
   - Maintained consistent blue gradient styling across all logo instances

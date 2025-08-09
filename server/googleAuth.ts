@@ -147,27 +147,27 @@ export async function setupAuth(app: Express) {
     passport.authenticate('google', { failureRedirect: '/login' }),
     async (req, res) => {
       try {
-        // Get user IP for tracking
-        const userIp = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || req.headers['x-forwarded-for'];
-        
-        if (userIp && req.user) {
-          // Check if this is a new user and apply IP restrictions
-          const user = req.user as any;
-          if (user && !user.lastLoginIp) {
+        // Handle device fingerprint tracking for new users
+        const user = req.user as any;
+        if (user) {
+          // Get device fingerprint from session if available (set by frontend)
+          const deviceFingerprint = req.session?.deviceFingerprint;
+          
+          if (deviceFingerprint && !user.deviceFingerprint) {
             // This is a new user, check for duplicate accounts
-            const existingAccountsFromIP = await storage.getUsersByIp(userIp as string);
+            const existingAccountsFromDevice = await storage.getUsersByDeviceFingerprint(deviceFingerprint);
             
-            // Get configurable max accounts per IP from admin settings (default to 1)
-            const maxAccountsSetting = await storage.getAppSetting('max_accounts_per_ip');
-            const maxAccountsPerIP = maxAccountsSetting?.value || 1;
+            // Get configurable max accounts per device from admin settings (default to 1)
+            const maxAccountsSetting = await storage.getAppSetting('max_accounts_per_device');
+            const maxAccountsPerDevice = maxAccountsSetting?.value || 1;
             
-            const activeAccounts = existingAccountsFromIP.filter(existingUser => 
+            const activeAccounts = existingAccountsFromDevice.filter(existingUser => 
               existingUser.status !== 'banned' && 
               existingUser.status !== 'restricted' &&
               existingUser._id.toString() !== user._id.toString() // Exclude current user
             );
             
-            if (activeAccounts.length >= maxAccountsPerIP) {
+            if (activeAccounts.length >= maxAccountsPerDevice) {
               // Delete the newly created user account
               await storage.deleteUser(user._id.toString(), 'system');
               
@@ -178,15 +178,15 @@ export async function setupAuth(app: Express) {
               });
               return;
             }
+            
+            // Update user device fingerprint for valid users
+            await storage.updateUserDeviceFingerprint(user._id.toString(), deviceFingerprint);
           }
-          
-          // Update user IP tracking for valid users
-          await storage.updateUserIp(user._id.toString(), userIp as string);
         }
       } catch (error) {
         console.error('Error in Google OAuth callback:', error);
         
-        // If IP check failed due to multiple accounts, redirect with error
+        // If device check failed due to multiple accounts, redirect with error
         if (error instanceof Error && error.message.includes('Multiple accounts detected')) {
           req.logout((err) => {
             if (err) console.error('Logout error:', err);

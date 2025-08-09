@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 import { SiGoogle } from "react-icons/si";
 import { Mail, Eye, EyeOff, UserPlus, ArrowLeft, Bot } from "lucide-react";
+import { getDeviceFingerprint } from "@/lib/deviceFingerprint";
 
 const signupSchema = z.object({
   firstName: z.string().min(2, "First name must be at least 2 characters"),
@@ -59,12 +60,16 @@ export default function Signup() {
   const onSubmit = async (data: SignupFormData) => {
     setIsLoading(true);
     try {
+      // Get device fingerprint before signup
+      const deviceFingerprint = await getDeviceFingerprint();
+      
       const payload = {
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
         password: data.password,
         referralCode: referralCode || undefined,
+        deviceFingerprint,
       };
 
       const response = await fetch("/api/auth/local/signup", {

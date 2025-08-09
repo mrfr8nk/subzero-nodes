@@ -92,8 +92,8 @@ export interface IStorage {
   promoteToAdmin(userId: string, adminId: string): Promise<void>;
   demoteFromAdmin(userId: string, adminId: string): Promise<void>;
   deleteAdmin(userId: string, adminId: string): Promise<void>;
-  getUsersByIp(ip: string): Promise<User[]>;
-  updateUserIp(userId: string, ip: string): Promise<void>;
+  getUsersByDeviceFingerprint(fingerprint: string): Promise<User[]>;
+  updateUserDeviceFingerprint(userId: string, fingerprint: string): Promise<void>;
   
   // Admin notification operations
   createAdminNotification(notification: InsertAdminNotification): Promise<AdminNotification>;
@@ -109,12 +109,8 @@ export interface IStorage {
   isMaintenanceModeEnabled(): Promise<boolean>;
   setMaintenanceMode(enabled: boolean, adminId: string, message?: string): Promise<void>;
   
-  // User deletion and IP management
+  // User deletion and device management  
   deleteUser(userId: string, adminId: string): Promise<void>;
-  banUserIp(ip: string, adminId: string, reason?: string): Promise<void>;
-  unbanUserIp(ip: string, adminId: string): Promise<void>;
-  getBannedIps(): Promise<string[]>;
-  isIpBanned(ip: string): Promise<boolean>;
   
   // Daily billing operations
   processDeploymentDailyCharges(): Promise<void>;
@@ -354,26 +350,24 @@ export class MongoStorage implements IStorage {
       return { ...existingUser, ...updatedData };
     } else {
       // Check for existing accounts from same IP address before creating new user
-      if (registrationIp) {
-        const existingAccountsFromIP = await this.getUsersByIp(registrationIp);
+      if (userData.deviceFingerprint) {
+        const existingAccountsFromDevice = await this.getUsersByDeviceFingerprint(userData.deviceFingerprint);
         
-        // Get configurable max accounts per IP from admin settings (default to 1)
-        const maxAccountsSetting = await this.getAppSetting('max_accounts_per_ip');
-        const maxAccountsPerIP = maxAccountsSetting?.value || 1;
+        // Get configurable max accounts per device from admin settings (default to 1)
+        const maxAccountsSetting = await this.getAppSetting('max_accounts_per_device');
+        const maxAccountsPerDevice = maxAccountsSetting?.value || 1;
         
         // Check if any of the existing accounts are active (not banned)
-        const activeAccounts = existingAccountsFromIP.filter(user => 
+        const activeAccounts = existingAccountsFromDevice.filter(user => 
           user.status !== 'banned' && user.status !== 'restricted'
         );
         
-        if (activeAccounts.length >= maxAccountsPerIP) {
-          throw new Error(`Multiple accounts detected from this IP address. Only ${maxAccountsPerIP} account(s) allowed per IP. Contact support if you believe this is an error.`);
+        if (activeAccounts.length >= maxAccountsPerDevice) {
+          throw new Error(`Multiple accounts detected from this device. Only ${maxAccountsPerDevice} account(s) allowed per device. Contact support if you believe this is an error.`);
         }
         
-        // Set registration IP in user data
-        userData.registrationIp = registrationIp;
-        userData.lastLoginIp = registrationIp;
-        userData.ipHistory = [registrationIp];
+        // Set device fingerprint in user data
+        userData.deviceHistory = [userData.deviceFingerprint];
       }
       // Create new user
       if (!userData.referralCode) {
@@ -390,10 +384,9 @@ export class MongoStorage implements IStorage {
         role: userData.role || 'user',
         status: userData.status || 'active',
         restrictions: userData.restrictions || [],
-        // IP tracking fields (will be updated by updateUserIp in callback)
-        registrationIp: userData.registrationIp,
-        lastLoginIp: userData.lastLoginIp,
-        ipHistory: userData.ipHistory || [],
+        // Device fingerprint tracking fields
+        deviceFingerprint: userData.deviceFingerprint,
+        deviceHistory: userData.deviceHistory || [],
         createdAt: now,
         updatedAt: now,
       };
@@ -784,28 +777,27 @@ export class MongoStorage implements IStorage {
     await this.deleteUser(userId, adminId);
   }
 
-  async getUsersByIp(ip: string): Promise<User[]> {
+  async getUsersByDeviceFingerprint(fingerprint: string): Promise<User[]> {
     return await this.usersCollection
       .find({ 
         $or: [
-          { registrationIp: ip },
-          { lastLoginIp: ip },
-          { ipHistory: { $in: [ip] } }
+          { deviceFingerprint: fingerprint },
+          { deviceHistory: { $in: [fingerprint] } }
         ]
       })
       .toArray();
   }
 
-  async updateUserIp(userId: string, ip: string): Promise<void> {
+  async updateUserDeviceFingerprint(userId: string, fingerprint: string): Promise<void> {
     const user = await this.getUser(userId);
     if (!user) return;
 
-    const ipHistory = user.ipHistory || [];
-    if (!ipHistory.includes(ip)) {
-      ipHistory.push(ip);
-      // Keep only last 10 IPs
-      if (ipHistory.length > 10) {
-        ipHistory.shift();
+    const deviceHistory = user.deviceHistory || [];
+    if (!deviceHistory.includes(fingerprint)) {
+      deviceHistory.push(fingerprint);
+      // Keep only last 10 device fingerprints
+      if (deviceHistory.length > 10) {
+        deviceHistory.shift();
       }
     }
 
@@ -813,24 +805,24 @@ export class MongoStorage implements IStorage {
       { _id: new ObjectId(userId) },
       { 
         $set: { 
-          lastLoginIp: ip,
-          ipHistory,
+          deviceFingerprint: fingerprint,
+          deviceHistory,
           updatedAt: new Date()
         }
       }
     );
 
-    // Check for multiple accounts from same IP
-    const usersWithSameIp = await this.getUsersByIp(ip);
-    if (usersWithSameIp.length > 1) {
+    // Check for multiple accounts from same device
+    const usersWithSameDevice = await this.getUsersByDeviceFingerprint(fingerprint);
+    if (usersWithSameDevice.length > 1) {
       await this.createAdminNotification({
-        type: "duplicate_ip",
-        title: "Multiple Accounts from Same IP",
-        message: `${usersWithSameIp.length} accounts detected from IP: ${ip}`,
+        type: "duplicate_device",
+        title: "Multiple Accounts from Same Device",
+        message: `${usersWithSameDevice.length} accounts detected from the same device`,
         data: { 
-          ip, 
-          userIds: usersWithSameIp.map(u => u._id.toString()),
-          userEmails: usersWithSameIp.map(u => u.email)
+          deviceFingerprint: fingerprint, 
+          userIds: usersWithSameDevice.map(u => u._id.toString()),
+          userEmails: usersWithSameDevice.map(u => u.email)
         },
         read: false
       });
@@ -1002,97 +994,7 @@ export class MongoStorage implements IStorage {
     });
   }
 
-  async banUserIp(ip: string, adminId: string, reason?: string): Promise<void> {
-    // Add IP to banned list
-    await this.setAppSetting({
-      key: `banned_ip_${ip.replace(/\./g, '_')}`,
-      value: {
-        ip,
-        bannedBy: adminId,
-        bannedAt: new Date().toISOString(),
-        reason: reason || 'No reason provided'
-      },
-      description: `Banned IP: ${ip}`,
-      updatedBy: adminId
-    });
 
-    // Get all users with this IP
-    const usersWithIp = await this.getUsersByIp(ip);
-    
-    // Ban all users with this IP
-    for (const user of usersWithIp) {
-      await this.updateUserStatus(user._id.toString(), 'banned', ['ip_banned']);
-    }
-
-    // Create admin notification
-    await this.createAdminNotification({
-      type: 'ip_banned',
-      title: 'IP Address Banned',
-      message: `IP ${ip} has been banned. ${usersWithIp.length} users affected.`,
-      data: { 
-        ip, 
-        bannedBy: adminId, 
-        affectedUsers: usersWithIp.length,
-        reason: reason || 'No reason provided'
-      },
-      read: false
-    });
-  }
-
-  async unbanUserIp(ip: string, adminId: string): Promise<void> {
-    // Remove IP from banned list
-    await this.appSettingsCollection.deleteOne({ 
-      key: `banned_ip_${ip.replace(/\./g, '_')}`
-    });
-
-    // Get all users with this IP that were banned due to IP ban
-    const usersWithIp = await this.getUsersByIp(ip);
-    const bannedUsers = usersWithIp.filter(user => 
-      user.status === 'banned' && 
-      user.restrictions?.includes('ip_banned')
-    );
-    
-    // Unban users that were only banned due to IP ban
-    for (const user of bannedUsers) {
-      const remainingRestrictions = user.restrictions?.filter(r => r !== 'ip_banned') || [];
-      if (remainingRestrictions.length === 0) {
-        await this.updateUserStatus(user._id.toString(), 'active', []);
-      } else {
-        await this.updateUserStatus(user._id.toString(), user.status || 'active', remainingRestrictions);
-      }
-    }
-
-    // Create admin notification
-    await this.createAdminNotification({
-      type: 'ip_unbanned',
-      title: 'IP Address Unbanned',
-      message: `IP ${ip} has been unbanned. ${bannedUsers.length} users restored.`,
-      data: { 
-        ip, 
-        unbannedBy: adminId, 
-        restoredUsers: bannedUsers.length
-      },
-      read: false
-    });
-  }
-
-  async getBannedIps(): Promise<string[]> {
-    const bannedIpSettings = await this.appSettingsCollection
-      .find({ key: { $regex: /^banned_ip_/ } })
-      .toArray();
-    
-    return bannedIpSettings.map(setting => {
-      if (typeof setting.value === 'object' && setting.value.ip) {
-        return setting.value.ip;
-      }
-      return setting.key.replace('banned_ip_', '').replace(/_/g, '.');
-    });
-  }
-
-  async isIpBanned(ip: string): Promise<boolean> {
-    const setting = await this.getAppSetting(`banned_ip_${ip.replace(/\./g, '_')}`);
-    return !!setting;
-  }
 
   // New deployment billing methods
   async updateDeploymentChargeDate(id: string, lastChargeDate: Date, nextChargeDate: Date): Promise<void> {

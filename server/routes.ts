@@ -207,48 +207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(maintenanceMiddleware);
 
-  // IP ban middleware - check if IP is banned
-  const ipBanMiddleware = async (req: any, res: any, next: any) => {
-    const url = req.originalUrl || req.url;
-    
-    // Skip IP ban check for admin routes (admins can access from any IP)
-    if (url.startsWith('/api/admin') || 
-        url.startsWith('/favicon.ico') ||
-        url.includes('vite') ||
-        url.includes('@')) {
-      return next();
-    }
 
-    // Check if user is admin - admins can bypass IP bans
-    const isAdmin = req.user && (req.user.isAdmin || req.user.role === 'admin' || req.user.role === 'super_admin');
-    if (isAdmin) {
-      return next();
-    }
-
-    try {
-      const userIp = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
-      if (userIp) {
-        const isBanned = await storage.isIpBanned(userIp);
-        if (isBanned) {
-          // For API requests, return JSON response
-          if (url.startsWith('/api/')) {
-            return res.status(403).json({ 
-              error: 'Access Forbidden', 
-              message: 'Your IP address has been banned. Please contact support if you believe this is an error.' 
-            });
-          }
-          // For regular requests, this will be handled by the frontend router
-          return res.status(403).send('Access Forbidden: IP address banned');
-        }
-      }
-    } catch (error) {
-      console.error('Error checking IP ban:', error);
-    }
-    
-    next();
-  };
-
-  app.use(ipBanMiddleware);
 
   // User status check middleware - auto logout banned users
   const userStatusMiddleware = async (req: any, res: any, next: any) => {
@@ -345,14 +304,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('Error processing Google OAuth referral:', error);
       }
       
-      // Track user IP for login/registration
+      // Track user device fingerprint for login/registration
       try {
-        const userIp = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
-        if (userIp && req.user) {
-          await storage.updateUserIp(req.user._id.toString(), userIp);
+        const deviceFingerprint = (req.session as any)?.deviceFingerprint;
+        if (deviceFingerprint && req.user) {
+          await storage.updateUserDeviceFingerprint(req.user._id.toString(), deviceFingerprint);
         }
       } catch (error) {
-        console.error('Error tracking user IP:', error);
+        console.error('Error tracking user device fingerprint:', error);
       }
       
       // Successful authentication, redirect to dashboard
@@ -490,24 +449,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'User with this email already exists' });
       }
 
-      // Get user IP for registration tracking and duplicate account prevention
-      const registrationIp = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || req.headers['x-forwarded-for'];
+      // Get device fingerprint for registration tracking and duplicate account prevention
+      const { deviceFingerprint } = req.body;
       
-      // Check for existing accounts from same IP address
-      if (registrationIp) {
-        const existingAccountsFromIP = await storage.getUsersByIp(registrationIp as string);
+      // Check for existing accounts from same device fingerprint
+      if (deviceFingerprint) {
+        const existingAccountsFromDevice = await storage.getUsersByDeviceFingerprint(deviceFingerprint);
         
-        // Get configurable max accounts per IP from admin settings (default to 1)
-        const maxAccountsSetting = await storage.getAppSetting('max_accounts_per_ip');
-        const maxAccountsPerIP = maxAccountsSetting?.value || 1;
+        // Get configurable max accounts per device from admin settings (default to 1)
+        const maxAccountsSetting = await storage.getAppSetting('max_accounts_per_device');
+        const maxAccountsPerDevice = maxAccountsSetting?.value || 1;
         
-        const activeAccounts = existingAccountsFromIP.filter(user => 
+        const activeAccounts = existingAccountsFromDevice.filter(user => 
           user.status !== 'banned' && user.status !== 'restricted'
         );
         
-        if (activeAccounts.length >= maxAccountsPerIP) {
+        if (activeAccounts.length >= maxAccountsPerDevice) {
           return res.status(400).json({ 
-            message: `Multiple accounts detected from this IP address. Only ${maxAccountsPerIP} account(s) allowed per IP. Contact support if you believe this is an error.`
+            message: `Multiple accounts detected from this device. Only ${maxAccountsPerDevice} account(s) allowed per device. Contact support if you believe this is an error.`
           });
         }
       }
@@ -529,9 +488,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         verificationTokenExpiry,
         isVerified: false,
         referralCode: referralCode || undefined,
-        registrationIp,
-        lastLoginIp: registrationIp,
-        ipHistory: registrationIp ? [registrationIp] : [],
+        deviceFingerprint: deviceFingerprint,
+        deviceHistory: deviceFingerprint ? [deviceFingerprint] : [],
       });
 
       // Send verification email with dynamic URL from request
@@ -624,14 +582,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(500).json({ message: 'Login failed' });
         }
         
-        // Track user IP for login
+        // Track user device fingerprint for login
         try {
-          const userIp = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
-          if (userIp) {
-            await storage.updateUserIp(user._id.toString(), userIp);
+          const { deviceFingerprint } = req.body;
+          if (deviceFingerprint) {
+            await storage.updateUserDeviceFingerprint(user._id.toString(), deviceFingerprint);
           }
         } catch (error) {
-          console.error('Error tracking user IP:', error);
+          console.error('Error tracking user device fingerprint:', error);
         }
         
         res.json({ message: 'Login successful', user: { _id: user._id, email: user.email, firstName: user.firstName, lastName: user.lastName } });
@@ -1613,63 +1571,23 @@ jobs:
     }
   });
 
-  // Ban user IP (admin only)
-  app.post('/api/admin/ip/ban', requireAdmin, async (req, res) => {
-    const { ip, reason } = req.body;
-    const adminId = (req.user as any)?._id?.toString();
 
-    if (!ip) {
-      return res.status(400).json({ message: 'IP address is required' });
-    }
 
+  // Set device fingerprint in session before OAuth
+  app.post('/api/auth/set-device-fingerprint', async (req, res) => {
     try {
-      await storage.banUserIp(ip, adminId, reason);
-      res.json({ message: 'IP address banned successfully' });
+      const { deviceFingerprint } = req.body;
+      
+      if (!deviceFingerprint) {
+        return res.status(400).json({ message: 'Device fingerprint is required' });
+      }
+      
+      // Store device fingerprint in session for OAuth callback
+      (req as any).session.deviceFingerprint = deviceFingerprint;
+      res.json({ success: true });
     } catch (error) {
-      console.error('Error banning IP:', error);
-      res.status(500).json({ message: 'Failed to ban IP address' });
-    }
-  });
-
-  // Unban user IP (admin only)
-  app.post('/api/admin/ip/unban', requireAdmin, async (req, res) => {
-    const { ip } = req.body;
-    const adminId = (req.user as any)?._id?.toString();
-
-    if (!ip) {
-      return res.status(400).json({ message: 'IP address is required' });
-    }
-
-    try {
-      await storage.unbanUserIp(ip, adminId);
-      res.json({ message: 'IP address unbanned successfully' });
-    } catch (error) {
-      console.error('Error unbanning IP:', error);
-      res.status(500).json({ message: 'Failed to unban IP address' });
-    }
-  });
-
-  // Get banned IPs
-  app.get('/api/admin/ip/banned', requireAdmin, async (req, res) => {
-    try {
-      const bannedIps = await storage.getBannedIps();
-      res.json(bannedIps);
-    } catch (error) {
-      console.error('Error fetching banned IPs:', error);
-      res.status(500).json({ message: 'Failed to fetch banned IPs' });
-    }
-  });
-
-  // Check if IP is banned
-  app.get('/api/admin/ip/check/:ip', requireAdmin, async (req, res) => {
-    const { ip } = req.params;
-    
-    try {
-      const isBanned = await storage.isIpBanned(ip);
-      res.json({ ip, banned: isBanned });
-    } catch (error) {
-      console.error('Error checking IP ban status:', error);
-      res.status(500).json({ message: 'Failed to check IP ban status' });
+      console.error('Error setting device fingerprint:', error);
+      res.status(500).json({ message: 'Failed to set device fingerprint' });
     }
   });
 

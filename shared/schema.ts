@@ -26,9 +26,8 @@ export interface User {
   role?: string; // 'user', 'admin', 'super_admin'
   status?: string; // 'active', 'banned', 'restricted'
   restrictions?: string[]; // Array of restriction types
-  registrationIp?: string;
-  lastLoginIp?: string;
-  ipHistory?: string[];
+  deviceFingerprint?: string; // Unique device/browser fingerprint
+  deviceHistory?: string[]; // History of device fingerprints
   createdAt: Date;
   updatedAt: Date;
 }
@@ -75,7 +74,7 @@ export interface Session {
 
 export interface AdminNotification {
   _id: ObjectId;
-  type: string; // 'duplicate_ip', 'suspicious_activity', etc.
+  type: string; // 'duplicate_device', 'suspicious_activity', etc.
   title: string;
   message: string;
   data?: any; // Additional data related to the notification
