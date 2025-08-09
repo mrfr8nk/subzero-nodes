@@ -8,6 +8,7 @@ import {
   DeploymentVariable,
   ChatMessage,
   ChatRestriction,
+  GitHubAccount,
   InsertUser,
   InsertDeployment,
   InsertTransaction,
@@ -129,6 +130,24 @@ export interface IStorage {
   restrictUserFromChat(userId: string, restrictedBy: string, reason?: string): Promise<void>;
   unrestrictUserFromChat(userId: string): Promise<void>;
   isChatRestricted(userId: string): Promise<boolean>;
+  
+  // GitHub account management
+  createGitHubAccount(account: {
+    name: string;
+    token: string;
+    owner: string;
+    repo: string;
+    workflowFile: string;
+    priority: number;
+    maxQueueLength: number;
+  }): Promise<GitHubAccount>;
+  getAllGitHubAccounts(): Promise<GitHubAccount[]>;
+  getActiveGitHubAccounts(): Promise<GitHubAccount[]>;
+  updateGitHubAccount(id: string, updates: Partial<GitHubAccount>): Promise<void>;
+  deleteGitHubAccount(id: string): Promise<void>;
+  getAvailableGitHubAccount(): Promise<GitHubAccount | null>;
+  updateGitHubAccountQueue(id: string, queueLength: number): Promise<void>;
+  setGitHubAccountActive(id: string, active: boolean): Promise<void>;
 }
 
 export class MongoStorage implements IStorage {
@@ -162,6 +181,10 @@ export class MongoStorage implements IStorage {
 
   private get chatRestrictionsCollection() {
     return getDb().collection<ChatRestriction>("chatRestrictions");
+  }
+
+  private get githubAccountsCollection() {
+    return getDb().collection<GitHubAccount>("githubAccounts");
   }
 
   private get deploymentVariablesCollection() {
@@ -1279,6 +1302,106 @@ export class MongoStorage implements IStorage {
       userId: new ObjectId(userId)
     });
     return !!restriction;
+  }
+
+  // GitHub account management operations
+  async createGitHubAccount(account: {
+    name: string;
+    token: string;
+    owner: string;
+    repo: string;
+    workflowFile: string;
+    priority: number;
+    maxQueueLength: number;
+  }): Promise<GitHubAccount> {
+    const now = new Date();
+    const githubAccount: GitHubAccount = {
+      _id: new ObjectId(),
+      name: account.name,
+      token: account.token,
+      owner: account.owner,
+      repo: account.repo,
+      workflowFile: account.workflowFile,
+      isActive: true,
+      priority: account.priority,
+      currentQueueLength: 0,
+      maxQueueLength: account.maxQueueLength,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await this.githubAccountsCollection.insertOne(githubAccount);
+    return githubAccount;
+  }
+
+  async getAllGitHubAccounts(): Promise<GitHubAccount[]> {
+    return await this.githubAccountsCollection
+      .find({})
+      .sort({ priority: 1 })
+      .toArray();
+  }
+
+  async getActiveGitHubAccounts(): Promise<GitHubAccount[]> {
+    return await this.githubAccountsCollection
+      .find({ isActive: true })
+      .sort({ priority: 1 })
+      .toArray();
+  }
+
+  async updateGitHubAccount(id: string, updates: Partial<GitHubAccount>): Promise<void> {
+    const updateData = {
+      ...updates,
+      updatedAt: new Date()
+    };
+    
+    await this.githubAccountsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+  }
+
+  async deleteGitHubAccount(id: string): Promise<void> {
+    await this.githubAccountsCollection.deleteOne({ _id: new ObjectId(id) });
+  }
+
+  async getAvailableGitHubAccount(): Promise<GitHubAccount | null> {
+    // Get active accounts sorted by priority
+    const activeAccounts = await this.getActiveGitHubAccounts();
+    
+    // Find first account that's not at max queue capacity
+    for (const account of activeAccounts) {
+      if (account.currentQueueLength < account.maxQueueLength) {
+        return account;
+      }
+    }
+    
+    // If all are at capacity, return the highest priority one anyway
+    return activeAccounts.length > 0 ? activeAccounts[0] : null;
+  }
+
+  async updateGitHubAccountQueue(id: string, queueLength: number): Promise<void> {
+    await this.githubAccountsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { 
+        $set: { 
+          currentQueueLength: queueLength,
+          lastUsed: new Date(),
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
+  async setGitHubAccountActive(id: string, active: boolean): Promise<void> {
+    await this.githubAccountsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { 
+        $set: { 
+          isActive: active,
+          updatedAt: new Date()
+        }
+      }
+    );
   }
 }
 

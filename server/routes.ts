@@ -1773,6 +1773,82 @@ jobs:
   });
 
   // GitHub deployment settings
+  // GitHub Account Management Routes
+  
+  // Get all GitHub accounts
+  app.get('/api/admin/github/accounts', requireAdmin, async (req, res) => {
+    try {
+      const accounts = await storage.getAllGitHubAccounts();
+      res.json(accounts.map(account => ({
+        ...account,
+        _id: account._id.toString(),
+        createdAt: account.createdAt.toISOString(),
+        updatedAt: account.updatedAt.toISOString(),
+        lastUsed: account.lastUsed?.toISOString()
+      })));
+    } catch (error) {
+      console.error('Error fetching GitHub accounts:', error);
+      res.status(500).json({ message: 'Failed to fetch GitHub accounts' });
+    }
+  });
+
+  // Create GitHub account
+  app.post('/api/admin/github/accounts', requireAdmin, async (req, res) => {
+    try {
+      const { name, token, owner, repo, workflowFile, priority, maxQueueLength } = req.body;
+      
+      if (!name || !token || !owner || !repo || !workflowFile) {
+        return res.status(400).json({ message: 'All fields are required' });
+      }
+
+      const account = await storage.createGitHubAccount({
+        name,
+        token,
+        owner,
+        repo,
+        workflowFile,
+        priority: priority || 1,
+        maxQueueLength: maxQueueLength || 5
+      });
+
+      res.status(201).json({
+        ...account,
+        _id: account._id.toString(),
+        createdAt: account.createdAt.toISOString(),
+        updatedAt: account.updatedAt.toISOString()
+      });
+    } catch (error) {
+      console.error('Error creating GitHub account:', error);
+      res.status(500).json({ message: 'Failed to create GitHub account' });
+    }
+  });
+
+  // Update GitHub account
+  app.patch('/api/admin/github/accounts/:id', requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      await storage.updateGitHubAccount(id, updates);
+      res.json({ message: 'GitHub account updated successfully' });
+    } catch (error) {
+      console.error('Error updating GitHub account:', error);
+      res.status(500).json({ message: 'Failed to update GitHub account' });
+    }
+  });
+
+  // Delete GitHub account
+  app.delete('/api/admin/github/accounts/:id', requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteGitHubAccount(id);
+      res.json({ message: 'GitHub account deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting GitHub account:', error);
+      res.status(500).json({ message: 'Failed to delete GitHub account' });
+    }
+  });
+
   app.get('/api/admin/github/settings', requireAdmin, async (req, res) => {
     try {
       const [githubToken, repoOwner, repoName, mainBranch, workflowFile] = await Promise.all([

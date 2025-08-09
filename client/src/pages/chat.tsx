@@ -5,9 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Users, Shield, Ban, MessageCircle, Crown } from "lucide-react";
+import { Send, Users, Shield, Ban, MessageCircle, Crown, ChevronDown } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ChatMessage {
   _id: string;
@@ -214,142 +219,141 @@ export default function Chat() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-8rem)]">
-          
-          {/* Chat Messages */}
-          <div className="lg:col-span-3">
-            <Card className="h-full flex flex-col">
-              <CardHeader className="border-b">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <MessageCircle className="w-5 h-5 text-blue-600" />
-                    <CardTitle>Community Chat</CardTitle>
-                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    {onlineUsers.length} online
-                  </Badge>
-                </div>
-              </CardHeader>
+    <div className="h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
+      <div className="flex-1 flex flex-col">
+        <Card className="flex-1 flex flex-col m-4 h-[calc(100vh-2rem)]">
+          <CardHeader className="border-b flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <MessageCircle className="w-5 h-5 text-blue-600" />
+                <CardTitle>Community Chat</CardTitle>
+                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+              </div>
               
-              <CardContent className="flex-1 flex flex-col p-0">
-                {/* Messages Area */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {!isConnected && (
-                    <Alert>
-                      <AlertTriangle className="w-4 h-4" />
-                      <AlertDescription>
-                        Connecting to chat server...
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  
-                  {messages.map((msg) => (
-                    <div key={msg._id} className="flex flex-col space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-medium text-sm">{msg.username}</span>
-                        {getRoleBadge(msg.role, msg.isAdmin)}
-                        <span className="text-xs text-gray-500">
-                          {formatTime(msg.createdAt)}
-                        </span>
-                      </div>
-                      <div className="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm">
-                        <p className="text-sm">{msg.message}</p>
-                      </div>
+              {/* Online Users Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center space-x-2">
+                    <Users className="w-4 h-4" />
+                    <span>{onlineUsers.length} online</span>
+                    <ChevronDown className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64 max-h-80 overflow-y-auto">
+                  <div className="p-2">
+                    <div className="font-medium text-sm mb-2 text-gray-600 dark:text-gray-400">
+                      Online Users ({onlineUsers.length})
                     </div>
-                  ))}
-                  <div ref={messagesEndRef} />
-                </div>
-                
-                {/* Message Input */}
-                <div className="border-t p-4">
-                  {isRestricted ? (
-                    <Alert variant="destructive">
-                      <Ban className="w-4 h-4" />
-                      <AlertDescription>
-                        You are restricted from sending messages.
-                      </AlertDescription>
-                    </Alert>
-                  ) : (
-                    <div className="flex space-x-2">
-                      <Input
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Type your message..."
-                        className="flex-1"
-                        maxLength={500}
-                      />
-                      <Button 
-                        onClick={sendMessage} 
-                        disabled={!message.trim() || !isConnected}
-                        size="sm"
-                      >
-                        <Send className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          {/* Online Users */}
-          <div className="lg:col-span-1">
-            <Card className="h-full">
-              <CardHeader className="border-b">
-                <CardTitle className="flex items-center space-x-2">
-                  <Users className="w-5 h-5" />
-                  <span>Online Users</span>
-                </CardTitle>
-              </CardHeader>
-              
-              <CardContent className="p-0">
-                <div className="max-h-96 overflow-y-auto">
-                  {onlineUsers.map((chatUser) => (
-                    <div key={chatUser.userId} className="flex items-center justify-between p-3 border-b hover:bg-gray-50 dark:hover:bg-gray-800">
-                      <div className="flex flex-col">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-medium">{chatUser.username}</span>
-                          {getRoleBadge(chatUser.role, chatUser.isAdmin)}
-                        </div>
-                        {chatUser.isRestricted && (
-                          <span className="text-xs text-red-500">Restricted</span>
-                        )}
-                      </div>
-                      
-                      {isAdmin && chatUser.userId !== (user?._id?.toString() || user?.email) && (
-                        <div className="flex space-x-1">
-                          {chatUser.isRestricted ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => unrestrictUser(chatUser.userId, chatUser.username)}
-                              className="text-xs px-2 py-1"
-                            >
-                              Unrestrict
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => restrictUser(chatUser.userId, chatUser.username)}
-                              className="text-xs px-2 py-1"
-                            >
-                              <Ban className="w-3 h-3" />
-                            </Button>
+                    <div className="space-y-2">
+                      {onlineUsers.map((chatUser) => (
+                        <div key={chatUser.userId} className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800">
+                          <div className="flex flex-col">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm font-medium">{chatUser.username}</span>
+                              {getRoleBadge(chatUser.role, chatUser.isAdmin)}
+                            </div>
+                            {chatUser.isRestricted && (
+                              <span className="text-xs text-red-500">Restricted</span>
+                            )}
+                          </div>
+                          
+                          {isAdmin && chatUser.userId !== (user?._id?.toString() || user?.email) && (
+                            <div className="flex space-x-1">
+                              {chatUser.isRestricted ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => unrestrictUser(chatUser.userId, chatUser.username)}
+                                  className="text-xs px-2 py-1 h-6"
+                                >
+                                  Unrestrict
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => restrictUser(chatUser.userId, chatUser.username)}
+                                  className="text-xs px-2 py-1 h-6"
+                                >
+                                  <Ban className="w-3 h-3" />
+                                </Button>
+                              )}
+                            </div>
                           )}
+                        </div>
+                      ))}
+                      {onlineUsers.length === 0 && (
+                        <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                          No users online
                         </div>
                       )}
                     </div>
-                  ))}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </CardHeader>
+          
+          <CardContent className="flex-1 flex flex-col p-0">
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {!isConnected && (
+                <Alert>
+                  <AlertTriangle className="w-4 h-4" />
+                  <AlertDescription>
+                    Connecting to chat server...
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              {messages.map((msg) => (
+                <div key={msg._id} className="flex flex-col space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium text-sm">{msg.username}</span>
+                    {getRoleBadge(msg.role, msg.isAdmin)}
+                    <span className="text-xs text-gray-500">
+                      {formatTime(msg.createdAt)}
+                    </span>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm">
+                    <p className="text-sm">{msg.message}</p>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+            
+            {/* Message Input */}
+            <div className="border-t p-4 flex-shrink-0">
+              {isRestricted ? (
+                <Alert variant="destructive">
+                  <Ban className="w-4 h-4" />
+                  <AlertDescription>
+                    You are restricted from sending messages.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="flex space-x-2">
+                  <Input
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Type your message..."
+                    className="flex-1"
+                    maxLength={500}
+                  />
+                  <Button 
+                    onClick={sendMessage} 
+                    disabled={!message.trim() || !isConnected}
+                    size="sm"
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -22,6 +22,7 @@ import Deployments from "@/pages/deployments";
 import DeploymentDetails from "@/pages/deployment-details";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
+import AdminGitHub from "@/pages/admin-github";
 import AccountSettings from "@/pages/account-settings";
 import Maintenance from "@/pages/maintenance";
 import Chat from "@/pages/chat";
@@ -84,6 +85,7 @@ function Router() {
         <Route path="/account-settings" component={AccountSettings} />
         <Route path="/chat" component={Chat} />
         {isAdmin && <Route path="/admin/dashboard" component={AdminDashboard} />}
+        {isAdmin && <Route path="/admin/github" component={AdminGitHub} />}
         <Route component={NotFound} />
       </Switch>
     </>

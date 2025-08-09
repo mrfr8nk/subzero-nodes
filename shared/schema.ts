@@ -124,6 +124,22 @@ export interface ChatRestriction {
   expiresAt?: Date; // Optional: when the restriction expires
 }
 
+export interface GitHubAccount {
+  _id: ObjectId;
+  name: string; // Friendly name for the account
+  token: string; // GitHub personal access token
+  owner: string; // GitHub username/organization
+  repo: string; // Repository name
+  workflowFile: string; // Workflow file name (e.g., 'deploy.yml')
+  isActive: boolean; // Whether this account is currently active
+  priority: number; // Lower number = higher priority (1 = highest)
+  currentQueueLength: number; // Current number of queued deployments
+  maxQueueLength: number; // Maximum allowed queue length before switching
+  lastUsed?: Date; // When this account was last used for deployment
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Zod schemas for validation
 export const insertUserSchema = z.object({
   googleId: z.string().optional(),
