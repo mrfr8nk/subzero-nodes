@@ -176,7 +176,7 @@ class AdvancedDeviceFingerprintGenerator {
       
       // Perform rendering test
       const renderingResult = this.performWebGLRenderingTest(webglCtx);
-      fingerprint.renderingTest = renderingResult;
+      (fingerprint as any).renderingTest = renderingResult;
       
       return JSON.stringify(fingerprint);
     } catch (e) {
@@ -262,12 +262,11 @@ class AdvancedDeviceFingerprintGenerator {
       
       // Create dynamic compressor for hardware-specific processing
       const compressor = context.createDynamicsCompressor();
-      compressor.threshold.value = -50;
-      compressor.knee.value = 40;
-      compressor.ratio.value = 12;
-      compressor.reduction.value = -20;
-      compressor.attack.value = 0;
-      compressor.release.value = 0.25;
+      if (compressor.threshold) compressor.threshold.setValueAtTime(-50, context.currentTime);
+      if (compressor.knee) compressor.knee.setValueAtTime(40, context.currentTime);
+      if (compressor.ratio) compressor.ratio.setValueAtTime(12, context.currentTime);
+      if (compressor.attack) compressor.attack.setValueAtTime(0, context.currentTime);
+      if (compressor.release) compressor.release.setValueAtTime(0.25, context.currentTime);
       
       // Connect audio nodes
       oscillator.connect(compressor);

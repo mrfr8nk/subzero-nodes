@@ -84,10 +84,7 @@ export async function adminLogin(req: Request, res: Response) {
         role: "admin",
         status: "active",
         coinBalance: 0, // Admins don't need coins
-        restrictions: [],
-        registrationIp: req.ip || req.connection.remoteAddress,
-        lastLoginIp: req.ip || req.connection.remoteAddress,
-        ipHistory: [req.ip || req.connection.remoteAddress].filter(Boolean),
+        restrictions: []
       };
 
       const result = await storage.createLocalUser(userData);
@@ -97,11 +94,6 @@ export async function adminLogin(req: Request, res: Response) {
       if (!adminUser.isAdmin) {
         await storage.updateUserRole(adminUser._id.toString(), "admin");
         adminUser = await storage.getUser(adminUser._id.toString());
-      }
-      
-      // Update IP tracking
-      if (req.ip && adminUser) {
-        await storage.updateUserIp(adminUser._id.toString(), req.ip);
       }
     }
 
