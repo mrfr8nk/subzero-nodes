@@ -9,8 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
-import { SiWhatsapp, SiGoogle } from "react-icons/si";
-import { Mail, Eye, EyeOff, UserPlus, ArrowLeft } from "lucide-react";
+import { SiGoogle } from "react-icons/si";
+import { Mail, Eye, EyeOff, UserPlus, ArrowLeft, Bot } from "lucide-react";
 
 const signupSchema = z.object({
   firstName: z.string().min(2, "First name must be at least 2 characters"),
@@ -112,7 +112,7 @@ export default function Signup() {
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2 sm:space-x-3 group">
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                <SiWhatsapp className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
                 <span className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white tracking-wide">SUBZERO-MD</span>

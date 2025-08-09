@@ -4,8 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { SiWhatsapp } from "react-icons/si";
-import { Menu, X, Shield } from "lucide-react";
+import { Menu, X, Shield, Bot } from "lucide-react";
 
 export default function Navbar() {
   const [location] = useLocation();
@@ -40,7 +39,7 @@ export default function Navbar() {
           <div className="flex items-center space-x-4">
             <Link href="/" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-                <SiWhatsapp className="w-5 h-5 text-white" />
+                <Bot className="w-5 h-5 text-white" />
               </div>
               <span className="text-xl font-bold text-gray-900 dark:text-white">SUBZERO-MD</span>
             </Link>

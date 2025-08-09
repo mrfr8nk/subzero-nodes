@@ -2,8 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { SiWhatsapp, SiGoogle } from "react-icons/si";
-import { Rocket, Coins, Users, ChartLine, Smartphone, Shield, Clock, CheckCircle, Star, ArrowRight, Play, Zap, Globe, Award } from "lucide-react";
+import { SiGoogle } from "react-icons/si";
+import { Rocket, Coins, Users, ChartLine, Smartphone, Shield, Clock, CheckCircle, Star, ArrowRight, Play, Zap, Globe, Award, Bot } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function Landing() {
@@ -86,7 +86,7 @@ export default function Landing() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
-                <SiWhatsapp className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
                 <span className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white tracking-wide">SUBZERO-MD</span>
@@ -244,7 +244,7 @@ export default function Landing() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-3 mb-4 md:mb-0">
               <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
-                <SiWhatsapp className="w-6 h-6 text-white" />
+                <Bot className="w-6 h-6 text-white" />
               </div>
               <div className="flex items-center space-x-2">
                 <span className="text-xl font-bold tracking-wide">SUBZERO-MD</span>

@@ -3,8 +3,7 @@ import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { SiWhatsapp } from "react-icons/si";
-import { CheckCircle, XCircle, RefreshCw, Mail } from "lucide-react";
+import { CheckCircle, XCircle, RefreshCw, Mail, Bot } from "lucide-react";
 
 export default function VerifyEmail() {
   const { toast } = useToast();
@@ -199,7 +198,7 @@ export default function VerifyEmail() {
         <div className="text-center mb-6 sm:mb-8">
           <div className="inline-flex items-center space-x-3 mb-4">
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center">
-              <SiWhatsapp className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+              <Bot className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">SUBZERO-MD</h1>

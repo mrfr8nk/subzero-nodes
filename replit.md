@@ -121,6 +121,10 @@ Add your domain's callback URL to Google Cloud Console OAuth settings:
   - Admin controls for IP restriction configuration
   - Fixed unhandled promise rejections with global error handlers
   - Enhanced WebSocket connection stability with better error handling
+- **Branding Update**: Replaced WhatsApp logos throughout the application with robot/bot icons to better represent the bot platform branding
+  - Updated all page headers and navigation with Bot icon from Lucide React
+  - Maintained consistent blue gradient styling across all logo instances
+  - Updated website manifest with proper app name and theme colors
 
 ### Deployment Notes
 - Update `FRONTEND_URL` and `BACKEND_URL` in production environment
