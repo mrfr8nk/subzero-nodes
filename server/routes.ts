@@ -2380,7 +2380,15 @@ jobs:
       ]);
 
       if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
-        return res.status(500).json({ message: 'GitHub settings not configured' });
+        return res.status(400).json({ 
+          message: 'GitHub integration not configured. Administrator needs to set up GitHub token and repository settings.',
+          details: 'Contact support to configure GitHub integration for deployment management.',
+          missingSettings: {
+            token: !githubToken?.value,
+            owner: !repoOwner?.value,  
+            repo: !repoName?.value
+          }
+        });
       }
 
       const GITHUB_TOKEN = githubToken.value;
@@ -2461,7 +2469,18 @@ ${Array.from(variableMap.entries()).map(([key, value]) => `  ${key}: "${value}",
         });
       } catch (error) {
         console.error('Redeploy error:', error);
-        res.status(500).json({ message: 'Failed to redeploy with updated variables' });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        if (errorMessage.includes('Bad credentials') || errorMessage.includes('Unauthorized')) {
+          res.status(400).json({ 
+            message: 'GitHub authentication failed. Please contact administrator to update GitHub token.',
+            details: 'The GitHub token may be expired or invalid.'
+          });
+        } else {
+          res.status(500).json({ 
+            message: 'Failed to redeploy with updated variables',
+            details: errorMessage
+          });
+        }
       }
     } catch (error) {
       console.error("Error redeploying:", error);

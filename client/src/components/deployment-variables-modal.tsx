@@ -165,7 +165,7 @@ export default function DeploymentVariablesModal({
       });
       onClose();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -177,11 +177,24 @@ export default function DeploymentVariablesModal({
         }, 500);
         return;
       }
-      toast({
-        title: "Error",
-        description: "Failed to redeploy with updated variables",
-        variant: "destructive",
-      });
+      
+      // Handle GitHub configuration errors
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to redeploy";
+      const errorDetails = error?.response?.data?.details;
+      
+      if (errorMessage.includes('GitHub integration not configured') || errorMessage.includes('GitHub authentication failed')) {
+        toast({
+          title: "GitHub Integration Required",
+          description: errorDetails || "Contact administrator to configure GitHub integration for deployment management.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Redeploy Failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     },
   });
 

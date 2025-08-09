@@ -124,17 +124,55 @@ export default function DeploymentDetails() {
     try {
       const response = await fetch(`/api/deployments/${deploymentId}/logs`);
       if (!response.ok) {
-        throw new Error('Failed to fetch logs');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.message || 'Failed to fetch logs';
+        
+        if (errorMessage.includes('GitHub integration not configured')) {
+          toast({
+            title: "GitHub Integration Required",
+            description: errorData.details || "Contact administrator to configure GitHub integration for logs access.",
+            variant: "destructive",
+          });
+          setLogs(["GitHub integration not configured. Contact administrator to set up GitHub token and repository settings."]);
+        } else {
+          toast({
+            title: "Error",
+            description: errorMessage,
+            variant: "destructive",
+          });
+          setLogs([`Error: ${errorMessage}`]);
+        }
+        return;
       }
+      
       const data = await response.json();
-      setLogs(data.logs || []);
+      if (data.workflowRuns && data.workflowRuns.length > 0) {
+        setLogs([
+          `Found ${data.workflowRuns.length} workflow runs for deployment "${data.deployment.name}":`,
+          "",
+          ...data.workflowRuns.map((run: any, index: number) => 
+            `${index + 1}. Run #${run.run_number} - ${run.status} (${run.conclusion || 'running'})`
+          ),
+          "",
+          "Click 'View Full Logs' to see detailed workflow execution logs."
+        ]);
+      } else {
+        setLogs([
+          `No workflow runs found for deployment "${data.deployment.name}".`,
+          "This could mean:",
+          "• The deployment hasn't been triggered yet",
+          "• GitHub workflow is not configured properly", 
+          "• The branch name doesn't match the workflow configuration"
+        ]);
+      }
     } catch (error) {
+      console.error('Fetch logs error:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch deployment logs",
+        description: "Network error while fetching logs",
         variant: "destructive",
       });
-      setLogs(["Failed to fetch logs. Please try again."]);
+      setLogs(["Network error while fetching logs. Please try again."]);
     } finally {
       setIsLoadingLogs(false);
     }
