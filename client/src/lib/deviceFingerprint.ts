@@ -41,14 +41,14 @@ class DeviceFingerprintGenerator {
         return { vendor: 'unknown', renderer: 'unknown' };
       }
       
-      const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+      const debugInfo = (gl as WebGLRenderingContext).getExtension('WEBGL_debug_renderer_info');
       if (!debugInfo) {
         return { vendor: 'unknown', renderer: 'unknown' };
       }
       
       return {
-        vendor: gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || 'unknown',
-        renderer: gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || 'unknown'
+        vendor: (gl as WebGLRenderingContext).getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || 'unknown',
+        renderer: (gl as WebGLRenderingContext).getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || 'unknown'
       };
     } catch (e) {
       return { vendor: 'unknown', renderer: 'unknown' };

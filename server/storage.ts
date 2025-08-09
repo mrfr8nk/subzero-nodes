@@ -9,6 +9,7 @@ import {
   ChatMessage,
   ChatRestriction,
   GitHubAccount,
+  BannedDeviceFingerprint,
   InsertUser,
   InsertDeployment,
   InsertTransaction,
@@ -17,6 +18,7 @@ import {
   InsertAppSettings,
   InsertDeploymentVariable,
   InsertChatMessage,
+  InsertBannedDeviceFingerprint,
 } from "@shared/schema";
 import { getDb } from "./db";
 import { ObjectId } from "mongodb";
@@ -94,6 +96,12 @@ export interface IStorage {
   deleteAdmin(userId: string, adminId: string): Promise<void>;
   getUsersByDeviceFingerprint(fingerprint: string): Promise<User[]>;
   updateUserDeviceFingerprint(userId: string, fingerprint: string): Promise<void>;
+  
+  // Device fingerprint banning operations
+  banDeviceFingerprint(fingerprint: string, reason: string, bannedBy: string): Promise<void>;
+  unbanDeviceFingerprint(fingerprint: string): Promise<void>;
+  getBannedDeviceFingerprints(): Promise<BannedDeviceFingerprint[]>;
+  isDeviceFingerprintBanned(fingerprint: string): Promise<boolean>;
   
   // Admin notification operations
   createAdminNotification(notification: InsertAdminNotification): Promise<AdminNotification>;
@@ -179,6 +187,10 @@ export class MongoStorage implements IStorage {
 
   private get deploymentVariablesCollection() {
     return getDb().collection<DeploymentVariable>("deploymentVariables");
+  }
+
+  private get bannedDeviceFingerprintsCollection() {
+    return getDb().collection<BannedDeviceFingerprint>("bannedDeviceFingerprints");
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -1366,6 +1378,101 @@ export class MongoStorage implements IStorage {
         }
       }
     );
+  }
+
+  // Device fingerprint banning operations
+  async banDeviceFingerprint(fingerprint: string, reason: string, bannedBy: string): Promise<void> {
+    // Get all users with this device fingerprint
+    const affectedUsers = await this.getUsersByDeviceFingerprint(fingerprint);
+    
+    const now = new Date();
+    const bannedDevice: BannedDeviceFingerprint = {
+      _id: new ObjectId(),
+      deviceFingerprint: fingerprint,
+      reason,
+      bannedBy: new ObjectId(bannedBy),
+      bannedAt: now,
+      affectedUsers: affectedUsers.map(user => user._id)
+    };
+
+    // Insert the banned device fingerprint
+    await this.bannedDeviceFingerprintsCollection.insertOne(bannedDevice);
+
+    // Ban all users associated with this device fingerprint
+    for (const user of affectedUsers) {
+      await this.updateUserStatus(user._id.toString(), 'banned', ['device_fingerprint_banned']);
+    }
+
+    // Create admin notification
+    await this.createAdminNotification({
+      type: 'device_fingerprint_banned',
+      title: 'Device Fingerprint Banned',
+      message: `Device fingerprint banned affecting ${affectedUsers.length} user(s): ${reason}`,
+      data: {
+        deviceFingerprint: fingerprint,
+        reason,
+        affectedUsers: affectedUsers.map(u => ({ id: u._id.toString(), email: u.email })),
+        bannedBy
+      },
+      read: false
+    });
+  }
+
+  async unbanDeviceFingerprint(fingerprint: string): Promise<void> {
+    // Find the banned device fingerprint record
+    const bannedDevice = await this.bannedDeviceFingerprintsCollection.findOne({ 
+      deviceFingerprint: fingerprint 
+    });
+    
+    if (!bannedDevice) {
+      return; // Already unbanned or never banned
+    }
+
+    // Remove the banned device fingerprint record
+    await this.bannedDeviceFingerprintsCollection.deleteOne({ 
+      deviceFingerprint: fingerprint 
+    });
+
+    // Unban all users that were banned solely for this device fingerprint
+    for (const userId of bannedDevice.affectedUsers) {
+      const user = await this.getUser(userId.toString());
+      if (user && user.status === 'banned' && 
+          user.restrictions?.includes('device_fingerprint_banned')) {
+        // Check if they have any other restrictions
+        const otherRestrictions = user.restrictions.filter(r => r !== 'device_fingerprint_banned');
+        if (otherRestrictions.length === 0) {
+          await this.updateUserStatus(userId.toString(), 'active', []);
+        } else {
+          await this.updateUserStatus(userId.toString(), user.status, otherRestrictions);
+        }
+      }
+    }
+
+    // Create admin notification
+    await this.createAdminNotification({
+      type: 'device_fingerprint_unbanned',
+      title: 'Device Fingerprint Unbanned',
+      message: `Device fingerprint unbanned affecting ${bannedDevice.affectedUsers.length} user(s)`,
+      data: {
+        deviceFingerprint: fingerprint,
+        affectedUsers: bannedDevice.affectedUsers.map(id => id.toString())
+      },
+      read: false
+    });
+  }
+
+  async getBannedDeviceFingerprints(): Promise<BannedDeviceFingerprint[]> {
+    return await this.bannedDeviceFingerprintsCollection
+      .find({})
+      .sort({ bannedAt: -1 })
+      .toArray();
+  }
+
+  async isDeviceFingerprintBanned(fingerprint: string): Promise<boolean> {
+    const bannedDevice = await this.bannedDeviceFingerprintsCollection.findOne({
+      deviceFingerprint: fingerprint
+    });
+    return !!bannedDevice;
   }
 }
 

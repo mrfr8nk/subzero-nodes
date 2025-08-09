@@ -125,6 +125,15 @@ export interface ChatRestriction {
   expiresAt?: Date; // Optional: when the restriction expires
 }
 
+export interface BannedDeviceFingerprint {
+  _id: ObjectId;
+  deviceFingerprint: string;
+  reason?: string;
+  bannedBy: ObjectId; // Admin who banned the device
+  bannedAt: Date;
+  affectedUsers: ObjectId[]; // Users who were using this device
+}
+
 export interface GitHubAccount {
   _id: ObjectId;
   name: string; // Friendly name for the account
@@ -163,9 +172,8 @@ export const insertUserSchema = z.object({
   role: z.string().default("user"),
   status: z.string().default("active"),
   restrictions: z.string().array().default([]),
-  registrationIp: z.string().optional(),
-  lastLoginIp: z.string().optional(),
-  ipHistory: z.string().array().default([]),
+  deviceFingerprint: z.string().optional(),
+  deviceHistory: z.string().array().default([]),
 });
 
 export const insertDeploymentSchema = z.object({
@@ -233,6 +241,13 @@ export const insertChatMessageSchema = z.object({
   isTagged: z.boolean().optional(),
 });
 
+export const insertBannedDeviceFingerprintSchema = z.object({
+  deviceFingerprint: z.string(),
+  reason: z.string().optional(),
+  bannedBy: z.string(),
+  affectedUsers: z.string().array().default([]),
+});
+
 // Insert types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertDeployment = z.infer<typeof insertDeploymentSchema>;
@@ -243,6 +258,7 @@ export type InsertAdminNotification = z.infer<typeof insertAdminNotificationSche
 export type InsertAppSettings = z.infer<typeof insertAppSettingsSchema>;
 export type InsertDeploymentVariable = z.infer<typeof insertDeploymentVariableSchema>;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type InsertBannedDeviceFingerprint = z.infer<typeof insertBannedDeviceFingerprintSchema>;
 
 // For backward compatibility
 export type UpsertUser = InsertUser;

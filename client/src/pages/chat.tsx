@@ -13,6 +13,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getDeviceFingerprint } from "@/lib/deviceFingerprint";
 
 interface ChatMessage {
   _id: string;
@@ -62,15 +63,25 @@ export default function Chat() {
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
-    ws.onopen = () => {
+    ws.onopen = async () => {
       setIsConnected(true);
+      
+      // Generate device fingerprint for device ban checking
+      let deviceFingerprint: string | undefined;
+      try {
+        deviceFingerprint = await getDeviceFingerprint();
+      } catch (error) {
+        console.error('Error generating device fingerprint:', error);
+      }
+      
       // Join chat room
       ws.send(JSON.stringify({
         type: 'join_chat',
         userId: user._id?.toString() || user.email || '',
         username: user.firstName || user.email?.split('@')[0] || 'User',
         isAdmin: !!isAdmin,
-        role: user.role || (isAdmin ? 'admin' : 'user')
+        role: user.role || (isAdmin ? 'admin' : 'user'),
+        deviceFingerprint
       }));
     };
 
@@ -128,11 +139,23 @@ export default function Chat() {
             ));
             break;
           case 'error':
-            toast({
-              title: "Error",
-              description: data.message,
-              variant: "destructive",
-            });
+            // Handle device ban specifically
+            if (data.code === 'DEVICE_BANNED') {
+              toast({
+                title: "Access Denied",
+                description: "Your device has been banned from using the chat service.",
+                variant: "destructive",
+              });
+              // Disconnect and prevent reconnection
+              setIsConnected(false);
+              ws.close();
+            } else {
+              toast({
+                title: "Error",
+                description: data.message,
+                variant: "destructive",
+              });
+            }
             break;
         }
       } catch (error) {

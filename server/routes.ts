@@ -11,6 +11,28 @@ import bcrypt from "bcryptjs";
 import { WebSocketServer, WebSocket } from 'ws';
 import crypto from "crypto";
 
+// Middleware to check if device fingerprint is banned
+async function checkDeviceBan(req: any, res: any, next: any) {
+  try {
+    const deviceFingerprint = req.body?.deviceFingerprint || req.headers['x-device-fingerprint'];
+    
+    if (deviceFingerprint) {
+      const isBanned = await storage.isDeviceFingerprintBanned(deviceFingerprint);
+      if (isBanned) {
+        return res.status(403).json({ 
+          message: 'Access denied: Device is banned from using this service',
+          code: 'DEVICE_BANNED'
+        });
+      }
+    }
+    
+    next();
+  } catch (error) {
+    console.error('Error checking device ban:', error);
+    next(); // Continue on error to avoid breaking the flow
+  }
+}
+
 // WebSocket connections for real-time updates
 const wsConnections = new Map<string, WebSocket>();
 const monitoringDeployments = new Map<string, NodeJS.Timeout>();
@@ -923,7 +945,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/deployments', isAuthenticated, async (req: any, res) => {
+  app.post('/api/deployments', checkDeviceBan, isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user._id.toString();
       const user = await storage.getUser(userId);
@@ -958,7 +980,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User GitHub deployment - uses admin GitHub settings
-  app.post('/api/deployments/github', isAuthenticated, async (req: any, res) => {
+  app.post('/api/deployments/github', checkDeviceBan, isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user._id.toString();
       const user = await storage.getUser(userId);
@@ -1544,16 +1566,16 @@ jobs:
     }
   });
 
-  // Get users by IP
-  app.get('/api/admin/users/by-ip/:ip', requireAdmin, async (req, res) => {
-    const { ip } = req.params;
+  // Get users by device fingerprint
+  app.get('/api/admin/users/by-device/:fingerprint', requireAdmin, async (req, res) => {
+    const { fingerprint } = req.params;
     
     try {
-      const users = await storage.getUsersByIp(ip);
+      const users = await storage.getUsersByDeviceFingerprint(fingerprint);
       res.json(users);
     } catch (error) {
-      console.error('Error fetching users by IP:', error);
-      res.status(500).json({ message: 'Failed to fetch users by IP' });
+      console.error('Error fetching users by device fingerprint:', error);
+      res.status(500).json({ message: 'Failed to fetch users by device fingerprint' });
     }
   });
 
@@ -1571,7 +1593,53 @@ jobs:
     }
   });
 
+  // Device fingerprint banning endpoints
+  app.post('/api/admin/device/ban', requireAdmin, async (req, res) => {
+    const { deviceFingerprint, reason } = req.body;
+    const adminId = (req.user as any)?._id?.toString();
+    
+    if (!deviceFingerprint) {
+      return res.status(400).json({ message: 'Device fingerprint is required' });
+    }
+    
+    if (!reason) {
+      return res.status(400).json({ message: 'Reason is required' });
+    }
 
+    try {
+      await storage.banDeviceFingerprint(deviceFingerprint, reason, adminId);
+      res.json({ message: 'Device fingerprint banned successfully' });
+    } catch (error) {
+      console.error('Error banning device fingerprint:', error);
+      res.status(500).json({ message: 'Failed to ban device fingerprint' });
+    }
+  });
+
+  app.post('/api/admin/device/unban', requireAdmin, async (req, res) => {
+    const { deviceFingerprint } = req.body;
+    
+    if (!deviceFingerprint) {
+      return res.status(400).json({ message: 'Device fingerprint is required' });
+    }
+
+    try {
+      await storage.unbanDeviceFingerprint(deviceFingerprint);
+      res.json({ message: 'Device fingerprint unbanned successfully' });
+    } catch (error) {
+      console.error('Error unbanning device fingerprint:', error);
+      res.status(500).json({ message: 'Failed to unban device fingerprint' });
+    }
+  });
+
+  app.get('/api/admin/device/banned', requireAdmin, async (req, res) => {
+    try {
+      const bannedDevices = await storage.getBannedDeviceFingerprints();
+      res.json(bannedDevices);
+    } catch (error) {
+      console.error('Error fetching banned device fingerprints:', error);
+      res.status(500).json({ message: 'Failed to fetch banned device fingerprints' });
+    }
+  });
 
   // Set device fingerprint in session before OAuth
   app.post('/api/auth/set-device-fingerprint', async (req, res) => {
@@ -2886,6 +2954,20 @@ jobs:
         }
         // Handle chat functionality
         else if (data.type === 'join_chat') {
+          // Check if device fingerprint is banned
+          if (data.deviceFingerprint) {
+            const isBanned = await storage.isDeviceFingerprintBanned(data.deviceFingerprint);
+            if (isBanned) {
+              ws.send(JSON.stringify({
+                type: 'error',
+                code: 'DEVICE_BANNED',
+                message: 'Access denied: Your device is banned from using the chat service'
+              }));
+              ws.close();
+              return;
+            }
+          }
+          
           const chatClient: ChatClient = {
             ws,
             userId: data.userId,

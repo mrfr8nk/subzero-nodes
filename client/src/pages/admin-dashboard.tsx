@@ -192,9 +192,9 @@ export default function AdminDashboard() {
     staleTime: 60000,
   });
 
-  // Fetch banned IPs
-  const { data: bannedIps = [] } = useQuery<string[]>({
-    queryKey: ['/api/admin/ip/banned'],
+  // Fetch banned device fingerprints
+  const { data: bannedDevices = [] } = useQuery<any[]>({
+    queryKey: ['/api/admin/device/banned'],
     staleTime: 30000,
   });
 
@@ -235,7 +235,7 @@ export default function AdminDashboard() {
   const [selectedDeploymentForLogs, setSelectedDeploymentForLogs] = useState<any>(null);
   const [realtimeUpdates, setRealtimeUpdates] = useState<any[]>([]);
   const [monitoredBranches, setMonitoredBranches] = useState<Set<string>>(new Set());
-  const [ipBanForm, setIpBanForm] = useState({ ip: '', reason: '' });
+  const [deviceBanForm, setDeviceBanForm] = useState({ deviceFingerprint: '', reason: '' });
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [costSettings, setCostSettings] = useState({ deploymentCost: 25, dailyCharge: 5 });
   
@@ -476,36 +476,36 @@ export default function AdminDashboard() {
     }
   });
 
-  // Ban IP mutation
-  const banIpMutation = useMutation({
-    mutationFn: async ({ ip, reason }: { ip: string; reason: string }) => {
-      return await apiRequest('POST', '/api/admin/ip/ban', { ip, reason });
+  // Ban device fingerprint mutation
+  const banDeviceMutation = useMutation({
+    mutationFn: async ({ deviceFingerprint, reason }: { deviceFingerprint: string; reason: string }) => {
+      return await apiRequest('POST', '/api/admin/device/ban', { deviceFingerprint, reason });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/ip/banned'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/device/banned'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/notifications'] });
-      toast({ title: "IP address banned successfully" });
-      setIpBanForm({ ip: '', reason: '' });
+      toast({ title: "Device fingerprint banned successfully" });
+      setDeviceBanForm({ deviceFingerprint: '', reason: '' });
     },
     onError: (error: any) => {
-      toast({ title: "Failed to ban IP address", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to ban device fingerprint", description: error.message, variant: "destructive" });
     }
   });
 
-  // Unban IP mutation
-  const unbanIpMutation = useMutation({
-    mutationFn: async (ip: string) => {
-      return await apiRequest('POST', '/api/admin/ip/unban', { ip });
+  // Unban device fingerprint mutation
+  const unbanDeviceMutation = useMutation({
+    mutationFn: async (deviceFingerprint: string) => {
+      return await apiRequest('POST', '/api/admin/device/unban', { deviceFingerprint });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/ip/banned'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/device/banned'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/notifications'] });
-      toast({ title: "IP address unbanned successfully" });
+      toast({ title: "Device fingerprint unbanned successfully" });
     },
     onError: (error: any) => {
-      toast({ title: "Failed to unban IP address", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to unban device fingerprint", description: error.message, variant: "destructive" });
     }
   });
 
@@ -649,16 +649,16 @@ export default function AdminDashboard() {
     deleteUserMutation.mutate(userId);
   };
 
-  const handleBanIp = () => {
-    if (!ipBanForm.ip.trim()) {
-      toast({ title: "Please enter an IP address", variant: "destructive" });
+  const handleBanDevice = () => {
+    if (!deviceBanForm.deviceFingerprint.trim()) {
+      toast({ title: "Please enter a device fingerprint", variant: "destructive" });
       return;
     }
-    banIpMutation.mutate(ipBanForm);
+    banDeviceMutation.mutate(deviceBanForm);
   };
 
-  const handleUnbanIp = (ip: string) => {
-    unbanIpMutation.mutate(ip);
+  const handleUnbanDevice = (deviceFingerprint: string) => {
+    unbanDeviceMutation.mutate(deviceFingerprint);
   };
 
   const checkBranchAvailability = async (branchName: string) => {
@@ -851,10 +851,10 @@ export default function AdminDashboard() {
                     Deployments
                   </div>
                 </SelectItem>
-                <SelectItem value="ip-management">
+                <SelectItem value="device-management">
                   <div className="flex items-center">
                     <Ban className="w-4 h-4 mr-2" />
-                    IP Management
+                    Device Management
                   </div>
                 </SelectItem>
                 <SelectItem value="settings">
@@ -884,7 +884,7 @@ export default function AdminDashboard() {
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Coins</TableHead>
-                      <TableHead>Registration IP</TableHead>
+                      <TableHead>Device Fingerprint</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -925,7 +925,7 @@ export default function AdminDashboard() {
                           {user.coinBalance}
                         </TableCell>
                         <TableCell className="text-xs" data-testid={`text-ip-${user._id}`}>
-                          {user.registrationIp}
+                          {user.deviceFingerprint || 'N/A'}
                         </TableCell>
                         <TableCell>
                           <div className="flex space-x-2">
@@ -1052,29 +1052,29 @@ export default function AdminDashboard() {
 
                                   <div className="space-y-4 pt-4 border-t">
                                     <div className="space-y-2">
-                                      <Label>IP Actions</Label>
+                                      <Label>Device Actions</Label>
                                       <div className="flex space-x-2">
                                         <Button 
                                           onClick={() => {
-                                            if (user.registrationIp) {
-                                              setIpBanForm(prev => ({ ...prev, ip: user.registrationIp! }));
+                                            if (user.deviceFingerprint) {
+                                              setDeviceBanForm(prev => ({ ...prev, deviceFingerprint: user.deviceFingerprint! }));
                                             }
                                           }}
                                           variant="outline"
                                           size="sm"
-                                          disabled={!user.registrationIp}
+                                          disabled={!user.deviceFingerprint}
                                         >
                                           <Ban className="w-4 h-4 mr-1" />
-                                          Ban IP
+                                          Ban Device
                                         </Button>
-                                        {user.registrationIp && bannedIps.includes(user.registrationIp) && (
+                                        {user.deviceFingerprint && bannedDevices.some(device => device.deviceFingerprint === user.deviceFingerprint) && (
                                           <Button 
-                                            onClick={() => handleUnbanIp(user.registrationIp!)}
+                                            onClick={() => handleUnbanDevice(user.deviceFingerprint!)}
                                             variant="outline"
                                             size="sm"
                                           >
                                             <UserCheck className="w-4 h-4 mr-1" />
-                                            Unban IP
+                                            Unban Device
                                           </Button>
                                         )}
                                       </div>
@@ -1400,62 +1400,70 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {selectedSection === "ip-management" && (
+        {selectedSection === "device-management" && (
           <div className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>IP Address Management</CardTitle>
-                <CardDescription>Ban or unban IP addresses to control access</CardDescription>
+                <CardTitle>Device Fingerprint Management</CardTitle>
+                <CardDescription>Ban or unban device fingerprints to control access</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Ban IP Address</Label>
+                  <Label>Ban Device Fingerprint</Label>
                   <div className="flex space-x-2">
                     <Input
-                      placeholder="Enter IP address (e.g., 192.168.1.1)"
-                      value={ipBanForm.ip}
-                      onChange={(e) => setIpBanForm(prev => ({ ...prev, ip: e.target.value }))}
+                      placeholder="Enter device fingerprint"
+                      value={deviceBanForm.deviceFingerprint}
+                      onChange={(e) => setDeviceBanForm(prev => ({ ...prev, deviceFingerprint: e.target.value }))}
                     />
                     <Input
                       placeholder="Reason for ban"
-                      value={ipBanForm.reason}
-                      onChange={(e) => setIpBanForm(prev => ({ ...prev, reason: e.target.value }))}
+                      value={deviceBanForm.reason}
+                      onChange={(e) => setDeviceBanForm(prev => ({ ...prev, reason: e.target.value }))}
                     />
                     <Button 
-                      onClick={handleBanIp}
-                      disabled={!ipBanForm.ip.trim() || banIpMutation.isPending}
+                      onClick={handleBanDevice}
+                      disabled={!deviceBanForm.deviceFingerprint.trim() || banDeviceMutation.isPending}
                     >
                       <Ban className="w-4 h-4 mr-1" />
-                      Ban IP
+                      Ban Device
                     </Button>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Banned IP Addresses ({bannedIps.length})</Label>
-                  {bannedIps.length === 0 ? (
+                  <Label>Banned Device Fingerprints ({bannedDevices.length})</Label>
+                  {bannedDevices.length === 0 ? (
                     <div className="text-sm text-muted-foreground p-4 border rounded">
-                      No IP addresses are currently banned.
+                      No device fingerprints are currently banned.
                     </div>
                   ) : (
                     <div className="border rounded">
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>IP Address</TableHead>
+                            <TableHead>Device Fingerprint</TableHead>
+                            <TableHead>Reason</TableHead>
+                            <TableHead>Banned By</TableHead>
+                            <TableHead>Banned At</TableHead>
+                            <TableHead>Affected Users</TableHead>
                             <TableHead>Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {bannedIps.map((ip) => (
-                            <TableRow key={ip}>
-                              <TableCell className="font-mono">{ip}</TableCell>
+                          {bannedDevices.map((device: any) => (
+                            <TableRow key={device.deviceFingerprint}>
+                              <TableCell className="font-mono">{device.deviceFingerprint}</TableCell>
+                              <TableCell>{device.reason}</TableCell>
+                              <TableCell>{device.bannedBy}</TableCell>
+                              <TableCell>{new Date(device.bannedAt).toLocaleString()}</TableCell>
+                              <TableCell>{device.affectedUsers?.length || 0}</TableCell>
                               <TableCell>
                                 <Button 
-                                  onClick={() => handleUnbanIp(ip)}
+                                  onClick={() => handleUnbanDevice(device.deviceFingerprint)}
                                   variant="outline"
                                   size="sm"
-                                  disabled={unbanIpMutation.isPending}
+                                  disabled={unbanDeviceMutation.isPending}
                                 >
                                   <UserCheck className="w-4 h-4 mr-1" />
                                   Unban
@@ -2131,7 +2139,7 @@ export default function AdminDashboard() {
                   <strong>User:</strong> {userToDelete.firstName} {userToDelete.lastName}<br/>
                   <strong>Email:</strong> {userToDelete.email}<br/>
                   <strong>Coins:</strong> {userToDelete.coinBalance}<br/>
-                  <strong>Registration IP:</strong> {userToDelete.registrationIp}
+                  <strong>Device Fingerprint:</strong> {userToDelete.deviceFingerprint || 'N/A'}
                 </div>
               </div>
               
