@@ -196,7 +196,7 @@ export default function Deployments() {
         <CardContent className="p-6">
           <div className="space-y-4">
             {deploymentsLoading ? (
-              <div className="text-gray-500">Loading deployments...</div>
+              <div className="text-muted-foreground">Loading deployments...</div>
             ) : deployments && deployments.length > 0 ? (
               deployments.map((deployment: any) => (
                 <div key={deployment._id} className="flex flex-col lg:flex-row lg:items-center justify-between p-4 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
@@ -205,8 +205,8 @@ export default function Deployments() {
                       <MessageSquare className="w-6 h-6 text-blue-600" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">{deployment.name}</h4>
-                      <p className="text-sm text-gray-600">
+                      <h4 className="font-semibold text-foreground">{deployment.name}</h4>
+                      <p className="text-sm text-muted-foreground">
                         Deployed {new Date(deployment.createdAt).toLocaleDateString()}
                       </p>
                       <div className="flex items-center space-x-4 mt-1">
@@ -219,9 +219,9 @@ export default function Deployments() {
                           {deployment.status === 'insufficient_funds' ? 'No Funds' : 
                            deployment.status.charAt(0).toUpperCase() + deployment.status.slice(1)}
                         </span>
-                        <span className="text-xs text-gray-500">Cost: {deployment.cost} coins/day</span>
+                        <span className="text-xs text-muted-foreground">Cost: {deployment.cost} coins/day</span>
                         {deployment.nextChargeDate && (
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-muted-foreground">
                             Next charge: {new Date(deployment.nextChargeDate).toLocaleDateString()}
                           </span>
                         )}
@@ -240,7 +240,7 @@ export default function Deployments() {
                 </div>
               ))
             ) : (
-              <div className="text-gray-500 text-center py-8">
+              <div className="text-muted-foreground text-center py-8">
                 No deployments yet. Click "Deploy New Bot" to get started!
               </div>
             )}

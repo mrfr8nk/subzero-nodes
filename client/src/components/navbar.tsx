@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Menu, X, Shield, Bot, Github } from "lucide-react";
+import { Menu, X, Shield, Bot, Github, Activity } from "lucide-react";
 
 export default function Navbar() {
   const [location] = useLocation();
@@ -32,7 +32,8 @@ export default function Navbar() {
     { path: "/chat", label: "Chat" },
     ...(isAdmin ? [
       { path: "/admin/dashboard", label: "Admin" },
-      { path: "/admin/github", label: "GitHub" }
+      { path: "/admin/github", label: "GitHub" },
+      { path: "/admin/api-test", label: "API Test" }
     ] : []),
   ];
 

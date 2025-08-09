@@ -1998,9 +1998,54 @@ jobs:
         }
       }
       
+      // Get detailed logs for the most recent run
+      let detailedLogs = [];
+      if (workflowRuns.length > 0) {
+        const latestRun = workflowRuns[0];
+        try {
+          // Get jobs for the latest run
+          const jobsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs/${latestRun.id}/jobs`;
+          const jobsResponse = await fetch(jobsUrl, {
+            headers: {
+              'Authorization': `token ${GITHUB_TOKEN}`,
+              'Accept': 'application/vnd.github.v3+json'
+            }
+          });
+
+          if (jobsResponse.ok) {
+            const jobsData = await jobsResponse.json();
+            const jobs = jobsData.jobs || [];
+            
+            // Get logs for each job
+            for (const job of jobs) {
+              const logsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/jobs/${job.id}/logs`;
+              const logsResponse = await fetch(logsUrl, {
+                headers: {
+                  'Authorization': `token ${GITHUB_TOKEN}`,
+                  'Accept': 'application/vnd.github.v3+json'
+                }
+              });
+
+              if (logsResponse.ok) {
+                const logs = await logsResponse.text();
+                detailedLogs.push({
+                  jobName: job.name,
+                  status: job.status,
+                  conclusion: job.conclusion,
+                  logs: logs || 'No logs available'
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching detailed logs:', error);
+        }
+      }
+
       res.json({
         deployment,
-        workflowRuns
+        workflowRuns,
+        detailedLogs
       });
     } catch (error) {
       console.error('Error fetching deployment logs:', error);
@@ -2672,6 +2717,20 @@ jobs:
         timestamp: new Date().toISOString()
       });
       
+      // Create deployment record with active status
+      const deploymentData = {
+        userId: (req.user as any)._id.toString(),
+        name: branchName,
+        branchName: branchName,
+        status: 'active', // Set to active immediately when workflow is triggered
+        cost: 25, // Default cost
+        configuration: JSON.stringify({ sessionId, ownerNumber, prefix }), // Required field
+        lastChargeDate: new Date(),
+        nextChargeDate: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
+      };
+
+      await storage.createDeployment(deploymentData);
+
       // Start monitoring this deployment after a short delay to allow GitHub to process
       setTimeout(() => {
         startWorkflowMonitoring(branchName);
@@ -2793,6 +2852,122 @@ jobs:
     } catch (error) {
       console.error('Error fetching specific workflow logs:', error);
       res.status(500).json({ message: 'Failed to fetch workflow logs' });
+    }
+  });
+
+  // GitHub API test endpoints for branches and workflows
+  app.get('/api/admin/github/branches', isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const [githubToken, repoOwner, repoName] = await Promise.all([
+        storage.getAppSetting('github_token'),
+        storage.getAppSetting('github_repo_owner'),
+        storage.getAppSetting('github_repo_name')
+      ]);
+
+      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
+        return res.status(400).json({ message: 'GitHub settings not configured' });
+      }
+
+      const response = await fetch(`https://api.github.com/repos/${repoOwner.value}/${repoName.value}/branches`, {
+        headers: {
+          'Authorization': `token ${githubToken.value}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`GitHub API error: ${response.statusText}`);
+      }
+
+      const branches = await response.json();
+      res.json(branches);
+    } catch (error) {
+      console.error('Error fetching branches:', error);
+      res.status(500).json({ message: 'Failed to fetch branches' });
+    }
+  });
+
+  app.get('/api/admin/github/workflows', isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const [githubToken, repoOwner, repoName, workflowFile] = await Promise.all([
+        storage.getAppSetting('github_token'),
+        storage.getAppSetting('github_repo_owner'),
+        storage.getAppSetting('github_repo_name'),
+        storage.getAppSetting('github_workflow_file')
+      ]);
+
+      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
+        return res.status(400).json({ message: 'GitHub settings not configured' });
+      }
+
+      const WORKFLOW_FILE = workflowFile?.value || 'main.yml';
+      const response = await fetch(`https://api.github.com/repos/${repoOwner.value}/${repoName.value}/actions/workflows/${WORKFLOW_FILE}/runs?per_page=20`, {
+        headers: {
+          'Authorization': `token ${githubToken.value}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`GitHub API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      res.json(data.workflow_runs || []);
+    } catch (error) {
+      console.error('Error fetching workflows:', error);
+      res.status(500).json({ message: 'Failed to fetch workflows' });
+    }
+  });
+
+  app.delete('/api/admin/github/branches', isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const { branches } = req.body;
+      if (!Array.isArray(branches) || branches.length === 0) {
+        return res.status(400).json({ message: 'Invalid branches array' });
+      }
+
+      const [githubToken, repoOwner, repoName] = await Promise.all([
+        storage.getAppSetting('github_token'),
+        storage.getAppSetting('github_repo_owner'),
+        storage.getAppSetting('github_repo_name')
+      ]);
+
+      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
+        return res.status(400).json({ message: 'GitHub settings not configured' });
+      }
+
+      const results = [];
+      for (const branchName of branches) {
+        // Don't allow deletion of main/master branches
+        if (branchName === 'main' || branchName === 'master') {
+          results.push({ branch: branchName, status: 'skipped', reason: 'Protected branch' });
+          continue;
+        }
+
+        try {
+          const response = await fetch(`https://api.github.com/repos/${repoOwner.value}/${repoName.value}/git/refs/heads/${branchName}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `token ${githubToken.value}`,
+              'Accept': 'application/vnd.github.v3+json'
+            }
+          });
+
+          if (response.ok) {
+            results.push({ branch: branchName, status: 'deleted' });
+          } else {
+            results.push({ branch: branchName, status: 'failed', reason: `HTTP ${response.status}` });
+          }
+        } catch (error) {
+          results.push({ branch: branchName, status: 'failed', reason: 'Network error' });
+        }
+      }
+
+      res.json({ results });
+    } catch (error) {
+      console.error('Error deleting branches:', error);
+      res.status(500).json({ message: 'Failed to delete branches' });
     }
   });
 

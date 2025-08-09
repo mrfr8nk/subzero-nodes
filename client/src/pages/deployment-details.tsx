@@ -146,7 +146,22 @@ export default function DeploymentDetails() {
       }
       
       const data = await response.json();
-      if (data.workflowRuns && data.workflowRuns.length > 0) {
+      if (data.detailedLogs && data.detailedLogs.length > 0) {
+        // Show actual deployment logs
+        const allLogs: string[] = [];
+        data.detailedLogs.forEach((jobLog: any, index: number) => {
+          allLogs.push(`=== ${jobLog.jobName} (${jobLog.status}) ===`);
+          if (jobLog.logs && jobLog.logs.trim()) {
+            // Parse and clean logs
+            const logLines = jobLog.logs.split('\n').filter((line: string) => line.trim());
+            allLogs.push(...logLines);
+          } else {
+            allLogs.push('No logs available for this job');
+          }
+          allLogs.push(''); // Add spacing between jobs
+        });
+        setLogs(allLogs);
+      } else if (data.workflowRuns && data.workflowRuns.length > 0) {
         setLogs([
           `Found ${data.workflowRuns.length} workflow runs for deployment "${data.deployment.name}":`,
           "",
@@ -154,7 +169,7 @@ export default function DeploymentDetails() {
             `${index + 1}. Run #${run.run_number} - ${run.status} (${run.conclusion || 'running'})`
           ),
           "",
-          "Click 'View Full Logs' to see detailed workflow execution logs."
+          "Detailed logs are being fetched..."
         ]);
       } else {
         setLogs([
