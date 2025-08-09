@@ -29,6 +29,7 @@ export default function Navbar() {
     { path: "/deployments", label: "Deployments" },
     { path: "/wallet", label: "Wallet" },
     { path: "/referrals", label: "Referrals" },
+    { path: "/chat", label: "Chat" },
     ...(isAdmin ? [{ path: "/admin/dashboard", label: "Admin" }] : []),
   ];
 
@@ -38,8 +39,19 @@ export default function Navbar() {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-4">
             <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-                <Bot className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center p-1">
+                <img 
+                  src="/robot-icon.jpg" 
+                  alt="SUBZERO-MD Bot" 
+                  className="w-full h-full rounded object-cover"
+                  onError={(e) => {
+                    // Fallback to Bot icon if image fails to load
+                    e.currentTarget.style.display = 'none';
+                    const botIcon = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (botIcon) botIcon.style.display = 'block';
+                  }}
+                />
+                <Bot className="w-5 h-5 text-white hidden" />
               </div>
               <span className="text-xl font-bold text-gray-900 dark:text-white">SUBZERO-MD</span>
             </Link>

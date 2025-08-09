@@ -24,6 +24,7 @@ import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AccountSettings from "@/pages/account-settings";
 import Maintenance from "@/pages/maintenance";
+import Chat from "@/pages/chat";
 import Navbar from "@/components/navbar";
 
 function Router() {
@@ -81,6 +82,7 @@ function Router() {
         <Route path="/deployments" component={Deployments} />
         <Route path="/deployments/:id" component={DeploymentDetails} />
         <Route path="/account-settings" component={AccountSettings} />
+        <Route path="/chat" component={Chat} />
         {isAdmin && <Route path="/admin/dashboard" component={AdminDashboard} />}
         <Route component={NotFound} />
       </Switch>

@@ -104,6 +104,26 @@ export interface DeploymentVariable {
   updatedAt: Date;
 }
 
+export interface ChatMessage {
+  _id: ObjectId;
+  userId: ObjectId;
+  username: string;
+  message: string;
+  isAdmin: boolean;
+  role?: string; // 'user', 'admin', 'super_admin'
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ChatRestriction {
+  _id: ObjectId;
+  userId: ObjectId;
+  restrictedBy: ObjectId; // Admin who restricted the user
+  reason?: string;
+  restrictedAt: Date;
+  expiresAt?: Date; // Optional: when the restriction expires
+}
+
 // Zod schemas for validation
 export const insertUserSchema = z.object({
   googleId: z.string().optional(),

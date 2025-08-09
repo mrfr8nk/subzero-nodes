@@ -15,6 +15,17 @@ import crypto from "crypto";
 const wsConnections = new Map<string, WebSocket>();
 const monitoringDeployments = new Map<string, NodeJS.Timeout>();
 
+// Chat WebSocket connections
+interface ChatClient {
+  ws: WebSocket;
+  userId: string;
+  username: string;
+  isAdmin: boolean;
+  role?: string;
+}
+
+const chatClients = new Map<string, ChatClient>();
+
 // Function to broadcast to WebSocket clients
 function broadcastToClients(type: string, data: any) {
   const message = JSON.stringify({ type, data, timestamp: new Date().toISOString() });
@@ -23,6 +34,18 @@ function broadcastToClients(type: string, data: any) {
       ws.send(message);
     } else {
       wsConnections.delete(clientId);
+    }
+  });
+}
+
+// Function to broadcast to chat clients
+function broadcastToChatClients(type: string, data: any, excludeClientId?: string) {
+  const message = JSON.stringify({ type, ...data, timestamp: new Date().toISOString() });
+  chatClients.forEach((chatClient, clientId) => {
+    if (clientId !== excludeClientId && chatClient.ws.readyState === WebSocket.OPEN) {
+      chatClient.ws.send(message);
+    } else if (chatClient.ws.readyState !== WebSocket.OPEN) {
+      chatClients.delete(clientId);
     }
   });
 }
@@ -2811,7 +2834,7 @@ jobs:
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   
   wss.on('connection', (ws: WebSocket, req) => {
-    const clientId = Math.random().toString(36).substring(2, 15);
+    const clientId = crypto.randomUUID();
     wsConnections.set(clientId, ws);
     
     console.log(`WebSocket client connected: ${clientId}`);
@@ -2823,11 +2846,11 @@ jobs:
       timestamp: new Date().toISOString()
     }));
     
-    ws.on('message', (message) => {
+    ws.on('message', async (message) => {
       try {
         const data = JSON.parse(message.toString());
         
-        // Handle client requests
+        // Handle deployment monitoring requests
         if (data.type === 'monitor_deployment' && data.branch) {
           startWorkflowMonitoring(data.branch);
           ws.send(JSON.stringify({
@@ -2836,6 +2859,142 @@ jobs:
             timestamp: new Date().toISOString()
           }));
         }
+        // Handle chat functionality
+        else if (data.type === 'join_chat') {
+          const chatClient: ChatClient = {
+            ws,
+            userId: data.userId,
+            username: data.username,
+            isAdmin: data.isAdmin,
+            role: data.role
+          };
+          
+          chatClients.set(clientId, chatClient);
+          
+          // Send chat history to the new client
+          try {
+            const messages = await storage.getChatMessages(50);
+            ws.send(JSON.stringify({
+              type: 'chat_history',
+              messages: messages.map(msg => ({
+                ...msg,
+                _id: msg._id.toString(),
+                userId: msg.userId.toString(),
+                createdAt: msg.createdAt.toISOString()
+              }))
+            }));
+            
+            // Send current users list
+            const users = Array.from(chatClients.values()).map(client => ({
+              userId: client.userId,
+              username: client.username,
+              isAdmin: client.isAdmin,
+              role: client.role,
+              isRestricted: false
+            }));
+            
+            ws.send(JSON.stringify({
+              type: 'users_list',
+              users
+            }));
+            
+            // Broadcast user joined to other clients
+            broadcastToChatClients('user_joined', {
+              user: {
+                userId: data.userId,
+                username: data.username,
+                isAdmin: data.isAdmin,
+                role: data.role,
+                isRestricted: false
+              }
+            }, clientId);
+            
+          } catch (error) {
+            console.error('Error handling chat join:', error);
+          }
+        }
+        else if (data.type === 'send_message') {
+          const chatClient = chatClients.get(clientId);
+          if (chatClient) {
+            try {
+              // Check if user is restricted
+              const isRestricted = await storage.isChatRestricted(chatClient.userId);
+              if (isRestricted) {
+                ws.send(JSON.stringify({
+                  type: 'error',
+                  message: 'You are restricted from sending messages'
+                }));
+                return;
+              }
+              
+              // Create and broadcast message
+              const chatMessage = await storage.createChatMessage({
+                userId: chatClient.userId,
+                username: chatClient.username,
+                message: data.message,
+                isAdmin: chatClient.isAdmin,
+                role: chatClient.role
+              });
+              
+              broadcastToChatClients('chat_message', {
+                message: {
+                  ...chatMessage,
+                  _id: chatMessage._id.toString(),
+                  userId: chatMessage.userId.toString(),
+                  createdAt: chatMessage.createdAt.toISOString()
+                }
+              });
+              
+            } catch (error) {
+              console.error('Error sending chat message:', error);
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Failed to send message'
+              }));
+            }
+          }
+        }
+        else if (data.type === 'restrict_user') {
+          const chatClient = chatClients.get(clientId);
+          if (chatClient && chatClient.isAdmin) {
+            try {
+              await storage.restrictUserFromChat(data.userId, chatClient.userId, data.reason);
+              
+              broadcastToChatClients('user_restricted', {
+                userId: data.userId,
+                restrictedBy: chatClient.userId,
+                reason: data.reason
+              });
+              
+            } catch (error) {
+              console.error('Error restricting user:', error);
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Failed to restrict user'
+              }));
+            }
+          }
+        }
+        else if (data.type === 'unrestrict_user') {
+          const chatClient = chatClients.get(clientId);
+          if (chatClient && chatClient.isAdmin) {
+            try {
+              await storage.unrestrictUserFromChat(data.userId);
+              
+              broadcastToChatClients('user_unrestricted', {
+                userId: data.userId,
+                unrestrictedBy: chatClient.userId
+              });
+              
+            } catch (error) {
+              console.error('Error unrestricting user:', error);
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Failed to unrestrict user'
+              }));
+            }
+          }
+        }
       } catch (error) {
         console.error('WebSocket message error:', error);
       }
@@ -2843,12 +3002,21 @@ jobs:
     
     ws.on('close', () => {
       wsConnections.delete(clientId);
+      const chatClient = chatClients.get(clientId);
+      if (chatClient) {
+        chatClients.delete(clientId);
+        // Broadcast user left to other clients
+        broadcastToChatClients('user_left', {
+          userId: chatClient.userId
+        }, clientId);
+      }
       console.log(`WebSocket client disconnected: ${clientId}`);
     });
     
     ws.on('error', (error) => {
       console.error('WebSocket error:', error);
       wsConnections.delete(clientId);
+      chatClients.delete(clientId);
     });
   });
   

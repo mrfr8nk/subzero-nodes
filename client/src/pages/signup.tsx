@@ -111,8 +111,18 @@ export default function Signup() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2 sm:space-x-3 group">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform p-1">
+                <img 
+                  src="/robot-icon.jpg" 
+                  alt="SUBZERO-MD Bot" 
+                  className="w-full h-full rounded object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const botIcon = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (botIcon) botIcon.style.display = 'block';
+                  }}
+                />
+                <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-white hidden" />
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
                 <span className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white tracking-wide">SUBZERO-MD</span>

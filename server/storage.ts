@@ -6,6 +6,8 @@ import {
   AdminNotification,
   AppSettings,
   DeploymentVariable,
+  ChatMessage,
+  ChatRestriction,
   InsertUser,
   InsertDeployment,
   InsertTransaction,
@@ -114,6 +116,19 @@ export interface IStorage {
   
   // Daily billing operations
   processDeploymentDailyCharges(): Promise<void>;
+  
+  // Chat operations
+  createChatMessage(message: {
+    userId: string;
+    username: string;
+    message: string;
+    isAdmin: boolean;
+    role?: string;
+  }): Promise<ChatMessage>;
+  getChatMessages(limit?: number): Promise<ChatMessage[]>;
+  restrictUserFromChat(userId: string, restrictedBy: string, reason?: string): Promise<void>;
+  unrestrictUserFromChat(userId: string): Promise<void>;
+  isChatRestricted(userId: string): Promise<boolean>;
 }
 
 export class MongoStorage implements IStorage {
@@ -139,6 +154,14 @@ export class MongoStorage implements IStorage {
 
   private get appSettingsCollection() {
     return getDb().collection<AppSettings>("appSettings");
+  }
+
+  private get chatMessagesCollection() {
+    return getDb().collection<ChatMessage>("chatMessages");
+  }
+
+  private get chatRestrictionsCollection() {
+    return getDb().collection<ChatRestriction>("chatRestrictions");
   }
 
   private get deploymentVariablesCollection() {
@@ -1197,6 +1220,65 @@ export class MongoStorage implements IStorage {
         console.error(`Error processing daily charge for deployment ${deployment._id}:`, error);
       }
     }
+  }
+
+  // Chat operations
+  async createChatMessage(message: {
+    userId: string;
+    username: string;
+    message: string;
+    isAdmin: boolean;
+    role?: string;
+  }): Promise<ChatMessage> {
+    const now = new Date();
+    const chatMessage: ChatMessage = {
+      _id: new ObjectId(),
+      userId: new ObjectId(message.userId),
+      username: message.username,
+      message: message.message,
+      isAdmin: message.isAdmin,
+      role: message.role,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await this.chatMessagesCollection.insertOne(chatMessage);
+    return chatMessage;
+  }
+
+  async getChatMessages(limit: number = 50): Promise<ChatMessage[]> {
+    return await this.chatMessagesCollection
+      .find({})
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray()
+      .then(messages => messages.reverse()); // Return in chronological order
+  }
+
+  async restrictUserFromChat(userId: string, restrictedBy: string, reason?: string): Promise<void> {
+    const now = new Date();
+    const restriction: ChatRestriction = {
+      _id: new ObjectId(),
+      userId: new ObjectId(userId),
+      restrictedBy: new ObjectId(restrictedBy),
+      reason,
+      restrictedAt: now,
+    };
+
+    await this.chatRestrictionsCollection.insertOne(restriction);
+  }
+
+  async unrestrictUserFromChat(userId: string): Promise<void> {
+    await this.chatRestrictionsCollection.deleteMany({
+      userId: new ObjectId(userId)
+    });
+  }
+
+  async isChatRestricted(userId: string): Promise<boolean> {
+    const restriction = await this.chatRestrictionsCollection.findOne({
+      userId: new ObjectId(userId)
+    });
+    return !!restriction;
   }
 }
 
