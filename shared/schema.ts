@@ -28,6 +28,15 @@ export interface User {
   restrictions?: string[]; // Array of restriction types
   deviceFingerprint?: string; // Unique device/browser fingerprint
   deviceHistory?: string[]; // History of device fingerprints
+  username?: string;
+  bio?: string;
+  preferences?: {
+    emailNotifications: boolean;
+    darkMode: boolean;
+    language: string;
+    timezone: string;
+  };
+  lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,12 +45,15 @@ export interface Deployment {
   _id: ObjectId;
   userId: ObjectId;
   name: string;
-  status: string; // 'active', 'stopped', 'failed', 'insufficient_funds'
+  status: string; // 'deploying', 'active', 'stopped', 'failed', 'insufficient_funds'
   configuration: string;
   cost: number;
   branchName?: string; // GitHub branch name for logs
   lastChargeDate?: Date; // Last time coins were deducted for this deployment
   nextChargeDate?: Date; // When the next charge will occur
+  deploymentLogs?: string[]; // Array of deployment log messages
+  lastLogUpdate?: Date; // Last time logs were updated
+  deploymentReason?: string; // Reason for current status
   createdAt: Date;
   updatedAt: Date;
 }

@@ -499,22 +499,7 @@ export class MongoStorage implements IStorage {
     }
   }
 
-  async updateDeploymentStatus(id: string, status: string): Promise<void> {
-    try {
-      // Validate ObjectId format before creating ObjectId
-      if (!id || typeof id !== 'string' || id.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(id)) {
-        throw new Error(`Invalid ObjectId format: ${id}`);
-      }
-      
-      await this.deploymentsCollection.updateOne(
-        { _id: new ObjectId(id) },
-        { $set: { status, updatedAt: new Date() } }
-      );
-    } catch (error) {
-      console.error(`Error updating deployment status for id ${id}:`, error);
-      throw error;
-    }
-  }
+  // Enhanced method with log monitoring moved to end of class
 
   async deleteDeployment(id: string): Promise<void> {
     try {
@@ -1626,6 +1611,181 @@ export class MongoStorage implements IStorage {
     }
 
     await this.chatMessagesCollection.deleteOne({ _id: new ObjectId(messageId) });
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    try {
+      const user = await this.usersCollection.findOne({ username });
+      return user || undefined;
+    } catch (error) {
+      console.error('Error getting user by username:', error);
+      return undefined;
+    }
+  }
+
+  async updateUserProfile(userId: string, profileData: { 
+    firstName: string; 
+    lastName: string; 
+    username: string; 
+    bio: string; 
+  }): Promise<void> {
+    try {
+      if (!userId || typeof userId !== 'string' || userId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(userId)) {
+        throw new Error('Invalid user ID format');
+      }
+
+      await this.usersCollection.updateOne(
+        { _id: new ObjectId(userId) },
+        { 
+          $set: {
+            firstName: profileData.firstName,
+            lastName: profileData.lastName,
+            username: profileData.username,
+            bio: profileData.bio,
+            updatedAt: new Date()
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      throw error;
+    }
+  }
+
+  async updateUserPreferences(userId: string, preferences: any): Promise<void> {
+    try {
+      if (!userId || typeof userId !== 'string' || userId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(userId)) {
+        throw new Error('Invalid user ID format');
+      }
+
+      await this.usersCollection.updateOne(
+        { _id: new ObjectId(userId) },
+        { 
+          $set: {
+            preferences: preferences,
+            updatedAt: new Date()
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error updating user preferences:', error);
+      throw error;
+    }
+  }
+
+  async updateDeploymentStatus(deploymentId: string, status: string, logs?: string[]): Promise<void> {
+    try {
+      if (!deploymentId || typeof deploymentId !== 'string' || deploymentId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(deploymentId)) {
+        throw new Error('Invalid deployment ID format');
+      }
+
+      const updateData: any = { 
+        status, 
+        updatedAt: new Date() 
+      };
+
+      if (logs) {
+        updateData.deploymentLogs = logs;
+        updateData.lastLogUpdate = new Date();
+      }
+
+      await this.deploymentsCollection.updateOne(
+        { _id: new ObjectId(deploymentId) },
+        { $set: updateData }
+      );
+    } catch (error) {
+      console.error('Error updating deployment status:', error);
+      throw error;
+    }
+  }
+
+  async addDeploymentLogs(deploymentId: string, logs: string[]): Promise<void> {
+    try {
+      if (!deploymentId || typeof deploymentId !== 'string' || deploymentId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(deploymentId)) {
+        throw new Error('Invalid deployment ID format');
+      }
+
+      await this.deploymentsCollection.updateOne(
+        { _id: new ObjectId(deploymentId) },
+        { 
+          $push: { deploymentLogs: { $each: logs } },
+          $set: { lastLogUpdate: new Date() }
+        }
+      );
+    } catch (error) {
+      console.error('Error adding deployment logs:', error);
+      throw error;
+    }
+  }
+
+  async analyzeDeploymentStatus(deploymentId: string): Promise<{ status: string; reason?: string }> {
+    try {
+      const deployment = await this.getDeployment(deploymentId);
+      if (!deployment || !deployment.deploymentLogs) {
+        return { status: 'deploying' };
+      }
+
+      const logs = Array.isArray(deployment.deploymentLogs) ? deployment.deploymentLogs : [];
+      const recentLogs = logs.slice(-50); // Analyze last 50 log entries
+      const logText = recentLogs.join(' ').toLowerCase();
+
+      // Success indicators
+      const successPatterns = [
+        'deployment successful',
+        'deploy complete',
+        'successfully deployed',
+        'deployment finished',
+        'build successful',
+        'started successfully',
+        'server is running',
+        'application started',
+        'workflow completed successfully',
+        'deployment completed'
+      ];
+
+      // Failure indicators
+      const failurePatterns = [
+        'deployment failed',
+        'deploy failed',
+        'error occurred',
+        'build failed',
+        'failed to start',
+        'deployment error',
+        'fatal error',
+        'cannot start',
+        'startup failed',
+        'deployment unsuccessful',
+        'workflow failed',
+        'build error'
+      ];
+
+      // Check for success
+      for (const pattern of successPatterns) {
+        if (logText.includes(pattern)) {
+          return { status: 'active', reason: 'Deployment completed successfully' };
+        }
+      }
+
+      // Check for failure
+      for (const pattern of failurePatterns) {
+        if (logText.includes(pattern)) {
+          return { status: 'failed', reason: 'Deployment failed - check logs for details' };
+        }
+      }
+
+      // If logs haven't been updated in a while, consider it stalled
+      const lastUpdate = deployment.lastLogUpdate || deployment.updatedAt;
+      const timeSinceUpdate = Date.now() - new Date(lastUpdate).getTime();
+      
+      if (timeSinceUpdate > 10 * 60 * 1000) { // 10 minutes
+        return { status: 'failed', reason: 'Deployment timed out' };
+      }
+
+      return { status: 'deploying' };
+    } catch (error) {
+      console.error('Error analyzing deployment logs:', error);
+      return { status: 'failed', reason: 'Error analyzing deployment status' };
+    }
   }
 }
 

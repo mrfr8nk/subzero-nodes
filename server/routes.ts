@@ -3492,6 +3492,141 @@ jobs:
     }
   });
 
+  // User settings API routes
+  app.get('/api/user/profile', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Return user profile with preferences
+      res.json({
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        username: user.username,
+        bio: user.bio,
+        isAdmin: user.isAdmin,
+        role: user.role,
+        status: user.status,
+        coinBalance: user.coinBalance,
+        createdAt: user.createdAt,
+        lastLogin: user.lastLogin,
+        preferences: user.preferences || {
+          emailNotifications: true,
+          darkMode: false,
+          language: 'en',
+          timezone: 'UTC'
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      res.status(500).json({ message: 'Failed to fetch profile' });
+    }
+  });
+
+  app.put('/api/user/profile', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const { firstName, lastName, username, bio } = req.body;
+
+      if (!firstName?.trim()) {
+        return res.status(400).json({ message: 'First name is required' });
+      }
+
+      // Check if username is already taken by another user
+      if (username) {
+        const existingUser = await storage.getUserByUsername(username);
+        if (existingUser && existingUser._id.toString() !== userId) {
+          return res.status(400).json({ message: 'Username already taken' });
+        }
+      }
+
+      await storage.updateUserProfile(userId, {
+        firstName: firstName.trim(),
+        lastName: lastName?.trim() || '',
+        username: username?.trim() || '',
+        bio: bio?.trim() || ''
+      });
+
+      res.json({ message: 'Profile updated successfully' });
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      res.status(500).json({ message: 'Failed to update profile' });
+    }
+  });
+
+  app.put('/api/user/preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const preferences = req.body;
+
+      await storage.updateUserPreferences(userId, preferences);
+      res.json({ message: 'Preferences updated successfully' });
+    } catch (error) {
+      console.error('Error updating user preferences:', error);
+      res.status(500).json({ message: 'Failed to update preferences' });
+    }
+  });
+
+  // Deployment monitoring endpoints
+  app.post('/api/deployments/:id/logs', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { logs } = req.body;
+      
+      if (!Array.isArray(logs)) {
+        return res.status(400).json({ message: 'Logs must be an array' });
+      }
+
+      await storage.addDeploymentLogs(id, logs);
+      
+      // Analyze logs to determine deployment status
+      const analysis = await storage.analyzeDeploymentStatus(id);
+      if (analysis.status !== 'deploying') {
+        await storage.updateDeploymentStatus(id, analysis.status);
+      }
+
+      res.json({ message: 'Logs added successfully', analysis });
+    } catch (error) {
+      console.error('Error adding deployment logs:', error);
+      res.status(500).json({ message: 'Failed to add logs' });
+    }
+  });
+
+  app.get('/api/deployments/:id/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const analysis = await storage.analyzeDeploymentStatus(id);
+      res.json(analysis);
+    } catch (error) {
+      console.error('Error analyzing deployment status:', error);
+      res.status(500).json({ message: 'Failed to analyze status' });
+    }
+  });
+
+  // Auto-check deployment status periodically
+  setInterval(async () => {
+    try {
+      const deployments = await storage.getDeployments();
+      const deployingDeployments = deployments.filter(d => d.status === 'deploying');
+      
+      for (const deployment of deployingDeployments) {
+        const analysis = await storage.analyzeDeploymentStatus(deployment._id.toString());
+        if (analysis.status !== 'deploying') {
+          await storage.updateDeploymentStatus(deployment._id.toString(), analysis.status);
+          console.log(`Updated deployment ${deployment._id} status to: ${analysis.status}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error in deployment status check:', error);
+    }
+  }, 2 * 60 * 1000); // Check every 2 minutes
+
   return httpServer;
 }
 

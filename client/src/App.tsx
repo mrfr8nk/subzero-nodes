@@ -83,6 +83,7 @@ function Router() {
         <Route path="/referrals" component={Referrals} />
         <Route path="/deployments" component={Deployments} />
         <Route path="/deployments/:id" component={DeploymentDetails} />
+        <Route path="/user-settings" component={() => import("./pages/user-settings").then(m => m.default)} />
         <Route path="/account-settings" component={AccountSettings} />
         <Route path="/chat" component={Chat} />
         {isAdmin && <Route path="/admin/dashboard" component={AdminDashboard} />}

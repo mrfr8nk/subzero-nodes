@@ -57,6 +57,8 @@ export default function Deployments() {
         return <Square className="w-5 h-5 text-red-600" />;
       case "insufficient_funds":
         return <AlertTriangle className="w-5 h-5 text-orange-600" />;
+      case "deploying":
+        return <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>;
       default:
         return <PauseCircle className="w-5 h-5 text-gray-600" />;
     }
@@ -72,6 +74,8 @@ export default function Deployments() {
         return "bg-red-100 text-red-800";
       case "insufficient_funds":
         return "bg-orange-100 text-orange-800";
+      case "deploying":
+        return "bg-blue-100 text-blue-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
