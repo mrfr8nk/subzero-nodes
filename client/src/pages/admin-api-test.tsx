@@ -71,7 +71,7 @@ export default function AdminApiTest() {
 
   const deleteBranchesMutation = useMutation({
     mutationFn: async (branchNames: string[]) => {
-      return await apiRequest("DELETE", "/api/admin/github/branches", { branches: branchNames });
+      return await apiRequest("/api/admin/github/branches", "DELETE", { branches: branchNames });
     },
     onSuccess: () => {
       toast({
@@ -92,7 +92,7 @@ export default function AdminApiTest() {
 
   const testTokenMutation = useMutation({
     mutationFn: async (accountId: string) => {
-      return await apiRequest("POST", `/api/admin/github/accounts/test/${accountId}`);
+      return await apiRequest(`/api/admin/github/accounts/test/${accountId}`, "POST");
     },
     onSuccess: (data: any, accountId) => {
       toast({
@@ -117,7 +117,7 @@ export default function AdminApiTest() {
 
   const addAccountMutation = useMutation({
     mutationFn: async (accountData: typeof newAccount) => {
-      return await apiRequest("POST", "/api/admin/github/accounts", accountData);
+      return await apiRequest("/api/admin/github/accounts", "POST", accountData);
     },
     onSuccess: () => {
       toast({
@@ -139,7 +139,7 @@ export default function AdminApiTest() {
 
   const toggleAccountMutation = useMutation({
     mutationFn: async ({ accountId, active }: { accountId: string; active: boolean }) => {
-      return await apiRequest("PUT", `/api/admin/github/accounts/${accountId}/active`, { active });
+      return await apiRequest(`/api/admin/github/accounts/${accountId}/active`, "PUT", { active });
     },
     onSuccess: () => {
       refetchAccounts();

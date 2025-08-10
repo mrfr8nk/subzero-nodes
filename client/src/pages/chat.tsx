@@ -198,6 +198,59 @@ export default function Chat() {
     };
   }, [user, isAdmin, toast]);
 
+  const banUser = async (userId: string, username: string) => {
+    if (!isAdmin) return;
+    
+    try {
+      await apiRequest(`/api/admin/users/${userId}/status`, "PATCH", {
+        status: "banned",
+        restrictions: ["chat_violation"]
+      });
+      
+      toast({
+        title: "User Banned",
+        description: `${username} has been banned from the platform`,
+      });
+      
+      // Remove user from online users list
+      setOnlineUsers(prev => prev.filter(u => u.userId !== userId));
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to ban user",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteMessage = async (messageId: string) => {
+    if (!isAdmin && !user) return;
+    
+    try {
+      const messageToDelete = messages.find(m => m._id === messageId);
+      if (!messageToDelete) return;
+      
+      // Only admins can delete any message, users can only delete their own
+      if (!isAdmin && messageToDelete.userId !== (user?._id?.toString() || user?.email)) return;
+      
+      await apiRequest(`/api/chat/message/${messageId}`, "DELETE");
+      
+      // Remove message from local state
+      setMessages(prev => prev.filter(m => m._id !== messageId));
+      
+      toast({
+        title: "Message Deleted",
+        description: "Message has been deleted successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete message",
+        variant: "destructive",
+      });
+    }
+  };
+
   const sendMessage = () => {
     if (!wsRef.current || !message.trim() || isRestricted) return;
 
@@ -256,24 +309,7 @@ export default function Chat() {
     }
   };
 
-  const deleteMessage = async (messageId: string) => {
-    try {
-      await apiRequest(`/api/chat/messages/${messageId}`, 'DELETE');
-      
-      setMessages(prev => prev.filter(msg => msg._id !== messageId));
-      
-      toast({
-        title: "Success",
-        description: "Message deleted successfully",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete message",
-        variant: "destructive",
-      });
-    }
-  };
+
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -539,13 +575,22 @@ export default function Chat() {
                             </>
                           )}
                           {isAdmin && msg.userId !== (user?._id?.toString() || user?.email) && (
-                            <DropdownMenuItem 
-                              onClick={() => restrictUser(msg.userId)}
-                              className="text-red-600"
-                            >
-                              <Ban className="h-4 w-4 mr-2" />
-                              Restrict User
-                            </DropdownMenuItem>
+                            <>
+                              <DropdownMenuItem 
+                                onClick={() => restrictUser(msg.userId)}
+                                className="text-yellow-600"
+                              >
+                                <Ban className="h-4 w-4 mr-2" />
+                                Restrict User
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => banUser(msg.userId, msg.username)}
+                                className="text-red-600"
+                              >
+                                <Ban className="h-4 w-4 mr-2" />
+                                Ban User
+                              </DropdownMenuItem>
+                            </>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
