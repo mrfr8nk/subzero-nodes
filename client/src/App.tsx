@@ -25,6 +25,7 @@ import AdminDashboard from "@/pages/admin-dashboard";
 import AdminGitHub from "@/pages/admin-github";
 import AdminApiTest from "@/pages/admin-api-test";
 import AccountSettings from "@/pages/account-settings";
+import UserSettings from "@/pages/user-settings";
 import Maintenance from "@/pages/maintenance";
 import Chat from "@/pages/chat";
 import Navbar from "@/components/navbar";
@@ -83,7 +84,7 @@ function Router() {
         <Route path="/referrals" component={Referrals} />
         <Route path="/deployments" component={Deployments} />
         <Route path="/deployments/:id" component={DeploymentDetails} />
-        <Route path="/user-settings" component={() => import("./pages/user-settings").then(m => m.default)} />
+        <Route path="/user-settings" component={UserSettings} />
         <Route path="/account-settings" component={AccountSettings} />
         <Route path="/chat" component={Chat} />
         {isAdmin && <Route path="/admin/dashboard" component={AdminDashboard} />}
