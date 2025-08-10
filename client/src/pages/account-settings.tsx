@@ -39,7 +39,7 @@ export default function AccountSettings() {
   // Delete account mutation
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest('DELETE', '/api/user/account');
+      return await apiRequest('/api/user/account', 'DELETE');
     },
     onSuccess: () => {
       toast({ 
@@ -63,7 +63,7 @@ export default function AccountSettings() {
   // Change password mutation
   const changePasswordMutation = useMutation({
     mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
-      return await apiRequest('POST', '/api/user/change-password', data);
+      return await apiRequest('/api/user/change-password', 'POST', data);
     },
     onSuccess: () => {
       toast({ 

@@ -57,7 +57,7 @@ export default function DeploymentVariablesModal({
   // Create/Update variable mutation
   const createVariableMutation = useMutation({
     mutationFn: async (data: { key: string; value: string; description?: string; isRequired: boolean }) => {
-      await apiRequest("POST", `/api/deployments/${deploymentId}/variables`, data);
+      await apiRequest(`/api/deployments/${deploymentId}/variables`, "POST", data);
     },
     onSuccess: () => {
       toast({
@@ -90,7 +90,7 @@ export default function DeploymentVariablesModal({
   // Update variable mutation
   const updateVariableMutation = useMutation({
     mutationFn: async ({ variableId, value }: { variableId: string; value: string }) => {
-      await apiRequest("PUT", `/api/deployments/${deploymentId}/variables/${variableId}`, { value });
+      await apiRequest(`/api/deployments/${deploymentId}/variables/${variableId}`, "PUT", { value });
     },
     onSuccess: () => {
       toast({
@@ -124,7 +124,7 @@ export default function DeploymentVariablesModal({
   // Delete variable mutation
   const deleteVariableMutation = useMutation({
     mutationFn: async (variableId: string) => {
-      await apiRequest("DELETE", `/api/deployments/${deploymentId}/variables/${variableId}`);
+      await apiRequest(`/api/deployments/${deploymentId}/variables/${variableId}`, "DELETE");
     },
     onSuccess: () => {
       toast({
@@ -156,7 +156,7 @@ export default function DeploymentVariablesModal({
   // Redeploy mutation
   const redeployMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", `/api/deployments/${deploymentId}/redeploy`);
+      await apiRequest(`/api/deployments/${deploymentId}/redeploy`, "POST");
     },
     onSuccess: () => {
       toast({

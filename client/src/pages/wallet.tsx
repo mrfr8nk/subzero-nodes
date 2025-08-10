@@ -79,7 +79,7 @@ export default function Wallet() {
   // Claim coins mutation
   const claimMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", "/api/coins/claim");
+      return await apiRequest("/api/coins/claim", "POST");
     },
     onSuccess: (data: any) => {
       toast({

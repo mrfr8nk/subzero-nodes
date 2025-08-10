@@ -358,7 +358,7 @@ export default function AdminDashboard() {
   // Update user status mutation
   const updateUserStatusMutation = useMutation({
     mutationFn: async ({ userId, status, restrictions }: { userId: string; status: string; restrictions?: string[] }) => {
-      return await apiRequest('PATCH', `/api/admin/users/${userId}/status`, { status, restrictions });
+      return await apiRequest(`/api/admin/users/${userId}/status`, 'PATCH', { status, restrictions });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
@@ -373,7 +373,7 @@ export default function AdminDashboard() {
   // Update user coins mutation
   const updateUserCoinsMutation = useMutation({
     mutationFn: async ({ userId, amount, reason }: { userId: string; amount: number; reason: string }) => {
-      return await apiRequest('PATCH', `/api/admin/users/${userId}/coins`, { amount, reason });
+      return await apiRequest(`/api/admin/users/${userId}/coins`, 'PATCH', { amount, reason });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
@@ -390,7 +390,7 @@ export default function AdminDashboard() {
   // Promote user mutation
   const promoteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      return await apiRequest('PATCH', `/api/admin/users/${userId}/promote`);
+      return await apiRequest(`/api/admin/users/${userId}/promote`, 'PATCH');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
@@ -404,7 +404,7 @@ export default function AdminDashboard() {
   // Demote admin mutation
   const demoteAdminMutation = useMutation({
     mutationFn: async (userId: string) => {
-      return await apiRequest('PATCH', `/api/admin/users/${userId}/demote`);
+      return await apiRequest(`/api/admin/users/${userId}/demote`, 'PATCH');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
@@ -418,7 +418,7 @@ export default function AdminDashboard() {
   // Delete admin mutation
   const deleteAdminMutation = useMutation({
     mutationFn: async (userId: string) => {
-      return await apiRequest('DELETE', `/api/admin/users/${userId}/admin`);
+      return await apiRequest(`/api/admin/users/${userId}/admin`, 'DELETE');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
@@ -434,7 +434,7 @@ export default function AdminDashboard() {
   // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      return await apiRequest('DELETE', `/api/admin/users/${userId}`);
+      return await apiRequest(`/api/admin/users/${userId}`, 'DELETE');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
@@ -450,7 +450,7 @@ export default function AdminDashboard() {
   // Mark notification as read mutation
   const markNotificationReadMutation = useMutation({
     mutationFn: async (notificationId: string) => {
-      return await apiRequest('PATCH', `/api/admin/notifications/${notificationId}/read`);
+      return await apiRequest(`/api/admin/notifications/${notificationId}/read`, 'PATCH');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/notifications'] });
@@ -464,7 +464,7 @@ export default function AdminDashboard() {
   // Delete deployment mutation
   const deleteDeploymentMutation = useMutation({
     mutationFn: async (deploymentId: string) => {
-      return await apiRequest('DELETE', `/api/admin/deployments/${deploymentId}`);
+      return await apiRequest(`/api/admin/deployments/${deploymentId}`, 'DELETE');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/deployments'] });
@@ -480,7 +480,7 @@ export default function AdminDashboard() {
   // Ban device fingerprint mutation
   const banDeviceMutation = useMutation({
     mutationFn: async ({ deviceFingerprint, reason }: { deviceFingerprint: string; reason: string }) => {
-      return await apiRequest('POST', '/api/admin/device/ban', { deviceFingerprint, reason });
+      return await apiRequest('/api/admin/device/ban', 'POST', { deviceFingerprint, reason });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/device/banned'] });
@@ -497,7 +497,7 @@ export default function AdminDashboard() {
   // Unban device fingerprint mutation
   const unbanDeviceMutation = useMutation({
     mutationFn: async (deviceFingerprint: string) => {
-      return await apiRequest('POST', '/api/admin/device/unban', { deviceFingerprint });
+      return await apiRequest('/api/admin/device/unban', 'POST', { deviceFingerprint });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/device/banned'] });
@@ -513,7 +513,7 @@ export default function AdminDashboard() {
   // Update app setting mutation
   const updateSettingMutation = useMutation({
     mutationFn: async ({ key, value, description }: { key: string; value: any; description?: string }) => {
-      return await apiRequest('PUT', `/api/admin/settings/${key}`, { value, description });
+      return await apiRequest(`/api/admin/settings/${key}`, 'PUT', { value, description });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/settings'] });
@@ -527,7 +527,7 @@ export default function AdminDashboard() {
   // Toggle maintenance mode mutation
   const toggleMaintenanceMutation = useMutation({
     mutationFn: async ({ enabled, message, estimatedTime, endTime }: { enabled: boolean; message?: string; estimatedTime?: string; endTime?: string }) => {
-      return await apiRequest('POST', '/api/admin/maintenance/toggle', { enabled, message, estimatedTime, endTime });
+      return await apiRequest('/api/admin/maintenance/toggle', 'POST', { enabled, message, estimatedTime, endTime });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/maintenance/status'] });
@@ -546,7 +546,7 @@ export default function AdminDashboard() {
   // Update currency settings mutation
   const updateCurrencyMutation = useMutation({
     mutationFn: async ({ currency, rate, symbol }: { currency: string; rate: number; symbol: string }) => {
-      return await apiRequest('PUT', '/api/admin/currency', { currency, rate, symbol });
+      return await apiRequest('/api/admin/currency', 'PUT', { currency, rate, symbol });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/currency'] });
@@ -563,7 +563,7 @@ export default function AdminDashboard() {
   // GitHub settings mutation
   const updateGithubSettingsMutation = useMutation({
     mutationFn: async (settings: typeof githubSettings) => {
-      return await apiRequest('PUT', '/api/admin/github/settings', settings);
+      return await apiRequest('/api/admin/github/settings', 'PUT', settings);
     },
     onSuccess: () => {
       refetchGithub();
@@ -578,8 +578,8 @@ export default function AdminDashboard() {
   const updateCostSettingsMutation = useMutation({
     mutationFn: async (costs: typeof costSettings) => {
       await Promise.all([
-        apiRequest('PUT', '/api/admin/settings/deployment_cost', { value: costs.deploymentCost, description: 'Cost to deploy a new bot' }),
-        apiRequest('PUT', '/api/admin/settings/daily_charge', { value: costs.dailyCharge, description: 'Daily charge for running deployments' })
+        apiRequest('/api/admin/settings/deployment_cost', 'PUT', { value: costs.deploymentCost, description: 'Cost to deploy a new bot' }),
+        apiRequest('/api/admin/settings/daily_charge', 'PUT', { value: costs.dailyCharge, description: 'Daily charge for running deployments' })
       ]);
     },
     onSuccess: () => {
@@ -611,7 +611,7 @@ export default function AdminDashboard() {
   // Deployment creation mutation
   const createDeploymentMutation = useMutation({
     mutationFn: async (deploymentData: typeof deploymentForm) => {
-      return await apiRequest('POST', '/api/admin/deployment/deploy', {
+      return await apiRequest('/api/admin/deployment/deploy', 'POST', {
         branchName: deploymentData.appName,
         sessionId: deploymentData.sessionId,
         ownerNumber: deploymentData.ownerNumber,
@@ -2203,7 +2203,7 @@ function CoinClaimManagement() {
 
   const updateClaimConfigMutation = useMutation({
     mutationFn: async (data: { dailyClaimAmount: number }) => {
-      return await apiRequest("POST", "/api/admin/coins/claim-config", data);
+      return await apiRequest("/api/admin/coins/claim-config", "POST", data);
     },
     onSuccess: () => {
       toast({
