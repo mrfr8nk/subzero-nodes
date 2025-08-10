@@ -86,7 +86,7 @@ export default function DeploymentDetails() {
 
   const deleteDeploymentMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/deployments/${id}`);
+      await apiRequest(`/api/deployments/${id}`, "DELETE");
     },
     onSuccess: () => {
       toast({

@@ -56,6 +56,7 @@ export default function DeploymentLogsModal({
   const { data: runLogsData, isLoading: logsLoading, refetch: refetchLogs } = useQuery({
     queryKey: [`/api/deployments/${deploymentId}/runs/${selectedRunId}/logs`],
     enabled: isOpen && !!selectedRunId,
+    refetchInterval: 10000, // Refetch logs every 10 seconds for live updates
   });
 
   const workflowRuns: WorkflowRun[] = (runsData as any)?.workflowRuns || [];
@@ -104,17 +105,23 @@ export default function DeploymentLogsModal({
                 {isAdmin ? 'Admin View' : 'User View'}
               </Badge>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                refetchRuns();
-                if (selectedRunId) refetchLogs();
-              }}
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  refetchRuns();
+                  if (selectedRunId) refetchLogs();
+                }}
+                disabled={runsLoading || logsLoading}
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${runsLoading || logsLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Badge variant="secondary" className="text-xs">
+                Auto-refresh: 10s
+              </Badge>
+            </div>
           </DialogTitle>
         </DialogHeader>
 
@@ -127,7 +134,10 @@ export default function DeploymentLogsModal({
                 <div className="text-center py-4">Loading runs...</div>
               ) : workflowRuns.length === 0 ? (
                 <div className="text-center py-4 text-muted-foreground">
-                  No workflow runs found
+                  <div className="mb-2">No workflow runs found</div>
+                  <div className="text-xs text-yellow-600 dark:text-yellow-400">
+                    This may indicate that GitHub integration is not configured or no builds have been triggered yet.
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -187,7 +197,12 @@ export default function DeploymentLogsModal({
               </div>
             ) : logs.length === 0 ? (
               <div className="h-full flex items-center justify-center text-muted-foreground">
-                No logs available for this run
+                <div className="text-center">
+                  <div className="mb-2">No logs available for this run</div>
+                  <div className="text-xs text-yellow-600 dark:text-yellow-400">
+                    The build may still be in progress or logs haven't been generated yet.
+                  </div>
+                </div>
               </div>
             ) : (
               <Tabs defaultValue={logs[0]?.jobId.toString()} className="h-full">
