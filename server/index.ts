@@ -105,11 +105,21 @@ app.use((req, res, next) => {
   }, 10000); // Wait 10 seconds after startup
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    // Prevent sending multiple responses
+    if (res.headersSent) {
+      return;
+    }
+    
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
+    console.error('Global error handler:', err);
     res.status(status).json({ message });
-    throw err;
+  });
+  
+  // Global unhandled promise rejection handler
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   });
 
   // importantly only setup vite in development and after

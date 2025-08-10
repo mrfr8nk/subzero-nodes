@@ -105,7 +105,14 @@ export async function adminLogin(req: Request, res: Response) {
     req.logIn(adminUser, (err) => {
       if (err) {
         console.error("Admin login error:", err);
+        if (res.headersSent) {
+          return;
+        }
         return res.status(500).json({ message: "Login failed" });
+      }
+      
+      if (res.headersSent) {
+        return;
       }
       
       res.json({
@@ -122,6 +129,9 @@ export async function adminLogin(req: Request, res: Response) {
 
   } catch (error) {
     console.error("Admin login error:", error);
+    if (res.headersSent) {
+      return;
+    }
     res.status(500).json({ message: "Login failed" });
   }
 }

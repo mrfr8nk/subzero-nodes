@@ -5,6 +5,7 @@ import type { Express, RequestHandler } from "express";
 import MongoStore from "connect-mongo";
 import { storage } from "./storage";
 import { connectToMongoDB } from "./db";
+import crypto from "crypto";
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
@@ -13,6 +14,10 @@ export function getSession() {
     mongoUrl: process.env.DATABASE_URL!,
     touchAfter: 24 * 3600, // lazy session update
     ttl: sessionTtl / 1000, // TTL in seconds
+    collectionName: 'sessions',
+    stringify: false,
+    autoRemove: 'native', // Use MongoDB TTL for automatic cleanup
+    autoRemoveInterval: 10, // Check for expired sessions every 10 minutes
   });
 
   return session({
@@ -26,6 +31,9 @@ export function getSession() {
       maxAge: sessionTtl,
       sameSite: (process.env.NODE_ENV === 'production' || !!process.env.KOYEB_PUBLIC_DOMAIN) ? 'none' : 'lax',
     },
+    genid: () => {
+      return crypto.randomBytes(32).toString('hex');
+    }
   });
 }
 
@@ -79,9 +87,26 @@ function getDynamicCallbackURL(): string {
   return 'http://localhost:5000/api/auth/google/callback';
 }
 
+// Function to clean up problematic sessions
+async function cleanupSessions() {
+  try {
+    const db = await connectToMongoDB();
+    // Drop the sessions collection to fix duplicate key issues
+    await db.collection('sessions').drop().catch(() => {
+      // Collection might not exist, ignore the error
+    });
+    console.log('Sessions collection cleaned up');
+  } catch (error) {
+    console.log('Session cleanup completed (collection may not have existed)');
+  }
+}
+
 export async function setupAuth(app: Express) {
   // Ensure MongoDB connection
   await connectToMongoDB();
+  
+  // Clean up sessions on startup to fix duplicate key issues
+  await cleanupSessions();
 
   app.set("trust proxy", 1);
   app.use(getSession());
@@ -114,6 +139,7 @@ export async function setupAuth(app: Express) {
         isAdmin: false,
         restrictions: [],
         ipHistory: [],
+        deviceHistory: [],
       };
 
       // Note: We can't access req object here in the strategy callback
@@ -151,7 +177,7 @@ export async function setupAuth(app: Express) {
         const user = req.user as any;
         if (user) {
           // Get device fingerprint from session if available (set by frontend)
-          const deviceFingerprint = req.session?.deviceFingerprint;
+          const deviceFingerprint = (req.session as any)?.deviceFingerprint;
           
           if (deviceFingerprint && !user.deviceFingerprint) {
             // This is a new user, check for duplicate accounts

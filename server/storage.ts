@@ -146,6 +146,10 @@ export interface IStorage {
   getBestGitHubAccount(): Promise<GitHubAccount | null>;
   updateGitHubAccountUsage(id: string): Promise<void>;
   setGitHubAccountActive(id: string, active: boolean): Promise<void>;
+  testGitHubAccountToken(id: string): Promise<{ isValid: boolean; error?: string; rateLimitRemaining?: number }>;
+  
+  // User password change operations
+  changeUserPassword(userId: string, currentPassword: string, newPassword: string): Promise<void>;
 }
 
 export class MongoStorage implements IStorage {
@@ -1374,6 +1378,89 @@ export class MongoStorage implements IStorage {
       { 
         $set: { 
           isActive: active,
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
+  async testGitHubAccountToken(id: string): Promise<{ isValid: boolean; error?: string; rateLimitRemaining?: number }> {
+    try {
+      const account = await this.githubAccountsCollection.findOne({ _id: new ObjectId(id) });
+      if (!account) {
+        return { isValid: false, error: 'GitHub account not found' };
+      }
+
+      // Test the token by making a request to GitHub API
+      const response = await fetch(`https://api.github.com/repos/${account.owner}/${account.repo}`, {
+        headers: {
+          'Authorization': `token ${account.token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'SUBZERO-Token-Test'
+        }
+      });
+
+      const rateLimitRemaining = parseInt(response.headers.get('X-RateLimit-Remaining') || '0', 10);
+
+      if (response.ok) {
+        return { 
+          isValid: true, 
+          rateLimitRemaining 
+        };
+      } else if (response.status === 401) {
+        return { 
+          isValid: false, 
+          error: 'Invalid or expired token', 
+          rateLimitRemaining 
+        };
+      } else if (response.status === 404) {
+        return { 
+          isValid: false, 
+          error: 'Repository not found or access denied', 
+          rateLimitRemaining 
+        };
+      } else {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        return { 
+          isValid: false, 
+          error: `GitHub API error: ${response.status} ${errorText}`, 
+          rateLimitRemaining 
+        };
+      }
+    } catch (error) {
+      return { 
+        isValid: false, 
+        error: `Network error: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      };
+    }
+  }
+
+  async changeUserPassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const bcrypt = require('bcryptjs');
+    
+    // Get user and verify current password
+    const user = await this.usersCollection.findOne({ _id: new ObjectId(userId) });
+    if (!user) {
+      throw new Error('User not found');
+    }
+    
+    if (!user.password) {
+      throw new Error('Password change not available for this account type');
+    }
+    
+    // Verify current password
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isCurrentPasswordValid) {
+      throw new Error('Current password is incorrect');
+    }
+    
+    // Hash new password and update
+    const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+    await this.usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $set: { 
+          password: hashedNewPassword,
           updatedAt: new Date()
         }
       }

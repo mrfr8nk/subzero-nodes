@@ -9,7 +9,7 @@ import { MessageSquare, Coins, Users, Rocket, Plus, Wallet, Share, Eye, Settings
 import { useLocation } from "wouter";
 
 export default function Dashboard() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -85,7 +85,9 @@ export default function Dashboard() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Dashboard Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="text-dashboard-greeting">
+          Hello, {user?.firstName || user?.email?.split('@')[0] || 'User'}! 
+        </h1>
         <p className="text-muted-foreground">Welcome back! Here's your bot deployment overview.</p>
       </div>
 

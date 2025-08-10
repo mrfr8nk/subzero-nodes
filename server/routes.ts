@@ -455,6 +455,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User password change endpoint
+  app.post('/api/user/change-password', isAuthenticated, async (req: any, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      const userId = req.user._id.toString();
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: 'Current password and new password are required' });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: 'New password must be at least 6 characters long' });
+      }
+
+      await storage.changeUserPassword(userId, currentPassword, newPassword);
+      res.json({ message: 'Password changed successfully' });
+    } catch (error: any) {
+      console.error('Error changing password:', error);
+      if (error.message.includes('not available for this account type')) {
+        return res.status(400).json({ message: 'Password change is not available for Google OAuth accounts' });
+      }
+      if (error.message.includes('Current password is incorrect')) {
+        return res.status(400).json({ message: 'Current password is incorrect' });
+      }
+      res.status(500).json({ message: 'Failed to change password' });
+    }
+  });
+
   // Local email signup route
   app.post('/api/auth/local/signup', async (req, res) => {
     try {
@@ -1921,6 +1949,75 @@ jobs:
     } catch (error) {
       console.error('Error updating GitHub settings:', error);
       res.status(500).json({ message: 'Failed to update GitHub settings' });
+    }
+  });
+
+  // GitHub account management endpoints
+  app.get('/api/admin/github/accounts', requireAdmin, async (req, res) => {
+    try {
+      const accounts = await storage.getAllGitHubAccounts();
+      res.json(accounts);
+    } catch (error) {
+      console.error('Error fetching GitHub accounts:', error);
+      res.status(500).json({ error: 'Failed to fetch GitHub accounts' });
+    }
+  });
+
+  app.post('/api/admin/github/accounts/test/:id', requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await storage.testGitHubAccountToken(id);
+      res.json(result);
+    } catch (error) {
+      console.error('Error testing GitHub token:', error);
+      res.status(500).json({ error: 'Failed to test GitHub token' });
+    }
+  });
+
+  app.post('/api/admin/github/accounts', requireAdmin, async (req, res) => {
+    try {
+      const { name, token, owner, repo, workflowFile } = req.body;
+      
+      if (!name || !token || !owner || !repo) {
+        return res.status(400).json({ error: 'All fields (name, token, owner, repo) are required' });
+      }
+
+      const account = await storage.createGitHubAccount({
+        name,
+        token,
+        owner,
+        repo,
+        workflowFile: workflowFile || 'SUBZERO.yml'
+      });
+
+      res.json(account);
+    } catch (error) {
+      console.error('Error creating GitHub account:', error);
+      res.status(500).json({ error: 'Failed to create GitHub account' });
+    }
+  });
+
+  app.put('/api/admin/github/accounts/:id/active', requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { active } = req.body;
+      
+      await storage.setGitHubAccountActive(id, active);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating GitHub account status:', error);
+      res.status(500).json({ error: 'Failed to update GitHub account status' });
+    }
+  });
+
+  app.delete('/api/admin/github/accounts/:id', requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteGitHubAccount(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting GitHub account:', error);
+      res.status(500).json({ error: 'Failed to delete GitHub account' });
     }
   });
 

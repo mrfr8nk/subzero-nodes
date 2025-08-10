@@ -5,7 +5,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Trash2, GitBranch, Activity, AlertTriangle, CheckCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RefreshCw, Trash2, GitBranch, Activity, AlertTriangle, CheckCircle, TestTube, Plus, Play } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface Branch {
@@ -27,10 +29,30 @@ interface WorkflowRun {
   run_number: number;
 }
 
+interface GitHubAccount {
+  _id: string;
+  name: string;
+  owner: string;
+  repo: string;
+  workflowFile: string;
+  isActive: boolean;
+  createdAt: string;
+  lastUsed?: string;
+}
+
 export default function AdminApiTest() {
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
   const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
+  const [testingTokens, setTestingTokens] = useState<{ [key: string]: boolean }>({});
+  const [showAddAccount, setShowAddAccount] = useState(false);
+  const [newAccount, setNewAccount] = useState({
+    name: '',
+    token: '',
+    owner: '',
+    repo: '',
+    workflowFile: 'SUBZERO.yml'
+  });
 
   const { data: branches, isLoading: branchesLoading, refetch: refetchBranches } = useQuery<Branch[]>({
     queryKey: ["/api/admin/github/branches"],
@@ -39,6 +61,11 @@ export default function AdminApiTest() {
 
   const { data: workflows, isLoading: workflowsLoading, refetch: refetchWorkflows } = useQuery<WorkflowRun[]>({
     queryKey: ["/api/admin/github/workflows"],
+    enabled: !!isAuthenticated && user?.isAdmin,
+  });
+
+  const { data: githubAccounts, isLoading: accountsLoading, refetch: refetchAccounts } = useQuery<GitHubAccount[]>({
+    queryKey: ["/api/admin/github/accounts"],
     enabled: !!isAuthenticated && user?.isAdmin,
   });
 
@@ -58,6 +85,69 @@ export default function AdminApiTest() {
       toast({
         title: "Error",
         description: error?.response?.data?.message || "Failed to delete branches",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const testTokenMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      return await apiRequest("POST", `/api/admin/github/accounts/test/${accountId}`);
+    },
+    onSuccess: (data: any, accountId) => {
+      toast({
+        title: data.isValid ? "Token Valid" : "Token Invalid",
+        description: data.isValid 
+          ? `Token is working. Rate limit: ${data.rateLimitRemaining || 'Unknown'}`
+          : data.error || "Token test failed",
+        variant: data.isValid ? "default" : "destructive",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Test Failed",
+        description: error?.response?.data?.error || "Failed to test token",
+        variant: "destructive",
+      });
+    },
+    onSettled: (_, __, accountId) => {
+      setTestingTokens(prev => ({ ...prev, [accountId]: false }));
+    },
+  });
+
+  const addAccountMutation = useMutation({
+    mutationFn: async (accountData: typeof newAccount) => {
+      return await apiRequest("POST", "/api/admin/github/accounts", accountData);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "GitHub account added successfully!",
+      });
+      setNewAccount({ name: '', token: '', owner: '', repo: '', workflowFile: 'SUBZERO.yml' });
+      setShowAddAccount(false);
+      refetchAccounts();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.error || "Failed to add GitHub account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleAccountMutation = useMutation({
+    mutationFn: async ({ accountId, active }: { accountId: string; active: boolean }) => {
+      return await apiRequest("PUT", `/api/admin/github/accounts/${accountId}/active`, { active });
+    },
+    onSuccess: () => {
+      refetchAccounts();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.error || "Failed to update account status",
         variant: "destructive",
       });
     },
@@ -114,14 +204,39 @@ export default function AdminApiTest() {
     return 'bg-gray-100 text-gray-800';
   };
 
+  const testToken = (accountId: string) => {
+    setTestingTokens(prev => ({ ...prev, [accountId]: true }));
+    testTokenMutation.mutate(accountId);
+  };
+
+  const toggleAccount = (accountId: string, currentStatus: boolean) => {
+    toggleAccountMutation.mutate({ accountId, active: !currentStatus });
+  };
+
+  const addAccount = () => {
+    if (!newAccount.name || !newAccount.token || !newAccount.owner || !newAccount.repo) {
+      toast({
+        title: "Missing Fields",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    addAccountMutation.mutate(newAccount);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">GitHub API Test</h1>
-          <p className="text-muted-foreground">Manage repository branches and monitor workflow activity</p>
+          <p className="text-muted-foreground">Test GitHub accounts and monitor workflow activity</p>
         </div>
         <div className="flex space-x-4">
+          <Button onClick={() => refetchAccounts()} disabled={accountsLoading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${accountsLoading ? 'animate-spin' : ''}`} />
+            Refresh Accounts
+          </Button>
           <Button onClick={() => refetchBranches()} disabled={branchesLoading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${branchesLoading ? 'animate-spin' : ''}`} />
             Refresh Branches
@@ -132,6 +247,142 @@ export default function AdminApiTest() {
           </Button>
         </div>
       </div>
+
+      {/* GitHub Accounts Management */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center space-x-2">
+              <TestTube className="w-5 h-5" />
+              <span>GitHub Accounts ({githubAccounts?.length || 0})</span>
+            </CardTitle>
+            <Button 
+              onClick={() => setShowAddAccount(!showAddAccount)}
+              size="sm"
+              data-testid="button-add-account"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Account
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {showAddAccount && (
+            <div className="border border-border rounded-lg p-4 mb-4 space-y-4">
+              <h3 className="font-medium">Add New GitHub Account</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="name">Account Name</Label>
+                  <Input
+                    id="name"
+                    value={newAccount.name}
+                    onChange={(e) => setNewAccount(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g., Main Account"
+                    data-testid="input-account-name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="token">GitHub Token</Label>
+                  <Input
+                    id="token"
+                    type="password"
+                    value={newAccount.token}
+                    onChange={(e) => setNewAccount(prev => ({ ...prev, token: e.target.value }))}
+                    placeholder="ghp_xxxxxxxxxxxx"
+                    data-testid="input-account-token"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="owner">Repository Owner</Label>
+                  <Input
+                    id="owner"
+                    value={newAccount.owner}
+                    onChange={(e) => setNewAccount(prev => ({ ...prev, owner: e.target.value }))}
+                    placeholder="username or organization"
+                    data-testid="input-account-owner"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="repo">Repository Name</Label>
+                  <Input
+                    id="repo"
+                    value={newAccount.repo}
+                    onChange={(e) => setNewAccount(prev => ({ ...prev, repo: e.target.value }))}
+                    placeholder="repository-name"
+                    data-testid="input-account-repo"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowAddAccount(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={addAccount}
+                  disabled={addAccountMutation.isPending}
+                  data-testid="button-save-account"
+                >
+                  {addAccountMutation.isPending ? "Adding..." : "Add Account"}
+                </Button>
+              </div>
+            </div>
+          )}
+          
+          {accountsLoading ? (
+            <div className="text-muted-foreground">Loading GitHub accounts...</div>
+          ) : githubAccounts && githubAccounts.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {githubAccounts.map((account) => (
+                <div key={account._id} className="border border-border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium">{account.name}</h4>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={account.isActive ? "default" : "secondary"}>
+                        {account.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => testToken(account._id)}
+                        disabled={testingTokens[account._id]}
+                        data-testid={`button-test-token-${account._id}`}
+                      >
+                        {testingTokens[account._id] ? (
+                          <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                        ) : (
+                          <Play className="w-3 h-3 mr-1" />
+                        )}
+                        Test
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={account.isActive ? "destructive" : "default"}
+                        onClick={() => toggleAccount(account._id, account.isActive)}
+                        disabled={toggleAccountMutation.isPending}
+                        data-testid={`button-toggle-${account._id}`}
+                      >
+                        {account.isActive ? "Disable" : "Enable"}
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {account.owner}/{account.repo}
+                  </p>
+                  {account.lastUsed && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Last used: {new Date(account.lastUsed).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-muted-foreground text-center py-8">
+              No GitHub accounts configured. Add one to get started.
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Branch Management */}
       <Card>
