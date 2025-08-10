@@ -81,8 +81,8 @@ export default function Deployments() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Bot Deployments</h1>
-        <p className="text-gray-600">Deploy and manage your SUBZERO-MD WhatsApp bots.</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Bot Deployments</h1>
+        <p className="text-gray-600 dark:text-gray-300">Deploy and manage your SUBZERO-MD WhatsApp bots.</p>
       </div>
 
       {/* Deploy New Bot Button - Made more accessible */}
@@ -114,8 +114,8 @@ export default function Deployments() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Total Bots</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Total Bots</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                   {statsLoading ? "..." : stats?.total || 0}
                 </p>
               </div>
@@ -130,8 +130,8 @@ export default function Deployments() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Active</p>
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Active</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                   {statsLoading ? "..." : stats?.active || 0}
                 </p>
               </div>
@@ -146,8 +146,8 @@ export default function Deployments() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Stopped</p>
-                <p className="text-2xl font-bold text-gray-600">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Stopped</p>
+                <p className="text-2xl font-bold text-gray-600 dark:text-gray-300">
                   {statsLoading ? "..." : stats?.stopped || 0}
                 </p>
               </div>
@@ -162,8 +162,8 @@ export default function Deployments() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">This Month</p>
-                <p className="text-2xl font-bold text-blue-600">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">This Month</p>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                   {statsLoading ? "..." : stats?.thisMonth || 0}
                 </p>
               </div>

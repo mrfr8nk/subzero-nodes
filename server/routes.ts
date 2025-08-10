@@ -3342,13 +3342,22 @@ jobs:
               }
               
               // Create and broadcast message
-              const chatMessage = await storage.createChatMessage({
+              const messageData: any = {
                 userId: chatClient.userId,
                 username: chatClient.username,
                 message: data.message,
                 isAdmin: chatClient.isAdmin,
                 role: chatClient.role
-              });
+              };
+
+              // Add reply data if this is a reply
+              if (data.replyTo) {
+                messageData.replyTo = data.replyTo;
+                messageData.replyToMessage = data.replyToMessage;
+                messageData.replyToUsername = data.replyToUsername;
+              }
+
+              const chatMessage = await storage.createChatMessage(messageData);
               
               broadcastToChatClients('chat_message', {
                 message: {
@@ -3434,6 +3443,55 @@ jobs:
     });
   });
   
+  // Chat API routes for message management
+  app.patch('/api/chat/messages/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { content } = req.body;
+      const userId = req.user._id.toString();
+
+      if (!content || content.trim().length === 0) {
+        return res.status(400).json({ message: 'Message content is required' });
+      }
+
+      await storage.updateChatMessage(id, content.trim(), userId);
+      res.json({ message: 'Message updated successfully' });
+    } catch (error) {
+      console.error('Error updating chat message:', error);
+      res.status(500).json({ message: error instanceof Error ? error.message : 'Failed to update message' });
+    }
+  });
+
+  app.delete('/api/chat/messages/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user._id.toString();
+      const isAdmin = !!req.user.isAdmin;
+
+      await storage.deleteChatMessage(id, userId, isAdmin);
+      res.json({ message: 'Message deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting chat message:', error);
+      res.status(500).json({ message: error instanceof Error ? error.message : 'Failed to delete message' });
+    }
+  });
+
+  app.get('/api/chat/messages/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const message = await storage.getChatMessage(id);
+      
+      if (!message) {
+        return res.status(404).json({ message: 'Message not found' });
+      }
+
+      res.json(message);
+    } catch (error) {
+      console.error('Error fetching chat message:', error);
+      res.status(500).json({ message: 'Failed to fetch message' });
+    }
+  });
+
   return httpServer;
 }
 

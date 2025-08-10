@@ -155,6 +155,18 @@ Add your domain's callback URL to Google Cloud Console OAuth settings:
   - Banned users are automatically logged out when accessing protected routes
   - Enhanced security middleware with forceLogout flag detection
   - Improved user experience with proper error messaging for banned accounts
+- **Enhanced Dark Theme Support**: Fixed font visibility issues in deployments and referrals sections
+  - Updated text colors to be lighter and more readable in dark mode
+  - Improved contrast for better accessibility across all UI components
+  - Consistent color scheme for dark theme throughout the application
+- **Advanced Chat System Features**: Implemented comprehensive message management capabilities
+  - Message replies with visual threading and context preservation
+  - In-line message editing with edit history tracking
+  - Message deletion for users (own messages) and admins (all messages)
+  - Enhanced dropdown menus for message actions (reply, edit, delete)
+  - Real-time updates for edited and deleted messages across all clients
+  - Improved message tagging system with better visual indicators
+  - Enhanced admin controls for user restriction and moderation
 
 ### Deployment Notes
 - Update `FRONTEND_URL` and `BACKEND_URL` in production environment

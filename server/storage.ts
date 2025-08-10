@@ -126,6 +126,9 @@ export interface IStorage {
   // Chat operations
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessages(limit?: number): Promise<ChatMessage[]>;
+  updateChatMessage(messageId: string, content: string, userId: string): Promise<void>;
+  deleteChatMessage(messageId: string, userId: string, isAdmin: boolean): Promise<void>;
+  getChatMessage(messageId: string): Promise<ChatMessage | undefined>;
   restrictUserFromChat(userId: string, restrictedBy: string, reason?: string): Promise<void>;
   unrestrictUserFromChat(userId: string): Promise<void>;
   isChatRestricted(userId: string): Promise<boolean>;
@@ -1560,6 +1563,69 @@ export class MongoStorage implements IStorage {
       deviceFingerprint: fingerprint
     });
     return !!bannedDevice;
+  }
+
+  async getChatMessage(messageId: string): Promise<ChatMessage | undefined> {
+    try {
+      if (!messageId || typeof messageId !== 'string' || messageId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(messageId)) {
+        console.warn(`Invalid ObjectId format: ${messageId}`);
+        return undefined;
+      }
+      
+      const message = await this.chatMessagesCollection.findOne({ _id: new ObjectId(messageId) });
+      return message || undefined;
+    } catch (error) {
+      console.error(`Error getting chat message with id ${messageId}:`, error);
+      return undefined;
+    }
+  }
+
+  async updateChatMessage(messageId: string, content: string, userId: string): Promise<void> {
+    const message = await this.getChatMessage(messageId);
+    if (!message) {
+      throw new Error('Message not found');
+    }
+
+    // Check if user owns the message or is admin
+    if (message.userId.toString() !== userId) {
+      const user = await this.getUser(userId);
+      if (!user?.isAdmin) {
+        throw new Error('Unauthorized to edit this message');
+      }
+    }
+
+    // Add current content to edit history
+    const editHistory = message.editHistory || [];
+    editHistory.push({
+      content: message.message,
+      editedAt: new Date()
+    });
+
+    await this.chatMessagesCollection.updateOne(
+      { _id: new ObjectId(messageId) },
+      { 
+        $set: { 
+          message: content,
+          isEdited: true,
+          editHistory: editHistory,
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
+  async deleteChatMessage(messageId: string, userId: string, isAdmin: boolean): Promise<void> {
+    const message = await this.getChatMessage(messageId);
+    if (!message) {
+      throw new Error('Message not found');
+    }
+
+    // Check if user owns the message or is admin
+    if (message.userId.toString() !== userId && !isAdmin) {
+      throw new Error('Unauthorized to delete this message');
+    }
+
+    await this.chatMessagesCollection.deleteOne({ _id: new ObjectId(messageId) });
   }
 }
 

@@ -87,8 +87,8 @@ export default function Referrals() {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Referral Program</h1>
-        <p className="text-gray-600">Invite friends and earn coins for every successful referral.</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Referral Program</h1>
+        <p className="text-gray-600 dark:text-gray-300">Invite friends and earn coins for every successful referral.</p>
       </div>
 
       {/* Referral Stats */}
@@ -158,7 +158,7 @@ export default function Referrals() {
               Share
             </Button>
           </div>
-          <p className="text-sm text-gray-600 mt-3">
+          <p className="text-sm text-gray-600 dark:text-gray-300 mt-3">
             Share this link with friends and earn <strong>50 coins</strong> for each successful signup!
           </p>
         </CardContent>
@@ -175,22 +175,22 @@ export default function Referrals() {
               <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Share className="w-8 h-8 text-blue-600" />
               </div>
-              <h4 className="font-semibold text-gray-900 mb-2">1. Share Your Link</h4>
-              <p className="text-gray-600 text-sm">Share your unique referral link with friends and family.</p>
+              <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">1. Share Your Link</h4>
+              <p className="text-gray-600 dark:text-gray-300 text-sm">Share your unique referral link with friends and family.</p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <UserPlus className="w-8 h-8 text-green-600" />
               </div>
-              <h4 className="font-semibold text-gray-900 mb-2">2. Friend Signs Up</h4>
-              <p className="text-gray-600 text-sm">When someone signs up using your link, they become your referral.</p>
+              <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">2. Friend Signs Up</h4>
+              <p className="text-gray-600 dark:text-gray-300 text-sm">When someone signs up using your link, they become your referral.</p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Gift className="w-8 h-8 text-purple-600" />
               </div>
-              <h4 className="font-semibold text-gray-900 mb-2">3. Earn Rewards</h4>
-              <p className="text-gray-600 text-sm">You earn 50 coins instantly when they complete registration.</p>
+              <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">3. Earn Rewards</h4>
+              <p className="text-gray-600 dark:text-gray-300 text-sm">You earn 50 coins instantly when they complete registration.</p>
             </div>
           </div>
         </CardContent>
@@ -204,30 +204,30 @@ export default function Referrals() {
         <CardContent>
           <div className="space-y-4">
             {referralsLoading ? (
-              <div className="text-gray-500">Loading referrals...</div>
+              <div className="text-gray-500 dark:text-gray-400">Loading referrals...</div>
             ) : referrals && referrals.length > 0 ? (
               referrals.map((referral: any) => (
-                <div key={referral.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div key={referral.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
                   <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      <UserPlus className="w-5 h-5 text-blue-600" />
+                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                      <UserPlus className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">New Referral</p>
-                      <p className="text-sm text-gray-600">
+                      <p className="font-medium text-gray-900 dark:text-gray-100">New Referral</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
                         Joined {new Date(referral.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
                       +{referral.rewardAmount} coins
                     </span>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="text-gray-500 text-center py-8">No referrals yet</div>
+              <div className="text-gray-500 dark:text-gray-400 text-center py-8">No referrals yet</div>
             )}
           </div>
         </CardContent>

@@ -112,6 +112,11 @@ export interface ChatMessage {
   role?: string; // 'user', 'admin', 'super_admin'
   tags?: string[]; // '@issue', '@request', '@query', etc.
   isTagged?: boolean; // Quick check for admin notifications
+  replyTo?: ObjectId; // ID of the message being replied to
+  replyToMessage?: string; // Content of the original message (for quick display)
+  replyToUsername?: string; // Username of the original message author
+  isEdited?: boolean; // Whether this message has been edited
+  editHistory?: { content: string; editedAt: Date }[]; // History of edits
   createdAt: Date;
   updatedAt: Date;
 }
@@ -239,6 +244,14 @@ export const insertChatMessageSchema = z.object({
   role: z.string().optional(),
   tags: z.string().array().optional(),
   isTagged: z.boolean().optional(),
+  replyTo: z.string().optional(), // ID of the message being replied to
+  replyToMessage: z.string().optional(), // Content of the original message
+  replyToUsername: z.string().optional(), // Username of the original message author
+  isEdited: z.boolean().optional().default(false),
+  editHistory: z.array(z.object({
+    content: z.string(),
+    editedAt: z.date()
+  })).optional(),
 });
 
 export const insertBannedDeviceFingerprintSchema = z.object({
