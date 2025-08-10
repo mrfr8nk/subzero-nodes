@@ -19,7 +19,7 @@ export default function AdminLogin() {
 
   const loginMutation = useMutation({
     mutationFn: async (loginData: { email: string; password: string }) => {
-      return await apiRequest('POST', '/api/admin/login', loginData);
+      return await apiRequest('/api/admin/login', 'POST', loginData);
     },
     onSuccess: () => {
       setLocation('/admin/dashboard');

@@ -26,7 +26,7 @@ import {
   Globe
 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Dialog,
   DialogContent,
@@ -123,15 +123,14 @@ export default function UserSettings() {
   // Update profile mutation
   const updateProfileMutation = useMutation({
     mutationFn: async (data: typeof profileData) => {
-      const response = await apiRequest("/api/user/profile", "PUT", data);
-      return await response.json();
+      return await apiRequest("/api/user/profile", "PUT", data);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/profile"] });
       toast({
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
       });
-      // Profile updated successfully
     },
     onError: (error: any) => {
       toast({
@@ -145,8 +144,7 @@ export default function UserSettings() {
   // Change password mutation
   const changePasswordMutation = useMutation({
     mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
-      const response = await apiRequest("/api/user/change-password", "POST", data);
-      return await response.json();
+      return await apiRequest("/api/user/change-password", "POST", data);
     },
     onSuccess: () => {
       toast({
@@ -167,10 +165,10 @@ export default function UserSettings() {
   // Update preferences mutation
   const updatePreferencesMutation = useMutation({
     mutationFn: async (data: typeof preferences) => {
-      const response = await apiRequest("/api/user/preferences", "PUT", data);
-      return await response.json();
+      return await apiRequest("/api/user/preferences", "PUT", data);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/profile"] });
       toast({
         title: "Preferences Updated",
         description: "Your preferences have been saved.",
@@ -188,8 +186,7 @@ export default function UserSettings() {
   // Delete account mutation
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("/api/user/account", "DELETE");
-      return await response.json();
+      return await apiRequest("/api/user/account", "DELETE");
     },
     onSuccess: () => {
       toast({
