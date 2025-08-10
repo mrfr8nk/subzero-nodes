@@ -106,6 +106,7 @@ interface User {
   status?: string;
   restrictions?: string[];
   coinBalance: number;
+  deviceFingerprint?: string;
   registrationIp?: string;
   lastLoginIp?: string;
   createdAt: string;
