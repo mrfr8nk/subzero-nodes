@@ -38,7 +38,7 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
 
   const githubDeployMutation = useMutation({
     mutationFn: async (data: { branchName: string; sessionId: string; ownerNumber: string; prefix: string }) => {
-      await apiRequest("POST", "/api/deployments/github", data);
+      await apiRequest("/api/deployments/github", "POST", data);
     },
     onSuccess: (data) => {
       toast({
