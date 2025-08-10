@@ -8,8 +8,8 @@ async function throwIfResNotOk(res: Response) {
 }
 
 export async function apiRequest(
-  method: string,
   url: string,
+  method: string,
   data?: unknown | undefined,
 ): Promise<Response> {
   try {
@@ -30,11 +30,11 @@ export async function apiRequest(
 
 // Enhanced API request function for JSON responses
 export async function apiRequestJson<T = any>(
-  method: string,
   url: string,
+  method: string,
   data?: unknown | undefined,
 ): Promise<T> {
-  const res = await apiRequest(method, url, data);
+  const res = await apiRequest(url, method, data);
   
   const text = await res.text();
   if (!text) return {} as T;

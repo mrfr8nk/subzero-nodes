@@ -43,6 +43,7 @@ export interface IStorage {
   deleteDeployment(id: string): Promise<void>;
   getUserDeployments(userId: string): Promise<Deployment[]>;
   getAllDeployments(): Promise<Deployment[]>;
+  getDeployments(): Promise<Deployment[]>;
   getDeployment(id: string): Promise<Deployment | undefined>;
   updateDeploymentStatus(id: string, status: string): Promise<void>;
   getDeploymentStats(userId: string): Promise<{
@@ -52,6 +53,7 @@ export interface IStorage {
     thisMonth: number;
   }>;
   updateDeploymentChargeDate(id: string, lastChargeDate: Date, nextChargeDate: Date): Promise<void>;
+  updateDeploymentStatus(id: string, status: string): Promise<void>;
   getActiveDeploymentsForBilling(): Promise<Deployment[]>;
   
   // Deployment variable operations
@@ -122,6 +124,10 @@ export interface IStorage {
   
   // Daily billing operations
   processDeploymentDailyCharges(): Promise<void>;
+  
+  // Enhanced deployment monitoring operations
+  addDeploymentLogs(deploymentId: string, logs: string[]): Promise<void>;
+  analyzeDeploymentStatus(deploymentId: string): Promise<{ status: string; logs?: string[]; lastCheck?: Date }>;
   
   // Chat operations
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
@@ -481,6 +487,10 @@ export class MongoStorage implements IStorage {
       .find({})
       .sort({ createdAt: -1 })
       .toArray();
+  }
+
+  async getDeployments(): Promise<Deployment[]> {
+    return this.getAllDeployments();
   }
 
   async getDeployment(id: string): Promise<Deployment | undefined> {
@@ -1613,6 +1623,33 @@ export class MongoStorage implements IStorage {
     await this.chatMessagesCollection.deleteOne({ _id: new ObjectId(messageId) });
   }
 
+  // Enhanced deployment monitoring operations
+  async addDeploymentLogs(deploymentId: string, logs: string[]): Promise<void> {
+    try {
+      if (!deploymentId || typeof deploymentId !== 'string' || deploymentId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(deploymentId)) {
+        throw new Error(`Invalid ObjectId format: ${deploymentId}`);
+      }
+      
+      const now = new Date();
+      await this.deploymentsCollection.updateOne(
+        { _id: new ObjectId(deploymentId) },
+        { 
+          $push: { 
+            logs: { 
+              $each: logs.map((log: string) => ({ content: log, timestamp: now }))
+            }
+          },
+          $set: { updatedAt: now }
+        }
+      );
+    } catch (error) {
+      console.error(`Error adding deployment logs for ${deploymentId}:`, error);
+      throw error;
+    }
+  }
+
+
+
   async getUserByUsername(username: string): Promise<User | undefined> {
     try {
       const user = await this.usersCollection.findOne({ username });
@@ -1673,47 +1710,23 @@ export class MongoStorage implements IStorage {
     }
   }
 
-  async updateDeploymentStatus(deploymentId: string, status: string, logs?: string[]): Promise<void> {
+  async updateDeploymentStatus(id: string, status: string): Promise<void> {
     try {
-      if (!deploymentId || typeof deploymentId !== 'string' || deploymentId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(deploymentId)) {
-        throw new Error('Invalid deployment ID format');
+      if (!id || typeof id !== 'string' || id.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(id)) {
+        throw new Error(`Invalid ObjectId format: ${id}`);
       }
-
-      const updateData: any = { 
-        status, 
-        updatedAt: new Date() 
-      };
-
-      if (logs) {
-        updateData.deploymentLogs = logs;
-        updateData.lastLogUpdate = new Date();
-      }
-
+      
       await this.deploymentsCollection.updateOne(
-        { _id: new ObjectId(deploymentId) },
-        { $set: updateData }
-      );
-    } catch (error) {
-      console.error('Error updating deployment status:', error);
-      throw error;
-    }
-  }
-
-  async addDeploymentLogs(deploymentId: string, logs: string[]): Promise<void> {
-    try {
-      if (!deploymentId || typeof deploymentId !== 'string' || deploymentId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(deploymentId)) {
-        throw new Error('Invalid deployment ID format');
-      }
-
-      await this.deploymentsCollection.updateOne(
-        { _id: new ObjectId(deploymentId) },
+        { _id: new ObjectId(id) },
         { 
-          $push: { deploymentLogs: { $each: logs } },
-          $set: { lastLogUpdate: new Date() }
+          $set: { 
+            status, 
+            updatedAt: new Date() 
+          }
         }
       );
     } catch (error) {
-      console.error('Error adding deployment logs:', error);
+      console.error(`Error updating deployment status for ${id}:`, error);
       throw error;
     }
   }
@@ -1721,11 +1734,11 @@ export class MongoStorage implements IStorage {
   async analyzeDeploymentStatus(deploymentId: string): Promise<{ status: string; reason?: string }> {
     try {
       const deployment = await this.getDeployment(deploymentId);
-      if (!deployment || !deployment.deploymentLogs) {
+      if (!deployment || !(deployment as any).deploymentLogs) {
         return { status: 'deploying' };
       }
 
-      const logs = Array.isArray(deployment.deploymentLogs) ? deployment.deploymentLogs : [];
+      const logs = Array.isArray((deployment as any).deploymentLogs) ? (deployment as any).deploymentLogs : [];
       const recentLogs = logs.slice(-50); // Analyze last 50 log entries
       const logText = recentLogs.join(' ').toLowerCase();
 

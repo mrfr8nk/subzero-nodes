@@ -455,6 +455,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User profile routes
+  app.get('/api/user/profile', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      res.json({
+        _id: user._id.toString(),
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        username: user.username,
+        bio: user.bio,
+        isAdmin: user.isAdmin,
+        role: user.role,
+        status: user.status,
+        coinBalance: user.coinBalance,
+        createdAt: user.createdAt.toISOString(),
+        lastLogin: user.lastLogin?.toISOString(),
+        preferences: user.preferences || {}
+      });
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      res.status(500).json({ message: 'Failed to fetch profile' });
+    }
+  });
+
+  app.put('/api/user/profile', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const { firstName, lastName, username, bio } = req.body;
+
+      if (!firstName || !lastName) {
+        return res.status(400).json({ message: 'First name and last name are required' });
+      }
+
+      await storage.updateUserProfile(userId, {
+        firstName,
+        lastName,
+        username: username || '',
+        bio: bio || ''
+      });
+
+      res.json({ message: 'Profile updated successfully' });
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      res.status(500).json({ message: 'Failed to update profile' });
+    }
+  });
+
+  app.put('/api/user/preferences', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const preferences = req.body;
+
+      await storage.updateUserPreferences(userId, preferences);
+      res.json({ message: 'Preferences updated successfully' });
+    } catch (error) {
+      console.error('Error updating user preferences:', error);
+      res.status(500).json({ message: 'Failed to update preferences' });
+    }
+  });
+
   // User password change endpoint
   app.post('/api/user/change-password', isAuthenticated, async (req: any, res) => {
     try {

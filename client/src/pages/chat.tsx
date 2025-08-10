@@ -232,7 +232,7 @@ export default function Chat() {
     if (!editingMessage || !editContent.trim()) return;
 
     try {
-      await apiRequest('PATCH', `/api/chat/messages/${editingMessage}`, {
+      await apiRequest(`/api/chat/messages/${editingMessage}`, 'PATCH', {
         content: editContent.trim()
       });
 
@@ -258,7 +258,7 @@ export default function Chat() {
 
   const deleteMessage = async (messageId: string) => {
     try {
-      await apiRequest('DELETE', `/api/chat/messages/${messageId}`);
+      await apiRequest(`/api/chat/messages/${messageId}`, 'DELETE');
       
       setMessages(prev => prev.filter(msg => msg._id !== messageId));
       

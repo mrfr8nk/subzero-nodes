@@ -67,7 +67,7 @@ interface UserProfile {
 }
 
 export default function UserSettings() {
-  const { user, updateUser } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   
   const [profileData, setProfileData] = useState({
@@ -123,7 +123,7 @@ export default function UserSettings() {
   // Update profile mutation
   const updateProfileMutation = useMutation({
     mutationFn: async (data: typeof profileData) => {
-      const response = await apiRequest("PUT", "/api/user/profile", data);
+      const response = await apiRequest("/api/user/profile", "PUT", data);
       return await response.json();
     },
     onSuccess: () => {
@@ -145,7 +145,7 @@ export default function UserSettings() {
   // Change password mutation
   const changePasswordMutation = useMutation({
     mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
-      const response = await apiRequest("POST", "/api/user/change-password", data);
+      const response = await apiRequest("/api/user/change-password", "POST", data);
       return await response.json();
     },
     onSuccess: () => {
@@ -167,7 +167,7 @@ export default function UserSettings() {
   // Update preferences mutation
   const updatePreferencesMutation = useMutation({
     mutationFn: async (data: typeof preferences) => {
-      const response = await apiRequest("PUT", "/api/user/preferences", data);
+      const response = await apiRequest("/api/user/preferences", "PUT", data);
       return await response.json();
     },
     onSuccess: () => {
@@ -188,7 +188,7 @@ export default function UserSettings() {
   // Delete account mutation
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("DELETE", "/api/user/account");
+      const response = await apiRequest("/api/user/account", "DELETE");
       return await response.json();
     },
     onSuccess: () => {

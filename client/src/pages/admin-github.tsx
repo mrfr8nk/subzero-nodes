@@ -130,6 +130,27 @@ export default function AdminGitHub() {
     },
   });
 
+  const testTokenMutation = useMutation({
+    mutationFn: (id: string) => 
+      apiRequest(`/api/admin/github/accounts/test/${id}`, "POST"),
+    onSuccess: (data: any) => {
+      toast({
+        title: "Token Test Result",
+        description: data.isValid ? 
+          `Token is valid! Rate limit remaining: ${data.rateLimitRemaining || 'Unknown'}` : 
+          `Token is invalid: ${data.error}`,
+        variant: data.isValid ? "default" : "destructive",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to test GitHub token",
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -386,7 +407,17 @@ export default function AdminGitHub() {
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => testTokenMutation.mutate(account._id)}
+                            disabled={testTokenMutation.isPending}
+                            title="Test Token"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleEdit(account)}
+                            title="Edit Account"
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
@@ -395,6 +426,7 @@ export default function AdminGitHub() {
                             size="sm"
                             onClick={() => handleDelete(account._id)}
                             className="text-red-600 hover:text-red-700"
+                            title="Delete Account"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
