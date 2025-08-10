@@ -565,6 +565,17 @@ export class MongoStorage implements IStorage {
   }
 
   async updateUserBalance(userId: string, amount: number): Promise<void> {
+    // If this is a deduction, check if user has enough balance first
+    if (amount < 0) {
+      const user = await this.getUser(userId);
+      if (!user) {
+        throw new Error('User not found');
+      }
+      if (user.coinBalance + amount < 0) {
+        throw new Error('Insufficient coin balance');
+      }
+    }
+
     await this.usersCollection.updateOne(
       { _id: new ObjectId(userId) },
       { 

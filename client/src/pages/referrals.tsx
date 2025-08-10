@@ -206,8 +206,8 @@ export default function Referrals() {
             {referralsLoading ? (
               <div className="text-gray-500 dark:text-gray-400">Loading referrals...</div>
             ) : referrals && referrals.length > 0 ? (
-              referrals.map((referral: any) => (
-                <div key={referral.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+              referrals.map((referral: any, index: number) => (
+                <div key={referral._id || referral.id || index} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
                   <div className="flex items-center space-x-4">
                     <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
                       <UserPlus className="w-5 h-5 text-blue-600 dark:text-blue-400" />

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Rocket, RefreshCw, CheckCircle, AlertTriangle } from "lucide-react";
+import { Rocket, RefreshCw, CheckCircle, AlertTriangle, Bot, Settings, Coins, ExternalLink } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 
@@ -177,10 +177,50 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
         </DialogHeader>
 
         <div className="mt-6 max-h-[60vh] overflow-y-auto pr-2">
-          <form onSubmit={handleGithubSubmit} className="space-y-6">
-          <div>
-            <Label htmlFor="bot-name">Bot Name</Label>
-            <div className="flex space-x-2 mt-2">
+          <form onSubmit={handleGithubSubmit} className="space-y-8">
+          {/* Template Selection */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 p-6 rounded-xl border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center mb-4">
+              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+                <Bot className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">SUBZERO-MD Bot Template</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Advanced WhatsApp bot with premium features</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="flex items-center text-green-700 dark:text-green-400">
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Multi-device support
+              </div>
+              <div className="flex items-center text-green-700 dark:text-green-400">
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Auto-reply system
+              </div>
+              <div className="flex items-center text-green-700 dark:text-green-400">
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Media downloads
+              </div>
+              <div className="flex items-center text-green-700 dark:text-green-400">
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Group management
+              </div>
+            </div>
+          </div>
+
+          {/* Bot Configuration */}
+          <div className="space-y-6">
+            <div className="flex items-center mb-4">
+              <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Bot Configuration</h3>
+            </div>
+
+            <div className="grid gap-6">
+              <div>
+                <Label htmlFor="bot-name" className="text-base font-medium">Bot Name</Label>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Choose a unique identifier for your bot</p>
+                <div className="flex space-x-2 mt-2">
               <Input
                 id="bot-name"
                 type="text"
@@ -232,67 +272,119 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
                 </div>
               </Alert>
             )}
-          </div>
+              </div>
 
-          <div>
-            <Label htmlFor="session-id">Session ID</Label>
-            <Input
-              id="session-id"
-              type="text"
-              placeholder="Your WhatsApp session ID"
-              value={githubForm.sessionId}
-              onChange={(e) => setGithubForm(prev => ({ ...prev, sessionId: e.target.value }))}
-              className="mt-2"
-              disabled={githubDeployMutation.isPending}
-            />
-            <p className="text-sm text-gray-600 mt-1">
-              Don't have session ID? Visit{' '}
-              <a 
-                href="https://subzero-auth.koyeb.app" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-700 underline"
-              >
-                subzero-auth.koyeb.app
-              </a>{' '}
-              to get one
-            </p>
-          </div>
+              <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                <div className="flex items-start">
+                  <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900 rounded-full flex items-center justify-center mr-3 mt-0.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div>
+                    <Label htmlFor="session-id" className="text-base font-medium text-gray-900 dark:text-gray-100">WhatsApp Session ID</Label>
+                    <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">Required for bot authentication with WhatsApp</p>
+                    <Input
+                      id="session-id"
+                      type="text"
+                      placeholder="Paste your session ID here"
+                      value={githubForm.sessionId}
+                      onChange={(e) => setGithubForm(prev => ({ ...prev, sessionId: e.target.value }))}
+                      className="mb-2"
+                      disabled={githubDeployMutation.isPending}
+                    />
+                    <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                      <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+                        <strong>Need a session ID?</strong>
+                      </p>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                        Get your WhatsApp session ID from our secure pairing service:
+                      </p>
+                      <a 
+                        href="https://subzero-auth.koyeb.app" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline text-sm font-medium"
+                      >
+                        subzero-auth.koyeb.app
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-          <div>
-            <Label htmlFor="owner-number">Owner Number</Label>
-            <Input
-              id="owner-number"
-              type="text"
-              placeholder="Your WhatsApp number with country code"
-              value={githubForm.ownerNumber}
-              onChange={(e) => setGithubForm(prev => ({ ...prev, ownerNumber: e.target.value }))}
-              className="mt-2"
-              disabled={githubDeployMutation.isPending}
-            />
-          </div>
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="owner-number" className="text-base font-medium">Owner Number</Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Your WhatsApp number (with country code)</p>
+                  <Input
+                    id="owner-number"
+                    type="text"
+                    placeholder="+1234567890"
+                    value={githubForm.ownerNumber}
+                    onChange={(e) => setGithubForm(prev => ({ ...prev, ownerNumber: e.target.value }))}
+                    disabled={githubDeployMutation.isPending}
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Include country code (e.g., +1 for US)</p>
+                </div>
 
-          <div>
-            <Label htmlFor="prefix">Bot Prefix</Label>
-            <Input
-              id="prefix"
-              type="text"
-              placeholder="Bot command prefix (default: .)"
-              value={githubForm.prefix}
-              onChange={(e) => setGithubForm(prev => ({ ...prev, prefix: e.target.value }))}
-              className="mt-2"
-              disabled={githubDeployMutation.isPending}
-            />
-          </div>
-
-          <div className="bg-blue-50 p-4 rounded-xl">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-700">Deployment Cost:</span>
-              <span className="font-bold text-blue-600">25 coins</span>
+                <div>
+                  <Label htmlFor="prefix" className="text-base font-medium">Command Prefix</Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Symbol to trigger bot commands</p>
+                  <Input
+                    id="prefix"
+                    type="text"
+                    placeholder="."
+                    value={githubForm.prefix}
+                    onChange={(e) => setGithubForm(prev => ({ ...prev, prefix: e.target.value }))}
+                    disabled={githubDeployMutation.isPending}
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Default: "." (dot)</p>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center justify-between mt-2">
-              <span className="text-gray-700">Your Balance:</span>
-              <span className="font-bold text-gray-900">{user?.coinBalance || 0} coins</span>
+          </div>
+
+          {/* Pricing Information */}
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 p-6 rounded-xl border border-green-200 dark:border-green-800">
+            <div className="flex items-center mb-4">
+              <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center mr-3">
+                <Coins className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Deployment Cost</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">One-time setup fee + daily hosting</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-green-200 dark:border-green-800">
+                <div className="text-center">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Setup Fee</p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">25 coins</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-500">One-time payment</p>
+                </div>
+              </div>
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-green-200 dark:border-green-800">
+                <div className="text-center">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Daily Cost</p>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">5 coins</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-500">Per 24 hours</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-green-200 dark:border-green-800">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-700 dark:text-gray-300 font-medium">Your Current Balance</span>
+                <span className={`text-xl font-bold ${(user?.coinBalance || 0) >= 25 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {user?.coinBalance || 0} coins
+                </span>
+              </div>
+              {(user?.coinBalance || 0) < 25 && (
+                <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                  Insufficient balance. You need at least 25 coins to deploy.
+                </p>
+              )}
             </div>
           </div>
 
@@ -314,7 +406,8 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
                 !githubForm.branchName.trim() || 
                 !githubForm.sessionId.trim() || 
                 !githubForm.ownerNumber.trim() ||
-                (branchCheckResult !== null && !branchCheckResult.available)
+                (branchCheckResult !== null && !branchCheckResult.available) ||
+                (user?.coinBalance || 0) < 25
               }
             >
               {githubDeployMutation.isPending ? "Deploying..." : "Deploy Bot"}
