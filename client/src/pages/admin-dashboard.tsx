@@ -321,6 +321,19 @@ export default function AdminDashboard() {
     }
   }, [settings]);
 
+  // Update coin management form values when configs are fetched
+  useEffect(() => {
+    if (deploymentFeeConfig) {
+      setDeploymentFeeForm({ deploymentFee: deploymentFeeConfig.deploymentFee });
+    }
+  }, [deploymentFeeConfig]);
+
+  useEffect(() => {
+    if (dailyChargeConfig) {
+      setDailyChargeForm({ dailyCharge: dailyChargeConfig.dailyCharge });
+    }
+  }, [dailyChargeConfig]);
+
   // Handle WebSocket messages for real-time updates
   useEffect(() => {
     if (lastMessage) {
