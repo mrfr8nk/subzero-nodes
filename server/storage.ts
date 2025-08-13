@@ -339,19 +339,23 @@ export class MongoStorage implements IStorage {
       try {
         const referrer = await this.getUserByReferralCode(userData.referralCode);
         if (referrer && result.insertedId.toString() !== referrer._id.toString()) {
+          // Get referral bonus from admin settings
+          const referralBonusSetting = await this.getAppSetting('referral_bonus');
+          const referralBonus = referralBonusSetting?.value || 10;
+          
           await this.createReferral({
             referrerId: referrer._id.toString(),
             referredId: result.insertedId.toString(),
             rewardClaimed: false,
-            rewardAmount: 50,
+            rewardAmount: referralBonus,
           });
           
           // Award referral bonus
-          await this.updateUserBalance(referrer._id.toString(), 50);
+          await this.updateUserBalance(referrer._id.toString(), referralBonus);
           await this.createTransaction({
             userId: referrer._id.toString(),
             type: "referral",
-            amount: 50,
+            amount: referralBonus,
             description: "Referral bonus for new user signup",
           });
         }
@@ -454,19 +458,23 @@ export class MongoStorage implements IStorage {
       // Handle referral if provided
       if (userData.referredById && user._id.toString() !== userData.referredById) {
         try {
+          // Get referral bonus from admin settings
+          const referralBonusSetting = await this.getAppSetting('referral_bonus');
+          const referralBonus = referralBonusSetting?.value || 10;
+          
           await this.createReferral({
             referrerId: userData.referredById,
             referredId: user._id.toString(),
             rewardClaimed: false,
-            rewardAmount: 50,
+            rewardAmount: referralBonus,
           });
           
           // Award referral bonus
-          await this.updateUserBalance(userData.referredById, 50);
+          await this.updateUserBalance(userData.referredById, referralBonus);
           await this.createTransaction({
             userId: userData.referredById,
             type: "referral",
-            amount: 50,
+            amount: referralBonus,
             description: "Referral bonus for new user signup",
           });
         } catch (error) {
@@ -637,7 +645,7 @@ export class MongoStorage implements IStorage {
       referrerId: new ObjectId(referral.referrerId),
       referredId: new ObjectId(referral.referredId),
       rewardClaimed: referral.rewardClaimed || false,
-      rewardAmount: referral.rewardAmount || 50,
+      rewardAmount: referral.rewardAmount || 10,
       createdAt: now,
     };
 
@@ -1164,9 +1172,9 @@ export class MongoStorage implements IStorage {
     const now = new Date();
     const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    // Get daily charge rate from settings
+    // Get daily charge rate from settings - admin controlled with fallback
     const dailyChargeSetting = await this.getAppSetting('daily_charge');
-    const dailyCharge = dailyChargeSetting?.value || 0;
+    const dailyCharge = dailyChargeSetting?.value || 5;
 
     for (const deployment of activeDeployments) {
       try {
@@ -1174,9 +1182,9 @@ export class MongoStorage implements IStorage {
         const user = await this.getUser(deployment.userId.toString());
         if (!user) continue;
 
-        // Check if user has enough coins (only if dailyCharge > 0)
-        if (dailyCharge > 0 && user.coinBalance < dailyCharge) {
-          // Delete the deployment permanently after 24 hours with insufficient funds
+        // Check if user has enough coins for maintenance charge
+        if (user.coinBalance < dailyCharge) {
+          // Delete the deployment permanently when user has zero balance
           await this.deleteDeployment(deployment._id.toString());
           
           // Create transaction record for failed charge and deletion
@@ -1184,28 +1192,25 @@ export class MongoStorage implements IStorage {
             userId: deployment.userId.toString(),
             type: 'deployment_deleted',
             amount: 0,
-            description: `Deployment deleted permanently: ${deployment.name} (insufficient funds for 24hr maintenance)`,
+            description: `Deployment deleted permanently: ${deployment.name} (insufficient funds - user balance: ${user.coinBalance}, required: ${dailyCharge})`,
             relatedId: deployment._id.toString()
           });
           
-          console.log(`Deleted deployment ${deployment.name} permanently due to insufficient funds for 24hr maintenance`);
+          console.log(`Deleted deployment ${deployment.name} permanently due to insufficient funds (balance: ${user.coinBalance}, required: ${dailyCharge})`);
           continue;
         }
 
-        // Only charge if dailyCharge > 0
-        if (dailyCharge > 0) {
-          // Deduct coins from user
-          await this.updateUserBalance(deployment.userId.toString(), -dailyCharge);
-          
-          // Create transaction record
-          await this.createTransaction({
-            userId: deployment.userId.toString(),
-            type: 'deployment_charge',
-            amount: -dailyCharge,
-            description: `Daily charge for deployment: ${deployment.name}`,
-            relatedId: deployment._id.toString()
-          });
-        }
+        // Deduct daily maintenance charge from user
+        await this.updateUserBalance(deployment.userId.toString(), -dailyCharge);
+        
+        // Create transaction record
+        await this.createTransaction({
+          userId: deployment.userId.toString(),
+          type: 'deployment_charge',
+          amount: -dailyCharge,
+          description: `Daily charge for deployment: ${deployment.name}`,
+          relatedId: deployment._id.toString()
+        });
 
         // Update deployment charge dates
         await this.updateDeploymentChargeDate(

@@ -287,7 +287,7 @@ export const insertReferralSchema = z.object({
   referrerId: z.string(),
   referredId: z.string(),
   rewardClaimed: z.boolean().default(false),
-  rewardAmount: z.number().default(50),
+  rewardAmount: z.number().default(10),
 });
 
 export const insertSessionSchema = z.object({

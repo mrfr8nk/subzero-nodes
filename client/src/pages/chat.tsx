@@ -366,11 +366,10 @@ export default function Chat() {
         const formData = new FormData();
         formData.append('image', imageFile);
         
-        const uploadResponse = await apiRequest('/api/chat/upload-image', 'POST', formData, {
-          'Content-Type': 'multipart/form-data'
-        });
+        const uploadResponse = await apiRequest('/api/chat/upload-image', 'POST', formData);
+        const uploadData = await uploadResponse.json();
 
-        messageData.imageData = uploadResponse.imageData;
+        messageData.imageData = uploadData.imageData;
         messageData.fileName = imageFile.name;
         messageData.fileSize = imageFile.size;
         

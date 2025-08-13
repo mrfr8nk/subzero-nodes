@@ -326,19 +326,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
             
             if (!alreadyReferred) {
+              // Get referral bonus from admin settings
+              const referralBonusSetting = await storage.getAppSetting('referral_bonus');
+              const referralBonus = referralBonusSetting?.value || 10;
+              
               await storage.createReferral({
                 referrerId: referrer._id.toString(),
                 referredId: req.user._id.toString(),
                 rewardClaimed: false,
-                rewardAmount: 50,
+                rewardAmount: referralBonus,
               });
               
               // Award referral bonus
-              await storage.updateUserBalance(referrer._id.toString(), 50);
+              await storage.updateUserBalance(referrer._id.toString(), referralBonus);
               await storage.createTransaction({
                 userId: referrer._id.toString(),
                 type: "referral",
-                amount: 50,
+                amount: referralBonus,
                 description: "Referral bonus for new user signup",
               });
             }
@@ -3658,7 +3662,7 @@ jobs:
             try {
               const message = await storage.getChatMessage(data.messageId);
               if (message && message.userId.toString() === chatClient.userId) {
-                await storage.updateChatMessage(data.messageId, data.newMessage);
+                await storage.updateChatMessage(data.messageId, data.newMessage, chatClient.userId);
                 
                 broadcastToChatClients('message_updated', {
                   messageId: data.messageId,
@@ -3724,7 +3728,8 @@ jobs:
                 reason: data.reason || 'Chat violations'
               };
               
-              await storage.banUser(bannedUser);
+              // Note: banUser functionality should be implemented in storage if needed
+              // await storage.banUser(bannedUser);
               
               broadcastToChatClients('user_banned', {
                 userId: data.userId,

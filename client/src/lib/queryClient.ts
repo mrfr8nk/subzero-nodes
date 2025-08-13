@@ -13,10 +13,21 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   try {
+    let headers: Record<string, string> = {};
+    let body: string | FormData | undefined;
+
+    if (data instanceof FormData) {
+      // For file uploads, let the browser set Content-Type (includes boundary for multipart)
+      body = data;
+    } else if (data) {
+      headers["Content-Type"] = "application/json";
+      body = JSON.stringify(data);
+    }
+
     const res = await fetch(url, {
       method,
-      headers: data ? { "Content-Type": "application/json" } : {},
-      body: data ? JSON.stringify(data) : undefined,
+      headers,
+      body,
       credentials: "include",
     });
 
