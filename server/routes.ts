@@ -3330,7 +3330,7 @@ jobs:
   app.get('/api/admin/coins/daily-charge', requireAdmin, async (req, res) => {
     try {
       const setting = await storage.getAppSetting('daily_charge');
-      const dailyCharge = setting?.value || 2;
+      const dailyCharge = setting?.value || 0; // Default to 0 coins daily maintenance
       res.json({ dailyCharge });
     } catch (error) {
       console.error('Error fetching daily charge:', error);

@@ -1174,33 +1174,38 @@ export class MongoStorage implements IStorage {
         const user = await this.getUser(deployment.userId.toString());
         if (!user) continue;
 
-        // Check if user has enough coins
-        if (user.coinBalance < dailyCharge) {
-          // Stop the deployment and update status
-          await this.updateDeploymentStatus(deployment._id.toString(), 'insufficient_funds');
+        // Check if user has enough coins (only if dailyCharge > 0)
+        if (dailyCharge > 0 && user.coinBalance < dailyCharge) {
+          // Delete the deployment permanently after 24 hours with insufficient funds
+          await this.deleteDeployment(deployment._id.toString());
           
-          // Create transaction record for failed charge
+          // Create transaction record for failed charge and deletion
           await this.createTransaction({
             userId: deployment.userId.toString(),
-            type: 'deployment_charge_failed',
-            amount: -dailyCharge,
-            description: `Failed daily charge for deployment: ${deployment.name} (insufficient funds)`,
+            type: 'deployment_deleted',
+            amount: 0,
+            description: `Deployment deleted permanently: ${deployment.name} (insufficient funds for 24hr maintenance)`,
             relatedId: deployment._id.toString()
           });
+          
+          console.log(`Deleted deployment ${deployment.name} permanently due to insufficient funds for 24hr maintenance`);
           continue;
         }
 
-        // Deduct coins from user
-        await this.updateUserBalance(deployment.userId.toString(), -dailyCharge);
-        
-        // Create transaction record
-        await this.createTransaction({
-          userId: deployment.userId.toString(),
-          type: 'deployment_charge',
-          amount: -dailyCharge,
-          description: `Daily charge for deployment: ${deployment.name}`,
-          relatedId: deployment._id.toString()
-        });
+        // Only charge if dailyCharge > 0
+        if (dailyCharge > 0) {
+          // Deduct coins from user
+          await this.updateUserBalance(deployment.userId.toString(), -dailyCharge);
+          
+          // Create transaction record
+          await this.createTransaction({
+            userId: deployment.userId.toString(),
+            type: 'deployment_charge',
+            amount: -dailyCharge,
+            description: `Daily charge for deployment: ${deployment.name}`,
+            relatedId: deployment._id.toString()
+          });
+        }
 
         // Update deployment charge dates
         await this.updateDeploymentChargeDate(
