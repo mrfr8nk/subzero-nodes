@@ -10,6 +10,10 @@ import { sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail } from 
 import bcrypt from "bcryptjs";
 import { WebSocketServer, WebSocket } from 'ws';
 import crypto from "crypto";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import express from "express";
 
 // Middleware to check if device fingerprint is banned
 async function checkDeviceBan(req: any, res: any, next: any) {
@@ -47,6 +51,26 @@ interface ChatClient {
 }
 
 const chatClients = new Map<string, ChatClient>();
+
+// Configure multer for file uploads
+const uploadDir = path.join(process.cwd(), 'uploads', 'chat-images');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const upload = multer({
+  dest: uploadDir,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
 
 // Function to broadcast to WebSocket clients
 function broadcastToClients(type: string, data: any) {
@@ -3396,6 +3420,43 @@ jobs:
     }
   });
 
+  // Chat image upload endpoint
+  app.post('/api/chat/upload-image', isAuthenticated, upload.single('image'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No image file provided' });
+      }
+
+      // Generate unique filename with timestamp
+      const timestamp = Date.now();
+      const extension = path.extname(req.file.originalname);
+      const filename = `chat_image_${timestamp}_${Math.random().toString(36).substring(2, 8)}${extension}`;
+      const newPath = path.join(uploadDir, filename);
+      
+      // Move file to final destination
+      fs.renameSync(req.file.path, newPath);
+
+      // Return image URL
+      const imageUrl = `/uploads/chat-images/${filename}`;
+      res.json({
+        success: true,
+        imageUrl,
+        fileName: req.file.originalname,
+        fileSize: req.file.size
+      });
+    } catch (error) {
+      console.error('Error uploading chat image:', error);
+      res.status(500).json({ message: 'Failed to upload image' });
+    }
+  });
+
+  // Serve uploaded images
+  app.use('/uploads', (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    next();
+  });
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
   const httpServer = createServer(app);
   
   // Setup WebSocket server
@@ -3514,9 +3575,17 @@ jobs:
                 userId: chatClient.userId,
                 username: chatClient.username,
                 message: data.message,
+                messageType: data.messageType || 'text',
                 isAdmin: chatClient.isAdmin,
                 role: chatClient.role
               };
+
+              // Add image data if this is an image message
+              if (data.messageType === 'image') {
+                messageData.imageUrl = data.imageUrl;
+                messageData.fileName = data.fileName;
+                messageData.fileSize = data.fileSize;
+              }
 
               // Add reply data if this is a reply
               if (data.replyTo) {
@@ -3582,6 +3651,95 @@ jobs:
               ws.send(JSON.stringify({
                 type: 'error',
                 message: 'Failed to unrestrict user'
+              }));
+            }
+          }
+        }
+        else if (data.type === 'update_message') {
+          const chatClient = chatClients.get(clientId);
+          if (chatClient) {
+            try {
+              const message = await storage.getChatMessage(data.messageId);
+              if (message && message.userId.toString() === chatClient.userId) {
+                await storage.updateChatMessage(data.messageId, data.newMessage);
+                
+                broadcastToChatClients('message_updated', {
+                  messageId: data.messageId,
+                  newMessage: data.newMessage,
+                  editedAt: new Date().toISOString()
+                });
+              }
+            } catch (error) {
+              console.error('Error updating message:', error);
+            }
+          }
+        }
+        else if (data.type === 'delete_message') {
+          const chatClient = chatClients.get(clientId);
+          if (chatClient) {
+            try {
+              await storage.deleteChatMessage(data.messageId);
+              
+              broadcastToChatClients('message_deleted', {
+                messageId: data.messageId
+              });
+              
+            } catch (error) {
+              console.error('Error deleting message:', error);
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Failed to delete message'
+              }));
+            }
+          }
+        }
+        else if (data.type === 'delete_selected_messages') {
+          const chatClient = chatClients.get(clientId);
+          if (chatClient && Array.isArray(data.messageIds)) {
+            try {
+              for (const messageId of data.messageIds) {
+                await storage.deleteChatMessage(messageId);
+              }
+              
+              broadcastToChatClients('messages_deleted', {
+                messageIds: data.messageIds
+              });
+              
+            } catch (error) {
+              console.error('Error deleting selected messages:', error);
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Failed to delete selected messages'
+              }));
+            }
+          }
+        }
+        else if (data.type === 'ban_user') {
+          const chatClient = chatClients.get(clientId);
+          if (chatClient && chatClient.isAdmin) {
+            try {
+              // Add user to banned users list
+              const bannedUser = {
+                userId: data.userId,
+                username: data.username,
+                bannedBy: chatClient.userId,
+                bannedAt: new Date(),
+                reason: data.reason || 'Chat violations'
+              };
+              
+              await storage.banUser(bannedUser);
+              
+              broadcastToChatClients('user_banned', {
+                userId: data.userId,
+                bannedBy: chatClient.userId,
+                reason: data.reason
+              });
+              
+            } catch (error) {
+              console.error('Error banning user:', error);
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Failed to ban user'
               }));
             }
           }

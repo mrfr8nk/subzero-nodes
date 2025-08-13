@@ -135,6 +135,10 @@ export interface ChatMessage {
   replyToUsername?: string; // Username of the original message author
   isEdited?: boolean; // Whether this message has been edited
   editHistory?: { content: string; editedAt: Date }[]; // History of edits
+  messageType?: 'text' | 'image' | 'file'; // Type of message
+  imageUrl?: string; // URL for image messages
+  fileName?: string; // Original file name for file messages
+  fileSize?: number; // File size in bytes
   createdAt: Date;
   updatedAt: Date;
 }
@@ -322,6 +326,10 @@ export const insertChatMessageSchema = z.object({
     content: z.string(),
     editedAt: z.date()
   })).optional(),
+  messageType: z.enum(['text', 'image', 'file']).optional().default('text'),
+  imageUrl: z.string().optional(),
+  fileName: z.string().optional(),
+  fileSize: z.number().optional(),
 });
 
 export const insertBannedDeviceFingerprintSchema = z.object({

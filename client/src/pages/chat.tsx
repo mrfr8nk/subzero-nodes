@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Users, Shield, Ban, MessageCircle, Crown, ChevronDown, Reply, Edit3, Trash2, MoreVertical } from "lucide-react";
+import { Send, Users, Shield, Ban, MessageCircle, Crown, ChevronDown, Reply, Edit3, Trash2, MoreVertical, ImagePlus, X, Check, Square, CheckSquare } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
 import { getDeviceFingerprint } from "@/lib/deviceFingerprint";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -31,6 +32,10 @@ interface ChatMessage {
   replyToUsername?: string;
   isEdited?: boolean;
   editHistory?: { content: string; editedAt: string }[];
+  messageType?: 'text' | 'image' | 'file';
+  imageUrl?: string;
+  fileName?: string;
+  fileSize?: number;
   createdAt: string;
 }
 
@@ -53,8 +58,13 @@ export default function Chat() {
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [selectedMessages, setSelectedMessages] = useState<string[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -224,15 +234,7 @@ export default function Chat() {
   };
 
   const deleteMessage = async (messageId: string) => {
-    if (!isAdmin && !user) return;
-    
     try {
-      const messageToDelete = messages.find(m => m._id === messageId);
-      if (!messageToDelete) return;
-      
-      // Only admins can delete any message, users can only delete their own
-      if (!isAdmin && messageToDelete.userId !== (user?._id?.toString() || user?.email)) return;
-      
       await apiRequest(`/api/chat/message/${messageId}`, "DELETE");
       
       // Remove message from local state
@@ -251,12 +253,98 @@ export default function Chat() {
     }
   };
 
-  const sendMessage = () => {
-    if (!wsRef.current || !message.trim() || isRestricted) return;
+  const deleteSelectedMessages = async () => {
+    if (selectedMessages.length === 0) return;
+    
+    try {
+      await Promise.all(
+        selectedMessages.map(messageId => 
+          apiRequest(`/api/chat/message/${messageId}`, "DELETE")
+        )
+      );
+      
+      // Remove messages from local state
+      setMessages(prev => prev.filter(m => !selectedMessages.includes(m._id)));
+      setSelectedMessages([]);
+      setIsSelectionMode(false);
+      
+      toast({
+        title: "Messages Deleted",
+        description: `${selectedMessages.length} messages deleted successfully`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete messages",
+        variant: "destructive",
+      });
+    }
+  };
 
-    const messageData: any = {
+  const toggleMessageSelection = (messageId: string) => {
+    setSelectedMessages(prev => 
+      prev.includes(messageId)
+        ? prev.filter(id => id !== messageId)
+        : [...prev, messageId]
+    );
+  };
+
+  const selectAllMessages = () => {
+    setSelectedMessages(messages.map(m => m._id));
+  };
+
+  const deselectAllMessages = () => {
+    setSelectedMessages([]);
+  };
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select an image under 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select an image file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImagePreview = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!wsRef.current || isRestricted) return;
+    if (!message.trim() && !imageFile) return;
+
+    let messageData: any = {
       type: 'send_message',
-      message: message.trim()
+      message: message.trim() || '',
+      messageType: imageFile ? 'image' : 'text'
     };
 
     if (replyingTo) {
@@ -265,9 +353,34 @@ export default function Chat() {
       messageData.replyToUsername = replyingTo.username;
     }
 
+    // Handle image upload
+    if (imageFile) {
+      try {
+        const formData = new FormData();
+        formData.append('image', imageFile);
+        
+        const uploadResponse = await apiRequest('/api/chat/upload-image', 'POST', formData, {
+          'Content-Type': 'multipart/form-data'
+        });
+
+        messageData.imageUrl = uploadResponse.imageUrl;
+        messageData.fileName = imageFile.name;
+        messageData.fileSize = imageFile.size;
+        
+      } catch (error) {
+        toast({
+          title: "Upload failed",
+          description: "Failed to upload image",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     wsRef.current.send(JSON.stringify(messageData));
     setMessage("");
     setReplyingTo(null);
+    removeImagePreview();
   };
 
   const startReply = (msg: ChatMessage) => {
@@ -468,6 +581,37 @@ export default function Chat() {
           </CardHeader>
           
           <CardContent className="flex-1 flex flex-col p-0">
+            {/* Selection Mode Toolbar */}
+            {isSelectionMode && (
+              <div className="border-b p-3 bg-blue-50 dark:bg-blue-900/20 flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm font-medium">
+                    {selectedMessages.length} message{selectedMessages.length !== 1 ? 's' : ''} selected
+                  </span>
+                  <Button size="sm" variant="outline" onClick={selectAllMessages}>
+                    Select All
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={deselectAllMessages}>
+                    Deselect All
+                  </Button>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button 
+                    size="sm" 
+                    variant="destructive" 
+                    onClick={deleteSelectedMessages}
+                    disabled={selectedMessages.length === 0}
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Delete ({selectedMessages.length})
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setIsSelectionMode(false)}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {!isConnected && (
@@ -482,20 +626,29 @@ export default function Chat() {
               {messages.map((msg) => (
                 <div key={msg._id} className="group">
                   {msg.replyTo && (
-                    <div className="ml-4 mb-2 text-xs bg-blue-50 dark:bg-blue-900/20 p-2 rounded border-l-4 border-blue-400">
-                      <div className="flex items-center space-x-1 mb-1">
-                        <Reply className="w-3 h-3" />
-                        <span className="font-medium text-blue-700 dark:text-blue-300">
-                          Replying to {msg.replyToUsername}:
+                    <div className="ml-12 mb-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-400">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <Reply className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <span className="font-medium text-blue-700 dark:text-blue-300 text-sm">
+                          Replying to {msg.replyToUsername}
                         </span>
                       </div>
-                      <div className="text-gray-600 dark:text-gray-400 truncate">
-                        "{(msg.replyToMessage || '').substring(0, 50)}{(msg.replyToMessage || '').length > 50 ? '...' : ''}"
+                      <div className="text-gray-700 dark:text-gray-300 text-sm p-2 bg-white dark:bg-gray-800 rounded border">
+                        "{(msg.replyToMessage || '').substring(0, 100)}{(msg.replyToMessage || '').length > 100 ? '...' : ''}"
                       </div>
                     </div>
                   )}
                   
                   <div className="flex items-start space-x-3">
+                    {/* Selection checkbox */}
+                    {isSelectionMode && (
+                      <Checkbox
+                        checked={selectedMessages.includes(msg._id)}
+                        onCheckedChange={() => toggleMessageSelection(msg._id)}
+                        className="mt-2"
+                      />
+                    )}
+                    
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${
                       msg.isAdmin ? 'bg-blue-600' : 'bg-gray-600'
                     }`}>
@@ -539,8 +692,30 @@ export default function Chat() {
                           </div>
                         </div>
                       ) : (
-                        <div className="text-gray-800 dark:text-gray-200 text-sm leading-relaxed">
-                          {highlightTags(msg.message)}
+                        <div className="space-y-2">
+                          {/* Image display */}
+                          {msg.messageType === 'image' && msg.imageUrl && (
+                            <div className="max-w-sm">
+                              <img
+                                src={msg.imageUrl}
+                                alt={msg.fileName || 'Shared image'}
+                                className="rounded-lg border max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => window.open(msg.imageUrl, '_blank')}
+                              />
+                              {msg.fileName && (
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                  {msg.fileName} {msg.fileSize && `(${(msg.fileSize / 1024).toFixed(1)} KB)`}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Text message */}
+                          {msg.message && (
+                            <div className="text-gray-800 dark:text-gray-200 text-sm leading-relaxed">
+                              {highlightTags(msg.message)}
+                            </div>
+                          )}
                         </div>
                       )}
                       
@@ -567,6 +742,10 @@ export default function Chat() {
                             <Reply className="h-4 w-4 mr-2" />
                             Reply
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setIsSelectionMode(true)}>
+                            <CheckSquare className="h-4 w-4 mr-2" />
+                            Select Messages
+                          </DropdownMenuItem>
                           
                           {/* Quick Reply Shortcuts */}
                           <DropdownMenuItem onClick={() => {
@@ -590,21 +769,17 @@ export default function Chat() {
                             <span className="mr-2">✅</span>
                             Mark Solved
                           </DropdownMenuItem>
-                          {(msg.userId === (user?._id?.toString() || user?.email) || isAdmin) && (
-                            <>
-                              <DropdownMenuItem onClick={() => startEdit(msg)}>
-                                <Edit3 className="h-4 w-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => deleteMessage(msg._id)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </>
-                          )}
+                          <DropdownMenuItem onClick={() => startEdit(msg)}>
+                            <Edit3 className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => deleteMessage(msg._id)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
                           {isAdmin && msg.userId !== (user?._id?.toString() || user?.email) && (
                             <>
                               <DropdownMenuItem 
@@ -633,21 +808,59 @@ export default function Chat() {
             </div>
             
             {/* Message Input */}
-            <div className="border-t p-4 flex-shrink-0">
+            <div className="border-t p-4 flex-shrink-0 space-y-3">
               {replyingTo && (
-                <div className="mb-3 p-2 bg-gray-100 dark:bg-gray-800 rounded border-l-4 border-blue-500">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm">
-                      <span className="font-medium">Replying to {replyingTo.username}:</span>
-                      <p className="text-muted-foreground truncate">{replyingTo.message}</p>
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border-l-4 border-blue-400">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <Reply className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                          Replying to {replyingTo.username}
+                        </span>
+                      </div>
+                      <div className="text-sm p-2 bg-white dark:bg-gray-800 rounded border">
+                        <div className="text-gray-700 dark:text-gray-300">
+                          "{replyingTo.message.substring(0, 100)}{replyingTo.message.length > 100 ? '...' : ''}"
+                        </div>
+                      </div>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => setReplyingTo(null)}
-                      className="text-muted-foreground hover:text-foreground"
+                      className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 ml-2"
                     >
-                      ×
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Image Preview */}
+              {imagePreview && (
+                <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg border">
+                  <div className="flex items-start space-x-3">
+                    <img
+                      src={imagePreview}
+                      alt="Image preview"
+                      className="w-20 h-20 object-cover rounded border"
+                    />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {imageFile?.name}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {imageFile && `${(imageFile.size / 1024).toFixed(1)} KB`}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={removeImagePreview}
+                      className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    >
+                      <X className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
@@ -666,6 +879,23 @@ export default function Chat() {
                     💡 Use <span className="font-medium text-blue-600 dark:text-blue-400">@issue</span>, <span className="font-medium text-yellow-600 dark:text-yellow-400">@request</span>, or <span className="font-medium text-green-600 dark:text-green-400">@query</span> to notify admins
                   </div>
                   <div className="flex space-x-2">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImageUpload}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isRestricted || !isConnected}
+                      className="flex-shrink-0"
+                      title="Upload image"
+                    >
+                      <ImagePlus className="w-4 h-4" />
+                    </Button>
                     <Input
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
@@ -674,14 +904,17 @@ export default function Chat() {
                       className="flex-1"
                       maxLength={500}
                       disabled={isRestricted || !isConnected}
-                  />
+                    />
                     <Button 
                       onClick={sendMessage} 
-                      disabled={!message.trim() || isRestricted || !isConnected}
+                      disabled={(!message.trim() && !imageFile) || isRestricted || !isConnected}
                       size="sm"
                     >
                       <Send className="w-4 h-4" />
                     </Button>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Press Enter to send • Shift+Enter for new line • Images up to 5MB
                   </div>
                 </div>
               )}
