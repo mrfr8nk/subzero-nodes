@@ -147,6 +147,9 @@ export default function AdminDashboard() {
   const [selectedSection, setSelectedSection] = useState("users");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [coinAdjustment, setCoinAdjustment] = useState({ amount: 0, reason: "" });
+  const [userSearchTerm, setUserSearchTerm] = useState("");
+  const [bannedUserSearchTerm, setBannedUserSearchTerm] = useState("");
+  const [deploymentSearchTerm, setDeploymentSearchTerm] = useState("");
   const [maintenanceForm, setMaintenanceForm] = useState({ 
     message: '', 
     estimatedTime: '',
@@ -167,6 +170,24 @@ export default function AdminDashboard() {
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ['/api/admin/users'],
     staleTime: 60000, // 1 minute
+  });
+
+  // Fetch users with countries
+  const { data: usersWithCountries = [] } = useQuery({
+    queryKey: ["/api/admin/users/countries"],
+    enabled: selectedSection === "users-countries",
+  });
+
+  // Fetch banned users
+  const { data: bannedUsers = [] } = useQuery({
+    queryKey: ["/api/admin/banned-users"],
+    enabled: selectedSection === "banned-users",
+  });
+
+  // Fetch all deployments
+  const { data: allDeployments = [] } = useQuery({
+    queryKey: ["/api/admin/deployments"],
+    enabled: selectedSection === "all-deployments",
   });
 
   // Fetch notifications
@@ -200,8 +221,8 @@ export default function AdminDashboard() {
   });
 
   // Fetch all deployments for logs dropdown
-  const { data: allDeployments = [] } = useQuery<any[]>({
-    queryKey: ['/api/admin/deployments'],
+  const { data: deploymentsForLogs = [] } = useQuery<any[]>({
+    queryKey: ['/api/admin/deployments-logs'],
     staleTime: 30000,
   });
 
@@ -398,6 +419,36 @@ export default function AdminDashboard() {
     },
     onError: (error: any) => {
       toast({ title: "Failed to promote user", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Ban user mutation
+  const banUserMutation = useMutation({
+    mutationFn: async ({ userId, reason }: { userId: string; reason: string }) => {
+      return await apiRequest(`/api/admin/users/${userId}/ban`, 'POST', { reason });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/banned-users'] });
+      toast({ title: "User banned successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to ban user", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Unban user mutation
+  const unbanUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest(`/api/admin/users/${userId}/unban`, 'POST');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/banned-users'] });
+      toast({ title: "User unbanned successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to unban user", description: error.message, variant: "destructive" });
     }
   });
 
@@ -814,6 +865,24 @@ export default function AdminDashboard() {
                     User Management
                   </div>
                 </SelectItem>
+                <SelectItem value="users-countries">
+                  <div className="flex items-center">
+                    <Globe className="w-4 h-4 mr-2" />
+                    Users & Countries
+                  </div>
+                </SelectItem>
+                <SelectItem value="banned-users">
+                  <div className="flex items-center">
+                    <UserX className="w-4 h-4 mr-2" />
+                    Banned Users
+                  </div>
+                </SelectItem>
+                <SelectItem value="all-deployments">
+                  <div className="flex items-center">
+                    <Hash className="w-4 h-4 mr-2" />
+                    All Deployments
+                  </div>
+                </SelectItem>
                 <SelectItem value="notifications">
                   <div className="flex items-center">
                     <Bell className="w-4 h-4 mr-2" />
@@ -1108,6 +1177,306 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
+          </div>
+        )}
+
+        {selectedSection === "users-countries" && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Globe className="h-5 w-5" />
+                  <span>Users & Countries</span>
+                </CardTitle>
+                <CardDescription>View users with their country information</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Search */}
+                  <div className="flex items-center space-x-2">
+                    <Search className="h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search by name or country..."
+                      value={userSearchTerm}
+                      onChange={(e) => setUserSearchTerm(e.target.value)}
+                      className="max-w-sm"
+                    />
+                  </div>
+
+                  {/* Users table */}
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>User</TableHead>
+                          <TableHead>Country</TableHead>
+                          <TableHead>Join Date</TableHead>
+                          <TableHead>Coins</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {usersWithCountries
+                          .filter((user: any) => 
+                            !userSearchTerm || 
+                            `${user.firstName} ${user.lastName}`.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                            user.email.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                            (user.country && user.country.toLowerCase().includes(userSearchTerm.toLowerCase()))
+                          )
+                          .map((user: any) => (
+                            <TableRow key={user._id}>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium">{user.firstName} {user.lastName}</div>
+                                  <div className="text-sm text-muted-foreground">{user.email}</div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center space-x-2">
+                                  <Globe className="h-4 w-4 text-gray-400" />
+                                  <span>{user.country || 'Unknown'}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center space-x-2">
+                                  <Calendar className="h-4 w-4 text-gray-400" />
+                                  <span>{format(new Date(user.createdAt), "MMM d, yyyy")}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>{user.coinBalance || 0} coins</TableCell>
+                              <TableCell>
+                                <Badge variant={user.status === 'banned' ? 'destructive' : 'default'}>
+                                  {user.status || 'Active'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center space-x-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const reason = prompt("Enter reason for ban:");
+                                      if (reason) {
+                                        banUserMutation.mutate({ userId: user._id, reason });
+                                      }
+                                    }}
+                                    disabled={user.status === 'banned'}
+                                  >
+                                    <Ban className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {selectedSection === "banned-users" && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <UserX className="h-5 w-5" />
+                  <span>Banned Users</span>
+                </CardTitle>
+                <CardDescription>Manage banned users and review ban reasons</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Search */}
+                  <div className="flex items-center space-x-2">
+                    <Search className="h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search banned users..."
+                      value={bannedUserSearchTerm}
+                      onChange={(e) => setBannedUserSearchTerm(e.target.value)}
+                      className="max-w-sm"
+                    />
+                  </div>
+
+                  {bannedUsers.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <UserX className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No banned users</p>
+                    </div>
+                  ) : (
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>User</TableHead>
+                            <TableHead>Reason</TableHead>
+                            <TableHead>Banned Date</TableHead>
+                            <TableHead>Banned By</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {bannedUsers
+                            .filter((ban: any) => 
+                              !bannedUserSearchTerm || 
+                              ban.userEmail.toLowerCase().includes(bannedUserSearchTerm.toLowerCase()) ||
+                              ban.reason.toLowerCase().includes(bannedUserSearchTerm.toLowerCase())
+                            )
+                            .map((ban: any) => (
+                              <TableRow key={ban._id}>
+                                <TableCell>
+                                  <div>
+                                    <div className="font-medium">{ban.userEmail}</div>
+                                    <div className="text-sm text-muted-foreground">ID: {ban.userId}</div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="max-w-xs">
+                                    <p className="text-sm">{ban.reason}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  {format(new Date(ban.bannedAt), "MMM d, yyyy 'at' h:mm a")}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="text-sm">
+                                    {ban.bannedBy || 'System'}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => unbanUserMutation.mutate(ban.userId)}
+                                    disabled={unbanUserMutation.isPending}
+                                  >
+                                    <CheckCircle className="w-4 h-4 mr-1" />
+                                    Unban
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {selectedSection === "all-deployments" && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Hash className="h-5 w-5" />
+                  <span>All Deployments</span>
+                </CardTitle>
+                <CardDescription>View all deployments across all users with deployment numbers</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Search */}
+                  <div className="flex items-center space-x-2">
+                    <Search className="h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search deployments..."
+                      value={deploymentSearchTerm}
+                      onChange={(e) => setDeploymentSearchTerm(e.target.value)}
+                      className="max-w-sm"
+                    />
+                  </div>
+
+                  {allDeployments.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Hash className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No deployments found</p>
+                    </div>
+                  ) : (
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>#</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead>User</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Cost</TableHead>
+                            <TableHead>Created</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {allDeployments
+                            .filter((deployment: any) => 
+                              !deploymentSearchTerm || 
+                              deployment.name.toLowerCase().includes(deploymentSearchTerm.toLowerCase()) ||
+                              deployment.userEmail.toLowerCase().includes(deploymentSearchTerm.toLowerCase())
+                            )
+                            .map((deployment: any) => (
+                              <TableRow key={deployment._id}>
+                                <TableCell>
+                                  <Badge variant="outline">
+                                    #{deployment.deploymentNumber || 'N/A'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <div>
+                                    <div className="font-medium">{deployment.name}</div>
+                                    <div className="text-sm text-muted-foreground">
+                                      {deployment.type === 'github' ? 'GitHub' : 'Regular'}
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div>
+                                    <div className="text-sm">{deployment.userEmail}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                      ID: {deployment.userId}
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={
+                                    deployment.status === 'active' ? 'default' :
+                                    deployment.status === 'failed' ? 'destructive' :
+                                    'secondary'
+                                  }>
+                                    {deployment.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  {deployment.cost || 0} coins
+                                </TableCell>
+                                <TableCell>
+                                  {format(new Date(deployment.createdAt), "MMM d, yyyy")}
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      // Navigate to deployment details or show logs
+                                      window.open(`/deployments/${deployment._id}`, '_blank');
+                                    }}
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 

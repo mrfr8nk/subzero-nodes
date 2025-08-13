@@ -36,6 +36,10 @@ export interface User {
     language: string;
     timezone: string;
   };
+  // Location data
+  country?: string; // User's country from IP geolocation
+  registrationIp?: string; // IP address used during registration
+  lastLoginIp?: string; // Last login IP address
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -54,6 +58,8 @@ export interface Deployment {
   deploymentLogs?: string[]; // Array of deployment log messages
   lastLogUpdate?: Date; // Last time logs were updated
   deploymentReason?: string; // Reason for current status
+  deploymentNumber?: number; // Sequential deployment number for user
+  totalDeployments?: number; // Total deployments count for this user
   createdAt: Date;
   updatedAt: Date;
 }
@@ -165,6 +171,35 @@ export interface GitHubAccount {
   updatedAt: Date;
 }
 
+export interface CoinTransfer {
+  _id: ObjectId;
+  fromUserId: ObjectId;
+  toUserId: ObjectId;
+  fromEmail: string; // Email of sender
+  toEmailOrUsername: string; // Email or username of recipient
+  amount: number;
+  message?: string; // Optional message with the transfer
+  status: string; // 'pending', 'completed', 'failed', 'cancelled'
+  transactionId?: ObjectId; // Related transaction ID
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface BannedUser {
+  _id: ObjectId;
+  userId: ObjectId;
+  email: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  reason: string;
+  bannedBy: ObjectId; // Admin who banned the user
+  bannedAt: Date;
+  country?: string;
+  deviceFingerprints?: string[];
+  isActive: boolean; // Can be unbanned by setting to false
+}
+
 // Zod schemas for validation
 export const insertUserSchema = z.object({
   googleId: z.string().optional(),
@@ -218,6 +253,29 @@ export const insertTransactionSchema = z.object({
   amount: z.number(),
   description: z.string(),
   relatedId: z.string().optional(),
+});
+
+export const insertCoinTransferSchema = z.object({
+  fromUserId: z.string(),
+  toUserId: z.string(),
+  fromEmail: z.string().email(),
+  toEmailOrUsername: z.string(),
+  amount: z.number().positive(),
+  message: z.string().optional(),
+  status: z.string().default('pending'),
+});
+
+export const insertBannedUserSchema = z.object({
+  userId: z.string(),
+  email: z.string().email(),
+  username: z.string().optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  reason: z.string(),
+  bannedBy: z.string(),
+  country: z.string().optional(),
+  deviceFingerprints: z.string().array().optional(),
+  isActive: z.boolean().default(true),
 });
 
 export const insertReferralSchema = z.object({
@@ -284,6 +342,8 @@ export type InsertAppSettings = z.infer<typeof insertAppSettingsSchema>;
 export type InsertDeploymentVariable = z.infer<typeof insertDeploymentVariableSchema>;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type InsertBannedDeviceFingerprint = z.infer<typeof insertBannedDeviceFingerprintSchema>;
+export type InsertCoinTransfer = z.infer<typeof insertCoinTransferSchema>;
+export type InsertBannedUser = z.infer<typeof insertBannedUserSchema>;
 
 // For backward compatibility
 export type UpsertUser = InsertUser;

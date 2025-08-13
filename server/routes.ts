@@ -5,7 +5,7 @@ import cors from "cors";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./googleAuth";
 import { adminLogin, requireAdmin, requireSuperAdmin } from "./adminAuth";
-import { insertDeploymentSchema, insertTransactionSchema, insertAppSettingsSchema } from "@shared/schema";
+import { insertDeploymentSchema, insertTransactionSchema, insertAppSettingsSchema, insertCoinTransferSchema, insertBannedUserSchema } from "@shared/schema";
 import { sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail } from "./emailService";
 import bcrypt from "bcryptjs";
 import { WebSocketServer, WebSocket } from 'ws';
@@ -1052,9 +1052,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const now = new Date();
       const nextChargeDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
       
+      // Get deployment number for user
+      const deploymentNumber = await storage.getNextDeploymentNumber(userId);
+      
       const deploymentData = insertDeploymentSchema.parse({
         ...req.body,
         userId,
+        deploymentNumber,
         lastChargeDate: now,
         nextChargeDate: nextChargeDate,
       });
@@ -1101,6 +1105,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: `Insufficient coins. You need ${cost} coins to deploy this bot. You currently have ${userBalance} coins.` 
         });
       }
+
+      // Get deployment number for user
+      const deploymentNumber = await storage.getNextDeploymentNumber(userId);
 
       // Get the best available GitHub account
       const githubAccount = await storage.getBestGitHubAccount();
@@ -1314,6 +1321,7 @@ jobs:
           userId,
           name: sanitizedBranchName,
           branchName: sanitizedBranchName,
+          deploymentNumber,
           status: "deploying",
           configuration: `GitHub: ${sanitizedBranchName}`,
           cost,
@@ -1514,10 +1522,14 @@ jobs:
         description: 'Daily coin claim reward'
       });
 
+      // Get updated user balance
+      const updatedUser = await storage.getUser(userId);
+      const newBalance = updatedUser?.coinBalance || (user.coinBalance + claimAmount);
+
       res.json({
         message: 'Coins claimed successfully',
         amount: claimAmount,
-        newBalance: user.coinBalance + claimAmount
+        newBalance: newBalance
       });
     } catch (error) {
       console.error('Error claiming coins:', error);
@@ -3676,23 +3688,248 @@ jobs:
     }
   });
 
-  // Auto-check deployment status periodically
-  setInterval(async () => {
+  // Coin transfer routes
+  app.post('/api/coins/transfer', isAuthenticated, async (req: any, res) => {
     try {
-      const deployments = await storage.getDeployments();
-      const deployingDeployments = deployments.filter(d => d.status === 'deploying');
-      
-      for (const deployment of deployingDeployments) {
-        const analysis = await storage.analyzeDeploymentStatus(deployment._id.toString());
-        if (analysis.status !== 'deploying') {
-          await storage.updateDeploymentStatus(deployment._id.toString(), analysis.status);
-          console.log(`Updated deployment ${deployment._id} status to: ${analysis.status}`);
-        }
+      const senderId = req.user._id.toString();
+      const { toEmailOrUsername, amount, message } = req.body;
+
+      if (!toEmailOrUsername || !amount || amount <= 0) {
+        return res.status(400).json({ message: 'Valid recipient and positive amount required' });
       }
+
+      // Find recipient
+      const recipient = await storage.getUserByUsernameOrEmail(toEmailOrUsername);
+      if (!recipient) {
+        return res.status(404).json({ message: 'Recipient not found' });
+      }
+
+      // Check if trying to send to self
+      if (senderId === recipient._id.toString()) {
+        return res.status(400).json({ message: 'Cannot send coins to yourself' });
+      }
+
+      const sender = await storage.getUser(senderId);
+      if (!sender) {
+        return res.status(404).json({ message: 'Sender not found' });
+      }
+
+      // Check balance
+      if (sender.coinBalance < amount) {
+        return res.status(400).json({ message: 'Insufficient balance' });
+      }
+
+      // Create transfer
+      const transfer = await storage.createCoinTransfer({
+        fromUserId: senderId,
+        toUserId: recipient._id.toString(),
+        fromEmail: sender.email,
+        toEmailOrUsername,
+        amount,
+        message: message || '',
+        status: 'pending'
+      });
+
+      // Process transfer immediately
+      await storage.processCoinTransfer(transfer._id.toString());
+
+      res.json({
+        message: 'Coins transferred successfully',
+        amount,
+        recipient: toEmailOrUsername,
+        transferId: transfer._id
+      });
     } catch (error) {
-      console.error('Error in deployment status check:', error);
+      console.error('Error transferring coins:', error);
+      res.status(500).json({ message: error.message || 'Failed to transfer coins' });
     }
-  }, 2 * 60 * 1000); // Check every 2 minutes
+  });
+
+  // Get user's coin transfers
+  app.get('/api/coins/transfers', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const transfers = await storage.getCoinTransfers(userId);
+      res.json(transfers);
+    } catch (error) {
+      console.error('Error fetching transfers:', error);
+      res.status(500).json({ message: 'Failed to fetch transfers' });
+    }
+  });
+
+  // Admin: Get all deployments with numbers
+  app.get('/api/admin/deployments/all', requireAdmin, async (req, res) => {
+    try {
+      const deployments = await storage.getAllDeployments();
+      
+      // Add deployment numbers for each user
+      const deploymentsWithNumbers = await Promise.all(
+        deployments.map(async (deployment) => {
+          const totalDeployments = await storage.getUserTotalDeployments(deployment.userId.toString());
+          const deploymentNumber = await storage.getNextDeploymentNumber(deployment.userId.toString()) - 1;
+          
+          return {
+            ...deployment,
+            deploymentNumber,
+            totalDeployments
+          };
+        })
+      );
+      
+      res.json(deploymentsWithNumbers);
+    } catch (error) {
+      console.error('Error fetching all deployments:', error);
+      res.status(500).json({ message: 'Failed to fetch deployments' });
+    }
+  });
+
+  // Admin: Get users with country information
+  app.get('/api/admin/users/countries', requireAdmin, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 100;
+      const search = req.query.search as string;
+      
+      let users = await storage.getAllUsersWithCountryInfo(limit);
+      
+      // Apply search filter if provided
+      if (search) {
+        users = users.filter(user => 
+          user.email.toLowerCase().includes(search.toLowerCase()) ||
+          user.firstName?.toLowerCase().includes(search.toLowerCase()) ||
+          user.lastName?.toLowerCase().includes(search.toLowerCase()) ||
+          user.username?.toLowerCase().includes(search.toLowerCase()) ||
+          user.country?.toLowerCase().includes(search.toLowerCase())
+        );
+      }
+
+      // Auto-detect country for users without country info
+      const usersWithCountry = await Promise.all(
+        users.map(async (user) => {
+          if (!user.country && (user.registrationIp || user.lastLoginIp)) {
+            const ip = user.lastLoginIp || user.registrationIp;
+            try {
+              // Use IP-API.com for country detection (free, no API key needed)
+              const response = await fetch(`http://ip-api.com/json/${ip}?fields=country,countryCode`);
+              if (response.ok) {
+                const geoData = await response.json();
+                if (geoData.country) {
+                  await storage.updateUserCountry(user._id.toString(), geoData.country);
+                  return { ...user, country: geoData.country };
+                }
+              }
+            } catch (error) {
+              console.error(`Failed to get country for IP ${ip}:`, error);
+            }
+          }
+          return user;
+        })
+      );
+
+      res.json(usersWithCountry);
+    } catch (error) {
+      console.error('Error fetching users with countries:', error);
+      res.status(500).json({ message: 'Failed to fetch user countries' });
+    }
+  });
+
+  // Admin: Banned users list
+  app.get('/api/admin/banned-users', requireAdmin, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 100;
+      const bannedUsers = await storage.getBannedUsers(limit);
+      res.json(bannedUsers);
+    } catch (error) {
+      console.error('Error fetching banned users:', error);
+      res.status(500).json({ message: 'Failed to fetch banned users' });
+    }
+  });
+
+  // Admin: Add user to banned list
+  app.post('/api/admin/banned-users', requireAdmin, async (req: any, res) => {
+    try {
+      const { userId, reason } = req.body;
+      const adminId = req.user._id.toString();
+
+      if (!userId || !reason) {
+        return res.status(400).json({ message: 'User ID and reason are required' });
+      }
+
+      // Get user info
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Create banned user record
+      const bannedUser = await storage.createBannedUser({
+        userId,
+        email: user.email,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        reason,
+        bannedBy: adminId,
+        country: user.country,
+        deviceFingerprints: user.deviceHistory || [],
+        isActive: true
+      });
+
+      // Update user status to banned
+      await storage.updateUserStatus(userId, 'banned', ['account_banned']);
+
+      res.json({
+        message: 'User added to banned list successfully',
+        bannedUser
+      });
+    } catch (error) {
+      console.error('Error adding user to banned list:', error);
+      res.status(500).json({ message: 'Failed to ban user' });
+    }
+  });
+
+  // Admin: Remove user from banned list
+  app.delete('/api/admin/banned-users/:userId', requireAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      
+      await storage.removeBannedUser(userId);
+      await storage.updateUserStatus(userId, 'active', []);
+
+      res.json({ message: 'User removed from banned list successfully' });
+    } catch (error) {
+      console.error('Error removing user from banned list:', error);
+      res.status(500).json({ message: 'Failed to unban user' });
+    }
+  });
+
+  // Auto-check deployment status periodically - Fixed workflow rerun
+  let deploymentCheckInterval: NodeJS.Timeout | null = null;
+  
+  const startDeploymentMonitoring = () => {
+    if (deploymentCheckInterval) {
+      clearInterval(deploymentCheckInterval);
+    }
+    
+    deploymentCheckInterval = setInterval(async () => {
+      try {
+        const deployments = await storage.getDeployments();
+        const deployingDeployments = deployments.filter(d => d.status === 'deploying');
+        
+        for (const deployment of deployingDeployments) {
+          const analysis = await storage.analyzeDeploymentStatus(deployment._id.toString());
+          if (analysis.status !== 'deploying') {
+            await storage.updateDeploymentStatus(deployment._id.toString(), analysis.status);
+            console.log(`Updated deployment ${deployment._id} status to: ${analysis.status}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error in deployment status check:', error);
+      }
+    }, 2 * 60 * 1000); // Check every 2 minutes
+  };
+
+  // Start deployment monitoring
+  startDeploymentMonitoring();
 
   return httpServer;
 }

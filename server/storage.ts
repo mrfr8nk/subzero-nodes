@@ -10,6 +10,8 @@ import {
   ChatRestriction,
   GitHubAccount,
   BannedDeviceFingerprint,
+  CoinTransfer,
+  BannedUser,
   InsertUser,
   InsertDeployment,
   InsertTransaction,
@@ -19,6 +21,8 @@ import {
   InsertDeploymentVariable,
   InsertChatMessage,
   InsertBannedDeviceFingerprint,
+  InsertCoinTransfer,
+  InsertBannedUser,
 } from "@shared/schema";
 import { getDb } from "./db";
 import { ObjectId } from "mongodb";
@@ -139,6 +143,26 @@ export interface IStorage {
   unrestrictUserFromChat(userId: string): Promise<void>;
   isChatRestricted(userId: string): Promise<boolean>;
   
+  // Coin transfer operations
+  createCoinTransfer(transfer: InsertCoinTransfer): Promise<CoinTransfer>;
+  getUserByUsernameOrEmail(usernameOrEmail: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  processCoinTransfer(transferId: string): Promise<void>;
+  getCoinTransfers(userId: string): Promise<CoinTransfer[]>;
+  updateCoinTransferStatus(transferId: string, status: string): Promise<void>;
+  
+  // Banned user management
+  createBannedUser(bannedUser: InsertBannedUser): Promise<BannedUser>;
+  getBannedUsers(limit?: number): Promise<BannedUser[]>;
+  removeBannedUser(userId: string): Promise<void>;
+  isBannedUser(userId: string): Promise<boolean>;
+  
+  // Deployment number tracking
+  getNextDeploymentNumber(userId: string): Promise<number>;
+  getUserTotalDeployments(userId: string): Promise<number>;
+  getAllUsersWithCountryInfo(limit?: number): Promise<User[]>;
+  updateUserCountry(userId: string, country: string): Promise<void>;
+  
   // GitHub account management
   createGitHubAccount(account: {
     name: string;
@@ -204,6 +228,14 @@ export class MongoStorage implements IStorage {
 
   private get bannedDeviceFingerprintsCollection() {
     return getDb().collection<BannedDeviceFingerprint>("bannedDeviceFingerprints");
+  }
+
+  private get coinTransfersCollection() {
+    return getDb().collection<CoinTransfer>("coinTransfers");
+  }
+
+  private get bannedUsersCollection() {
+    return getDb().collection<BannedUser>("bannedUsers");
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -1810,6 +1842,191 @@ export class MongoStorage implements IStorage {
       console.error('Error analyzing deployment logs:', error);
       return { status: 'failed', reason: 'Error analyzing deployment status' };
     }
+  }
+
+  // Coin transfer operations
+  async createCoinTransfer(transfer: InsertCoinTransfer): Promise<CoinTransfer> {
+    const coinTransfer: CoinTransfer = {
+      _id: new ObjectId(),
+      fromUserId: new ObjectId(transfer.fromUserId),
+      toUserId: new ObjectId(transfer.toUserId),
+      fromEmail: transfer.fromEmail,
+      toEmailOrUsername: transfer.toEmailOrUsername,
+      amount: transfer.amount,
+      message: transfer.message,
+      status: transfer.status || 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await this.coinTransfersCollection.insertOne(coinTransfer);
+    return coinTransfer;
+  }
+
+  async getUserByUsernameOrEmail(usernameOrEmail: string): Promise<User | undefined> {
+    // Try to find by email first, then by username
+    let user = await this.usersCollection.findOne({ email: usernameOrEmail });
+    if (!user) {
+      user = await this.usersCollection.findOne({ username: usernameOrEmail });
+    }
+    return user || undefined;
+  }
+
+  async processCoinTransfer(transferId: string): Promise<void> {
+    const transfer = await this.coinTransfersCollection.findOne({ _id: new ObjectId(transferId) });
+    if (!transfer) {
+      throw new Error('Transfer not found');
+    }
+
+    if (transfer.status !== 'pending') {
+      throw new Error('Transfer is not in pending status');
+    }
+
+    // Get sender and receiver
+    const sender = await this.getUser(transfer.fromUserId.toString());
+    const receiver = await this.getUser(transfer.toUserId.toString());
+
+    if (!sender || !receiver) {
+      await this.updateCoinTransferStatus(transferId, 'failed');
+      throw new Error('Sender or receiver not found');
+    }
+
+    // Check if sender has enough balance
+    if (sender.coinBalance < transfer.amount) {
+      await this.updateCoinTransferStatus(transferId, 'failed');
+      throw new Error('Insufficient balance');
+    }
+
+    // Process the transfer
+    await this.updateUserBalance(sender._id.toString(), -transfer.amount);
+    await this.updateUserBalance(receiver._id.toString(), transfer.amount);
+
+    // Create transaction records
+    await this.createTransaction({
+      userId: sender._id.toString(),
+      type: 'coin_transfer_sent',
+      amount: -transfer.amount,
+      description: `Sent ${transfer.amount} coins to ${transfer.toEmailOrUsername}`,
+      relatedId: transferId
+    });
+
+    await this.createTransaction({
+      userId: receiver._id.toString(),
+      type: 'coin_transfer_received',
+      amount: transfer.amount,
+      description: `Received ${transfer.amount} coins from ${transfer.fromEmail}`,
+      relatedId: transferId
+    });
+
+    // Mark transfer as completed
+    await this.updateCoinTransferStatus(transferId, 'completed');
+  }
+
+  async getCoinTransfers(userId: string): Promise<CoinTransfer[]> {
+    return await this.coinTransfersCollection
+      .find({
+        $or: [
+          { fromUserId: new ObjectId(userId) },
+          { toUserId: new ObjectId(userId) }
+        ]
+      })
+      .sort({ createdAt: -1 })
+      .toArray();
+  }
+
+  async updateCoinTransferStatus(transferId: string, status: string): Promise<void> {
+    await this.coinTransfersCollection.updateOne(
+      { _id: new ObjectId(transferId) },
+      { 
+        $set: { 
+          status,
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
+  // Banned user management
+  async createBannedUser(bannedUser: InsertBannedUser): Promise<BannedUser> {
+    const banned: BannedUser = {
+      _id: new ObjectId(),
+      userId: new ObjectId(bannedUser.userId),
+      email: bannedUser.email,
+      username: bannedUser.username,
+      firstName: bannedUser.firstName,
+      lastName: bannedUser.lastName,
+      reason: bannedUser.reason,
+      bannedBy: new ObjectId(bannedUser.bannedBy),
+      bannedAt: new Date(),
+      country: bannedUser.country,
+      deviceFingerprints: bannedUser.deviceFingerprints,
+      isActive: bannedUser.isActive ?? true,
+    };
+
+    await this.bannedUsersCollection.insertOne(banned);
+    return banned;
+  }
+
+  async getBannedUsers(limit: number = 100): Promise<BannedUser[]> {
+    return await this.bannedUsersCollection
+      .find({ isActive: true })
+      .sort({ bannedAt: -1 })
+      .limit(limit)
+      .toArray();
+  }
+
+  async removeBannedUser(userId: string): Promise<void> {
+    await this.bannedUsersCollection.updateOne(
+      { userId: new ObjectId(userId) },
+      { 
+        $set: { 
+          isActive: false,
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
+  async isBannedUser(userId: string): Promise<boolean> {
+    const banned = await this.bannedUsersCollection.findOne({ 
+      userId: new ObjectId(userId),
+      isActive: true
+    });
+    return !!banned;
+  }
+
+  // Deployment number tracking
+  async getNextDeploymentNumber(userId: string): Promise<number> {
+    const count = await this.deploymentsCollection.countDocuments({
+      userId: new ObjectId(userId)
+    });
+    return count + 1;
+  }
+
+  async getUserTotalDeployments(userId: string): Promise<number> {
+    return await this.deploymentsCollection.countDocuments({
+      userId: new ObjectId(userId)
+    });
+  }
+
+  async getAllUsersWithCountryInfo(limit: number = 100): Promise<User[]> {
+    return await this.usersCollection
+      .find({})
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+  }
+
+  async updateUserCountry(userId: string, country: string): Promise<void> {
+    await this.usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $set: { 
+          country,
+          updatedAt: new Date()
+        }
+      }
+    );
   }
 }
 
