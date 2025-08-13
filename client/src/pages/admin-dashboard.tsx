@@ -175,7 +175,12 @@ export default function AdminDashboard() {
 
   // Fetch users
   const { data: users = [] } = useQuery<User[]>({
-    queryKey: ['/api/admin/users'],
+    queryKey: ['/api/admin/users', userSearchTerm],
+    queryFn: ({ queryKey }) => {
+      const [url, search] = queryKey;
+      const params = search ? `?search=${encodeURIComponent(search)}` : '';
+      return fetch(`${url}${params}`).then(res => res.json());
+    },
     staleTime: 60000, // 1 minute
   });
 
@@ -953,8 +958,21 @@ export default function AdminDashboard() {
               <CardDescription>Manage user accounts, roles, and permissions</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border">
-                <Table>
+              <div className="space-y-4">
+                {/* Search */}
+                <div className="flex items-center space-x-2">
+                  <Search className="h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search users by name, email, username, or referral code..."
+                    value={userSearchTerm}
+                    onChange={(e) => setUserSearchTerm(e.target.value)}
+                    className="max-w-lg"
+                    data-testid="input-user-search"
+                  />
+                </div>
+                
+                <div className="rounded-md border">
+                  <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>User</TableHead>
@@ -1181,6 +1199,7 @@ export default function AdminDashboard() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1329,15 +1348,17 @@ export default function AdminDashboard() {
                           {bannedUsers
                             .filter((ban: any) => 
                               !bannedUserSearchTerm || 
-                              ban.userEmail.toLowerCase().includes(bannedUserSearchTerm.toLowerCase()) ||
-                              ban.reason.toLowerCase().includes(bannedUserSearchTerm.toLowerCase())
+                              ban.email.toLowerCase().includes(bannedUserSearchTerm.toLowerCase()) ||
+                              ban.reason.toLowerCase().includes(bannedUserSearchTerm.toLowerCase()) ||
+                              (ban.username && ban.username.toLowerCase().includes(bannedUserSearchTerm.toLowerCase()))
                             )
                             .map((ban: any) => (
                               <TableRow key={ban._id}>
                                 <TableCell>
                                   <div>
-                                    <div className="font-medium">{ban.userEmail}</div>
-                                    <div className="text-sm text-muted-foreground">ID: {ban.userId}</div>
+                                    <div className="font-medium">{ban.email}</div>
+                                    {ban.username && <div className="text-sm text-muted-foreground">{ban.username}</div>}
+                                    <div className="text-xs text-muted-foreground">ID: {ban.userId}</div>
                                   </div>
                                 </TableCell>
                                 <TableCell>

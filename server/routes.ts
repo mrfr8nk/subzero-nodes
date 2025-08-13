@@ -1556,7 +1556,15 @@ jobs:
     try {
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
-      const users = await storage.getAllUsers(limit, offset);
+      const search = req.query.search as string;
+      
+      let users;
+      if (search) {
+        users = await storage.searchUsers(search, limit);
+      } else {
+        users = await storage.getAllUsers(limit, offset);
+      }
+      
       res.json(users);
     } catch (error) {
       console.error('Error fetching users:', error);

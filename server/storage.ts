@@ -735,6 +735,24 @@ export class MongoStorage implements IStorage {
       .toArray();
   }
 
+  async searchUsers(searchTerm: string, limit: number = 50): Promise<User[]> {
+    const searchRegex = new RegExp(searchTerm, 'i'); // Case-insensitive search
+    
+    return await this.usersCollection
+      .find({
+        $or: [
+          { email: searchRegex },
+          { firstName: searchRegex },
+          { lastName: searchRegex },
+          { username: searchRegex },
+          { referralCode: searchRegex }
+        ]
+      })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+  }
+
   async updateUserStatus(userId: string, status: string, restrictions?: string[]): Promise<void> {
     const updateData: any = {
       status,
