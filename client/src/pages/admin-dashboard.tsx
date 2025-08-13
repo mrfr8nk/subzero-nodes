@@ -34,12 +34,19 @@ import {
   FileText,
   Gift,
   Clock,
-  Trash2
+  Trash2,
+  Globe,
+  UserX,
+  Hash,
+  Search,
+  Calendar,
+  CheckCircle
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import DeploymentLogsModal from "@/components/deployment-logs-modal";
+import { format } from "date-fns";
 
 // Maintenance countdown component
 function MaintenanceCountdown({ endTime }: { endTime: string }) {
@@ -173,19 +180,19 @@ export default function AdminDashboard() {
   });
 
   // Fetch users with countries
-  const { data: usersWithCountries = [] } = useQuery({
+  const { data: usersWithCountries = [] } = useQuery<any[]>({
     queryKey: ["/api/admin/users/countries"],
     enabled: selectedSection === "users-countries",
   });
 
   // Fetch banned users
-  const { data: bannedUsers = [] } = useQuery({
+  const { data: bannedUsers = [] } = useQuery<User[]>({
     queryKey: ["/api/admin/banned-users"],
     enabled: selectedSection === "banned-users",
   });
 
   // Fetch all deployments
-  const { data: allDeployments = [] } = useQuery({
+  const { data: allDeployments = [] } = useQuery<any[]>({
     queryKey: ["/api/admin/deployments"],
     enabled: selectedSection === "all-deployments",
   });
