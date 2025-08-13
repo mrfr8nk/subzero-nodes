@@ -81,9 +81,18 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
       }
       
       if (error.message.includes("Insufficient coins")) {
+        const errorData = (error as any)?.response?.data;
+        const shortfall = errorData?.shortfall || 0;
+        const required = errorData?.required || 0;
+        const current = errorData?.current || 0;
+        
+        const detailMessage = shortfall > 0 
+          ? `You need ${required} coins but only have ${current} coins. You're short ${shortfall} coins.`
+          : "You don't have enough coins to deploy this bot. Please add more coins to your wallet.";
+        
         toast({
           title: "Insufficient Coins",
-          description: "You don't have enough coins to deploy this bot. Please add more coins to your wallet.",
+          description: detailMessage,
           variant: "destructive",
         });
       } else if (error.message.includes("GitHub settings not configured")) {

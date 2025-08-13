@@ -67,6 +67,8 @@ export default function AdminApiTest() {
   const { data: githubAccounts, isLoading: accountsLoading, refetch: refetchAccounts } = useQuery<GitHubAccount[]>({
     queryKey: ["/api/admin/github/accounts"],
     enabled: !!isAuthenticated && user?.isAdmin,
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
+    staleTime: 10000, // Consider data stale after 10 seconds
   });
 
   const deleteBranchesMutation = useMutation({
@@ -95,13 +97,20 @@ export default function AdminApiTest() {
       return await apiRequest(`/api/admin/github/accounts/test/${accountId}`, "POST");
     },
     onSuccess: (data: any, accountId) => {
+      const lastUsedText = data.lastUsed 
+        ? `Last used: ${new Date(data.lastUsed).toLocaleString()}`
+        : 'Never used';
+      
       toast({
-        title: data.isValid ? "Token Valid" : "Token Invalid",
+        title: data.isValid ? "Token Valid ✓" : "Token Invalid ✗",
         description: data.isValid 
-          ? `Token is working. Rate limit: ${data.rateLimitRemaining || 'Unknown'}`
-          : data.error || "Token test failed",
+          ? `Token is active. Rate limit: ${data.rateLimitRemaining || 'Unknown'}. ${lastUsedText}`
+          : `${data.error || "Token test failed"}. ${lastUsedText}`,
         variant: data.isValid ? "default" : "destructive",
       });
+      
+      // Refresh accounts data to show updated lastUsed time
+      refetchAccounts();
     },
     onError: (error: any) => {
       toast({

@@ -1443,7 +1443,7 @@ export class MongoStorage implements IStorage {
     );
   }
 
-  async testGitHubAccountToken(id: string): Promise<{ isValid: boolean; error?: string; rateLimitRemaining?: number }> {
+  async testGitHubAccountToken(id: string): Promise<{ isValid: boolean; error?: string; rateLimitRemaining?: number; lastUsed?: string }> {
     try {
       const account = await this.githubAccountsCollection.findOne({ _id: new ObjectId(id) });
       if (!account) {
@@ -1460,30 +1460,38 @@ export class MongoStorage implements IStorage {
       });
 
       const rateLimitRemaining = parseInt(response.headers.get('X-RateLimit-Remaining') || '0', 10);
+      const now = new Date();
 
       if (response.ok) {
+        // Update lastUsed timestamp when token is successfully validated
+        await this.updateGitHubAccountUsage(id);
+        
         return { 
           isValid: true, 
-          rateLimitRemaining 
+          rateLimitRemaining,
+          lastUsed: now.toISOString()
         };
       } else if (response.status === 401) {
         return { 
           isValid: false, 
           error: 'Invalid or expired token', 
-          rateLimitRemaining 
+          rateLimitRemaining,
+          lastUsed: account.lastUsed?.toISOString()
         };
       } else if (response.status === 404) {
         return { 
           isValid: false, 
           error: 'Repository not found or access denied', 
-          rateLimitRemaining 
+          rateLimitRemaining,
+          lastUsed: account.lastUsed?.toISOString()
         };
       } else {
         const errorText = await response.text().catch(() => 'Unknown error');
         return { 
           isValid: false, 
           error: `GitHub API error: ${response.status} ${errorText}`, 
-          rateLimitRemaining 
+          rateLimitRemaining,
+          lastUsed: account.lastUsed?.toISOString()
         };
       }
     } catch (error) {

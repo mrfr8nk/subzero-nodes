@@ -1097,16 +1097,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'All fields are required' });
       }
 
-      // Get deployment cost setting
-      // Get deployment fee from database configuration
+      // Get deployment cost setting - admin controlled
       const deploymentFeeSetting = await storage.getAppSetting('deployment_fee');
-      const deploymentFee = deploymentFeeSetting?.value || 10; // Fallback to 10 coins
+      const deploymentFee = parseInt(deploymentFeeSetting?.value) || 10; // Fallback to 10 coins if not set by admin
 
-      // Check if user has enough coins
-      const userBalance = user.coinBalance || 0;
+      // Check user's current wallet balance
+      const currentUser = await storage.getUser(userId); // Get fresh user data
+      const userBalance = currentUser?.coinBalance || 0;
+      
+      // Validate user has sufficient funds for deployment
       if (userBalance < deploymentFee) {
         return res.status(400).json({ 
-          message: `Insufficient coins. You need ${deploymentFee} coins to deploy this bot. You currently have ${userBalance} coins.` 
+          message: `Insufficient coins. You need ${deploymentFee} coins to deploy this bot. You currently have ${userBalance} coins.`,
+          required: deploymentFee,
+          current: userBalance,
+          shortfall: deploymentFee - userBalance
         });
       }
 

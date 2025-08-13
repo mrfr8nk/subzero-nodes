@@ -167,6 +167,13 @@ Add your domain's callback URL to Google Cloud Console OAuth settings:
   - Real-time updates for edited and deleted messages across all clients
   - Improved message tagging system with better visual indicators
   - Enhanced admin controls for user restriction and moderation
+- **Enhanced GitHub Token Management**: Improved API validation and monitoring system
+  - Removed default GitHub tokens in favor of admin-only configuration
+  - Enhanced API status checking with automatic refresh and last used tracking
+  - Improved deployment cost validation with detailed balance comparison
+  - Real-time token validation status with rate limiting information
+  - Automatic refresh of GitHub account status every 30 seconds
+  - Better error messaging for insufficient funds with exact shortfall amounts
 
 ### Deployment Notes
 - Update `FRONTEND_URL` and `BACKEND_URL` in production environment
