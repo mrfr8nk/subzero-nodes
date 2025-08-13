@@ -324,7 +324,7 @@ export class MongoStorage implements IStorage {
     
     const newUser = {
       ...userData,
-      coinBalance: 100,
+      coinBalance: 10,
       emailVerified: false,
       authProvider: 'local',
       referralCode: referralCode,
@@ -433,7 +433,7 @@ export class MongoStorage implements IStorage {
 
       const newUser: Omit<User, '_id'> = {
         ...userData,
-        coinBalance: userData.coinBalance || 100,
+        coinBalance: userData.coinBalance || 10,
         emailVerified: userData.emailVerified || true,
         authProvider: userData.authProvider || 'google',
         // Set default admin fields

@@ -3257,6 +3257,78 @@ jobs:
     }
   });
 
+  // Get deployment fee configuration
+  app.get('/api/admin/coins/deployment-fee', requireAdmin, async (req, res) => {
+    try {
+      const setting = await storage.getAppSetting('deployment_fee');
+      const deploymentFee = setting?.value || 5;
+      res.json({ deploymentFee });
+    } catch (error) {
+      console.error('Error fetching deployment fee:', error);
+      res.status(500).json({ message: 'Failed to fetch deployment fee' });
+    }
+  });
+
+  // Update deployment fee
+  app.post('/api/admin/coins/deployment-fee', requireAdmin, async (req, res) => {
+    try {
+      const { deploymentFee } = req.body;
+      const adminId = (req.user as any)?._id?.toString();
+      
+      if (typeof deploymentFee !== 'number' || deploymentFee < 0) {
+        return res.status(400).json({ message: 'Valid deployment fee required' });
+      }
+
+      await storage.setAppSetting({
+        key: 'deployment_fee',
+        value: deploymentFee,
+        description: 'Fee charged for creating new deployments',
+        updatedBy: adminId
+      });
+
+      res.json({ message: 'Deployment fee updated successfully' });
+    } catch (error) {
+      console.error('Error updating deployment fee:', error);
+      res.status(500).json({ message: 'Failed to update deployment fee' });
+    }
+  });
+
+  // Get daily charge configuration
+  app.get('/api/admin/coins/daily-charge', requireAdmin, async (req, res) => {
+    try {
+      const setting = await storage.getAppSetting('daily_charge');
+      const dailyCharge = setting?.value || 2;
+      res.json({ dailyCharge });
+    } catch (error) {
+      console.error('Error fetching daily charge:', error);
+      res.status(500).json({ message: 'Failed to fetch daily charge' });
+    }
+  });
+
+  // Update daily charge
+  app.post('/api/admin/coins/daily-charge', requireAdmin, async (req, res) => {
+    try {
+      const { dailyCharge } = req.body;
+      const adminId = (req.user as any)?._id?.toString();
+      
+      if (typeof dailyCharge !== 'number' || dailyCharge < 0) {
+        return res.status(400).json({ message: 'Valid daily charge required' });
+      }
+
+      await storage.setAppSetting({
+        key: 'daily_charge',
+        value: dailyCharge,
+        description: 'Daily maintenance charge for active deployments',
+        updatedBy: adminId
+      });
+
+      res.json({ message: 'Daily charge updated successfully' });
+    } catch (error) {
+      console.error('Error updating daily charge:', error);
+      res.status(500).json({ message: 'Failed to update daily charge' });
+    }
+  });
+
   // Admin currency management routes
   app.get('/api/admin/currency', requireAdmin, async (req, res) => {
     try {
@@ -3749,7 +3821,7 @@ jobs:
       });
     } catch (error) {
       console.error('Error transferring coins:', error);
-      res.status(500).json({ message: error.message || 'Failed to transfer coins' });
+      res.status(500).json({ message: (error as Error).message || 'Failed to transfer coins' });
     }
   });
 

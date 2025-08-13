@@ -164,6 +164,8 @@ export default function AdminDashboard() {
     enableCountdown: false
   });
   const [currencyForm, setCurrencyForm] = useState({ currency: 'USD', rate: 0.1, symbol: '$' });
+  const [deploymentFeeForm, setDeploymentFeeForm] = useState({ deploymentFee: 5 });
+  const [dailyChargeForm, setDailyChargeForm] = useState({ dailyCharge: 2 });
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -178,7 +180,7 @@ export default function AdminDashboard() {
     queryKey: ['/api/admin/users', userSearchTerm],
     queryFn: ({ queryKey }) => {
       const [url, search] = queryKey;
-      const params = search ? `?search=${encodeURIComponent(search)}` : '';
+      const params = search ? `?search=${encodeURIComponent(search as string)}` : '';
       return fetch(`${url}${params}`).then(res => res.json());
     },
     staleTime: 60000, // 1 minute
@@ -212,6 +214,18 @@ export default function AdminDashboard() {
   const { data: settings = [] } = useQuery<AppSetting[]>({
     queryKey: ['/api/admin/settings'],
     staleTime: 60000,
+  });
+
+  // Fetch deployment fee config
+  const { data: deploymentFeeConfig } = useQuery<{deploymentFee: number}>({
+    queryKey: ["/api/admin/coins/deployment-fee"],
+    enabled: selectedSection === "coin-management",
+  });
+
+  // Fetch daily charge config
+  const { data: dailyChargeConfig } = useQuery<{dailyCharge: number}>({
+    queryKey: ["/api/admin/coins/daily-charge"],
+    enabled: selectedSection === "coin-management",
   });
 
   // Fetch maintenance status
@@ -621,6 +635,48 @@ export default function AdminDashboard() {
     onError: (error: any) => {
       toast({ title: "Failed to update currency settings", description: error.message, variant: "destructive" });
     }
+  });
+
+  // Deployment fee mutation
+  const updateDeploymentFeeMutation = useMutation({
+    mutationFn: async (data: { deploymentFee: number }) => {
+      return await apiRequest("/api/admin/coins/deployment-fee", "POST", data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Deployment fee updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/coins/deployment-fee"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update deployment fee",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Daily charge mutation
+  const updateDailyChargeMutation = useMutation({
+    mutationFn: async (data: { dailyCharge: number }) => {
+      return await apiRequest("/api/admin/coins/daily-charge", "POST", data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Daily charge updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/coins/daily-charge"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update daily charge",
+        variant: "destructive",
+      });
+    },
   });
 
   // GitHub settings mutation
@@ -1795,6 +1851,100 @@ export default function AdminDashboard() {
         {selectedSection === "coin-management" && (
           <div className="space-y-4">
             <CoinClaimManagement />
+            
+            {/* Comprehensive Coin Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Deployment & Daily Charges</CardTitle>
+                <CardDescription>Configure deployment fees and daily maintenance charges</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Deployment Fee (per deployment)</Label>
+                    <div className="flex space-x-2">
+                      <Input
+                        type="number"
+                        placeholder="e.g., 5"
+                        min="0"
+                        step="1"
+                        value={deploymentFeeForm.deploymentFee}
+                        onChange={(e) => setDeploymentFeeForm({ deploymentFee: parseInt(e.target.value) || 0 })}
+                        data-testid="input-deployment-fee"
+                      />
+                      <Button 
+                        size="sm" 
+                        onClick={() => updateDeploymentFeeMutation.mutate(deploymentFeeForm)}
+                        disabled={updateDeploymentFeeMutation.isPending}
+                        data-testid="button-update-deployment-fee"
+                      >
+                        {updateDeploymentFeeMutation.isPending ? "Updating..." : "Update"}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Coins charged when user creates a new deployment
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Daily Maintenance Charge (per 24 hours)</Label>
+                    <div className="flex space-x-2">
+                      <Input
+                        type="number"
+                        placeholder="e.g., 2"
+                        min="0"
+                        step="1"
+                        value={dailyChargeForm.dailyCharge}
+                        onChange={(e) => setDailyChargeForm({ dailyCharge: parseInt(e.target.value) || 0 })}
+                        data-testid="input-daily-charge"
+                      />
+                      <Button 
+                        size="sm" 
+                        onClick={() => updateDailyChargeMutation.mutate(dailyChargeForm)}
+                        disabled={updateDailyChargeMutation.isPending}
+                        data-testid="button-update-daily-charge"
+                      >
+                        {updateDailyChargeMutation.isPending ? "Updating..." : "Update"}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Coins charged every 24 hours for active deployments
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Auto-Delete After Insufficient Funds</Label>
+                  <div className="flex items-center space-x-2">
+                    <Switch data-testid="switch-auto-delete" />
+                    <span className="text-sm">Delete deployments after 24 hours of insufficient balance</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    When enabled, deployments will be automatically deleted if user has insufficient coins for daily charges
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Default User Coin Balance</Label>
+                  <div className="flex space-x-2">
+                    <Input
+                      type="number"
+                      placeholder="10"
+                      value="10"
+                      min="0"
+                      step="1"
+                      data-testid="input-default-balance"
+                    />
+                    <Button size="sm" data-testid="button-update-default-balance">
+                      Update
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Starting coin balance for new users (currently set to 10)
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 

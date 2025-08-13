@@ -482,8 +482,16 @@ export default function Chat() {
               {messages.map((msg) => (
                 <div key={msg._id} className="group">
                   {msg.replyTo && (
-                    <div className="ml-4 mb-2 text-sm text-muted-foreground border-l-2 border-gray-300 pl-2">
-                      <span className="font-medium">{msg.replyToUsername}:</span> {msg.replyToMessage}
+                    <div className="ml-4 mb-2 text-xs bg-blue-50 dark:bg-blue-900/20 p-2 rounded border-l-4 border-blue-400">
+                      <div className="flex items-center space-x-1 mb-1">
+                        <Reply className="w-3 h-3" />
+                        <span className="font-medium text-blue-700 dark:text-blue-300">
+                          Replying to {msg.replyToUsername}:
+                        </span>
+                      </div>
+                      <div className="text-gray-600 dark:text-gray-400 truncate">
+                        "{(msg.replyToMessage || '').substring(0, 50)}{(msg.replyToMessage || '').length > 50 ? '...' : ''}"
+                      </div>
                     </div>
                   )}
                   
@@ -558,6 +566,29 @@ export default function Chat() {
                           <DropdownMenuItem onClick={() => startReply(msg)}>
                             <Reply className="h-4 w-4 mr-2" />
                             Reply
+                          </DropdownMenuItem>
+                          
+                          {/* Quick Reply Shortcuts */}
+                          <DropdownMenuItem onClick={() => {
+                            setMessage("👍 Thanks!");
+                            sendMessage();
+                          }}>
+                            <span className="mr-2">👍</span>
+                            Quick Thanks
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {
+                            setMessage("👎 Not helpful");
+                            sendMessage();
+                          }}>
+                            <span className="mr-2">👎</span>
+                            Not Helpful
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {
+                            setMessage("✅ Solved!");
+                            sendMessage();
+                          }}>
+                            <span className="mr-2">✅</span>
+                            Mark Solved
                           </DropdownMenuItem>
                           {(msg.userId === (user?._id?.toString() || user?.email) || isAdmin) && (
                             <>
