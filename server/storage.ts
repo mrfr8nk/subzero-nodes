@@ -1166,7 +1166,7 @@ export class MongoStorage implements IStorage {
 
     // Get daily charge rate from settings
     const dailyChargeSetting = await this.getAppSetting('daily_charge');
-    const dailyCharge = dailyChargeSetting?.value || 5;
+    const dailyCharge = dailyChargeSetting?.value || 0;
 
     for (const deployment of activeDeployments) {
       try {
@@ -1249,6 +1249,14 @@ export class MongoStorage implements IStorage {
       role: message.role,
       tags: tags.length > 0 ? tags : undefined,
       isTagged,
+      messageType: message.messageType || 'text',
+      imageUrl: message.imageUrl,
+      imageData: message.imageData,
+      fileName: message.fileName,
+      fileSize: message.fileSize,
+      replyTo: message.replyTo ? new ObjectId(message.replyTo) : undefined,
+      replyToMessage: message.replyToMessage,
+      replyToUsername: message.replyToUsername,
       createdAt: now,
       updatedAt: now,
     };

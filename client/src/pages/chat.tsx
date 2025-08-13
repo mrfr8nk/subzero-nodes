@@ -34,6 +34,7 @@ interface ChatMessage {
   editHistory?: { content: string; editedAt: string }[];
   messageType?: 'text' | 'image' | 'file';
   imageUrl?: string;
+  imageData?: string;
   fileName?: string;
   fileSize?: number;
   createdAt: string;
@@ -62,6 +63,7 @@ export default function Chat() {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -120,6 +122,9 @@ export default function Chat() {
             break;
           case 'message_deleted':
             setMessages(prev => prev.filter(msg => msg._id !== data.messageId));
+            break;
+          case 'messages_deleted':
+            setMessages(prev => prev.filter(msg => !data.messageIds.includes(msg._id)));
             break;
           case 'user_joined':
             setOnlineUsers(prev => {
@@ -234,11 +239,14 @@ export default function Chat() {
   };
 
   const deleteMessage = async (messageId: string) => {
+    if (!wsRef.current) return;
+    
     try {
-      await apiRequest(`/api/chat/message/${messageId}`, "DELETE");
-      
-      // Remove message from local state
-      setMessages(prev => prev.filter(m => m._id !== messageId));
+      // Send deletion via WebSocket for real-time sync
+      wsRef.current.send(JSON.stringify({
+        type: 'delete_message',
+        messageId
+      }));
       
       toast({
         title: "Message Deleted",
@@ -254,17 +262,15 @@ export default function Chat() {
   };
 
   const deleteSelectedMessages = async () => {
-    if (selectedMessages.length === 0) return;
+    if (selectedMessages.length === 0 || !wsRef.current) return;
     
     try {
-      await Promise.all(
-        selectedMessages.map(messageId => 
-          apiRequest(`/api/chat/message/${messageId}`, "DELETE")
-        )
-      );
+      // Send deletion via WebSocket for real-time sync
+      wsRef.current.send(JSON.stringify({
+        type: 'delete_selected_messages',
+        messageIds: selectedMessages
+      }));
       
-      // Remove messages from local state
-      setMessages(prev => prev.filter(m => !selectedMessages.includes(m._id)));
       setSelectedMessages([]);
       setIsSelectionMode(false);
       
@@ -353,8 +359,9 @@ export default function Chat() {
       messageData.replyToUsername = replyingTo.username;
     }
 
-    // Handle image upload
+    // Handle image upload with loading state
     if (imageFile) {
+      setIsUploading(true);
       try {
         const formData = new FormData();
         formData.append('image', imageFile);
@@ -363,17 +370,20 @@ export default function Chat() {
           'Content-Type': 'multipart/form-data'
         });
 
-        messageData.imageUrl = uploadResponse.imageUrl;
+        messageData.imageData = uploadResponse.imageData;
         messageData.fileName = imageFile.name;
         messageData.fileSize = imageFile.size;
         
       } catch (error) {
+        setIsUploading(false);
         toast({
           title: "Upload failed",
           description: "Failed to upload image",
           variant: "destructive",
         });
         return;
+      } finally {
+        setIsUploading(false);
       }
     }
 
@@ -694,13 +704,22 @@ export default function Chat() {
                       ) : (
                         <div className="space-y-2">
                           {/* Image display */}
-                          {msg.messageType === 'image' && msg.imageUrl && (
+                          {msg.messageType === 'image' && (msg.imageUrl || msg.imageData) && (
                             <div className="max-w-sm">
                               <img
-                                src={msg.imageUrl}
+                                src={msg.imageData || msg.imageUrl}
                                 alt={msg.fileName || 'Shared image'}
                                 className="rounded-lg border max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
-                                onClick={() => window.open(msg.imageUrl, '_blank')}
+                                onClick={() => {
+                                  const imageUrl = msg.imageData || msg.imageUrl;
+                                  if (imageUrl) {
+                                    window.open(imageUrl, '_blank');
+                                  }
+                                }}
+                                onLoad={() => {
+                                  // Add loading state complete indicator if needed
+                                }}
+                                data-testid={`img-chat-${msg._id}`}
                               />
                               {msg.fileName && (
                                 <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -907,10 +926,14 @@ export default function Chat() {
                     />
                     <Button 
                       onClick={sendMessage} 
-                      disabled={(!message.trim() && !imageFile) || isRestricted || !isConnected}
+                      disabled={(!message.trim() && !imageFile) || isRestricted || !isConnected || isUploading}
                       size="sm"
                     >
-                      <Send className="w-4 h-4" />
+                      {isUploading ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
                     </Button>
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">

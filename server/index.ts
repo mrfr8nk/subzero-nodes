@@ -83,7 +83,7 @@ app.use((req, res, next) => {
     }
   }, 30000); // Check every 30 seconds
 
-  // Start daily billing scheduler
+  // Start daily billing scheduler - runs every hour to ensure reliability  
   setInterval(async () => {
     try {
       console.log('Processing daily deployment charges...');
@@ -92,7 +92,7 @@ app.use((req, res, next) => {
     } catch (error) {
       console.error('Error processing daily deployment charges:', error);
     }
-  }, 24 * 60 * 60 * 1000); // Run every 24 hours
+  }, 60 * 60 * 1000); // Run every hour for better reliability
 
   // Process charges immediately on startup for any overdue deployments
   setTimeout(async () => {

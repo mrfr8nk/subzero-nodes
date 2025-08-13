@@ -3420,27 +3420,23 @@ jobs:
     }
   });
 
-  // Chat image upload endpoint
+  // Chat image upload endpoint - using base64 storage
   app.post('/api/chat/upload-image', isAuthenticated, upload.single('image'), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: 'No image file provided' });
       }
 
-      // Generate unique filename with timestamp
-      const timestamp = Date.now();
-      const extension = path.extname(req.file.originalname);
-      const filename = `chat_image_${timestamp}_${Math.random().toString(36).substring(2, 8)}${extension}`;
-      const newPath = path.join(uploadDir, filename);
+      // Read file and convert to base64
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const base64Data = `data:${req.file.mimetype};base64,${fileBuffer.toString('base64')}`;
       
-      // Move file to final destination
-      fs.renameSync(req.file.path, newPath);
+      // Clean up temporary file
+      fs.unlinkSync(req.file.path);
 
-      // Return image URL
-      const imageUrl = `/uploads/chat-images/${filename}`;
       res.json({
         success: true,
-        imageUrl,
+        imageData: base64Data,
         fileName: req.file.originalname,
         fileSize: req.file.size
       });
@@ -3583,6 +3579,7 @@ jobs:
               // Add image data if this is an image message
               if (data.messageType === 'image') {
                 messageData.imageUrl = data.imageUrl;
+                messageData.imageData = data.imageData;
                 messageData.fileName = data.fileName;
                 messageData.fileSize = data.fileSize;
               }
@@ -3678,7 +3675,7 @@ jobs:
           const chatClient = chatClients.get(clientId);
           if (chatClient) {
             try {
-              await storage.deleteChatMessage(data.messageId);
+              await storage.deleteChatMessage(data.messageId, chatClient.userId, chatClient.isAdmin);
               
               broadcastToChatClients('message_deleted', {
                 messageId: data.messageId
@@ -3698,7 +3695,7 @@ jobs:
           if (chatClient && Array.isArray(data.messageIds)) {
             try {
               for (const messageId of data.messageIds) {
-                await storage.deleteChatMessage(messageId);
+                await storage.deleteChatMessage(messageId, chatClient.userId, chatClient.isAdmin);
               }
               
               broadcastToChatClients('messages_deleted', {

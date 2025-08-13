@@ -137,6 +137,7 @@ export interface ChatMessage {
   editHistory?: { content: string; editedAt: Date }[]; // History of edits
   messageType?: 'text' | 'image' | 'file'; // Type of message
   imageUrl?: string; // URL for image messages
+  imageData?: string; // Base64 encoded image data
   fileName?: string; // Original file name for file messages
   fileSize?: number; // File size in bytes
   createdAt: Date;
@@ -213,7 +214,7 @@ export const insertUserSchema = z.object({
   profileImageUrl: z.string().optional(),
   authProvider: z.string().default("google"),
   emailVerified: z.boolean().default(true),
-  coinBalance: z.number().default(100),
+  coinBalance: z.number().default(10),
   referralCode: z.string().optional(),
   referredById: z.string().optional(),
   password: z.string().optional(),
@@ -238,7 +239,7 @@ export const insertDeploymentSchema = z.object({
   branchName: z.string().optional(),
   status: z.string().default("active"),
   configuration: z.string().default("standard"),
-  cost: z.number().default(25),
+  cost: z.number().default(10),
   lastChargeDate: z.date().optional(),
   nextChargeDate: z.date().optional(),
 });
@@ -328,6 +329,7 @@ export const insertChatMessageSchema = z.object({
   })).optional(),
   messageType: z.enum(['text', 'image', 'file']).optional().default('text'),
   imageUrl: z.string().optional(),
+  imageData: z.string().optional(), // Base64 encoded image data
   fileName: z.string().optional(),
   fileSize: z.number().optional(),
 });
