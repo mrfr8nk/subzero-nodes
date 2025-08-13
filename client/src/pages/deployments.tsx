@@ -10,6 +10,7 @@ import { MessageSquare, Plus, CheckCircle, PauseCircle, Calendar, AlertTriangle,
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import DeployModal from "@/components/deploy-modal";
+import CountdownTimer from "@/components/countdown-timer";
 
 export default function Deployments() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -224,6 +225,12 @@ export default function Deployments() {
                            deployment.status.charAt(0).toUpperCase() + deployment.status.slice(1)}
                         </span>
                         <span className="text-xs text-muted-foreground">Cost: {deployment.cost} coins/day</span>
+                      </div>
+                      <div className="flex items-center space-x-4 mt-2">
+                        <CountdownTimer 
+                          createdAt={deployment.createdAt}
+                          className="text-xs"
+                        />
                         {deployment.nextChargeDate && (
                           <span className="text-xs text-muted-foreground">
                             Next charge: {new Date(deployment.nextChargeDate).toLocaleDateString()}

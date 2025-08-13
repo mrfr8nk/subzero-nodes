@@ -1063,11 +1063,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nextChargeDate: nextChargeDate,
       });
 
-      // Check if user has enough coins
+      // Check if user has enough coins using database configuration
       const userBalance = user.coinBalance || 0;
-      const cost = deploymentData.cost || 25;
-      if (userBalance < cost) {
-        return res.status(400).json({ message: "Insufficient coins" });
+      const deploymentFeeSetting = await storage.getAppSetting('deployment_fee');
+      const deploymentFee = deploymentFeeSetting?.value || 10; // Fallback to 10 coins
+      if (userBalance < deploymentFee) {
+        return res.status(400).json({ 
+          message: `Insufficient coins. You need ${deploymentFee} coins to deploy this bot. You currently have ${userBalance} coins.`
+        });
       }
 
       const deployment = await storage.createDeployment(deploymentData);
@@ -1095,14 +1098,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get deployment cost setting
-      const deploymentCostSetting = await storage.getAppSetting('deployment_cost');
-      const cost = deploymentCostSetting?.value || 25;
+      // Get deployment fee from database configuration
+      const deploymentFeeSetting = await storage.getAppSetting('deployment_fee');
+      const deploymentFee = deploymentFeeSetting?.value || 10; // Fallback to 10 coins
 
       // Check if user has enough coins
       const userBalance = user.coinBalance || 0;
-      if (userBalance < cost) {
+      if (userBalance < deploymentFee) {
         return res.status(400).json({ 
-          message: `Insufficient coins. You need ${cost} coins to deploy this bot. You currently have ${userBalance} coins.` 
+          message: `Insufficient coins. You need ${deploymentFee} coins to deploy this bot. You currently have ${userBalance} coins.` 
         });
       }
 
@@ -1180,7 +1184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // The frontend should have already validated availability
 
       // Deduct coins first
-      await storage.updateUserBalance(userId, -cost);
+      await storage.updateUserBalance(userId, -deploymentFee);
 
       // GitHub API helper
       const makeGitHubRequest = async (method: string, endpoint: string, data: any = null) => {
@@ -1324,7 +1328,7 @@ jobs:
           deploymentNumber,
           status: "deploying",
           configuration: `GitHub: ${sanitizedBranchName}`,
-          cost,
+          cost: deploymentFee,
           lastChargeDate: now,
           nextChargeDate: nextChargeDate,
         });
@@ -1340,7 +1344,7 @@ jobs:
 
       } catch (githubError) {
         // Refund coins if GitHub deployment fails
-        await storage.updateUserBalance(userId, cost);
+        await storage.updateUserBalance(userId, deploymentFee);
         throw githubError;
       }
 
