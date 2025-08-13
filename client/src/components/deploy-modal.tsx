@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -34,6 +34,21 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
     sanitized?: string;
   } | null>(null);
   const [isCheckingBranch, setIsCheckingBranch] = useState(false);
+
+  // Fetch deployment costs from database
+  const { data: deploymentFeeConfig } = useQuery<{deploymentFee: number}>({
+    queryKey: ["/api/admin/coins/deployment-fee"],
+    enabled: isOpen,
+  });
+
+  const { data: dailyChargeConfig } = useQuery<{dailyCharge: number}>({
+    queryKey: ["/api/admin/coins/daily-charge"], 
+    enabled: isOpen,
+  });
+
+  // Use database values with fallback to 10 coins
+  const deploymentFee = deploymentFeeConfig?.deploymentFee || 10;
+  const dailyCharge = dailyChargeConfig?.dailyCharge || 10;
 
 
   const githubDeployMutation = useMutation({
@@ -119,11 +134,10 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
     }
 
     const userBalance = user?.coinBalance || 0;
-    const deploymentCost = 25; // Default deployment cost
-    if (userBalance < deploymentCost) {
+    if (userBalance < deploymentFee) {
       toast({
         title: "Insufficient Coins",
-        description: `You need ${deploymentCost} coins to deploy this bot. You currently have ${userBalance} coins.`,
+        description: `You need ${deploymentFee} coins to deploy this bot. You currently have ${userBalance} coins.`,
         variant: "destructive",
       });
       return;
@@ -344,47 +358,115 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
             </div>
           </div>
 
-          {/* Pricing Information */}
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 p-6 rounded-xl border border-green-200 dark:border-green-800">
-            <div className="flex items-center mb-4">
-              <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center mr-3">
-                <Coins className="w-6 h-6 text-white" />
+          {/* Pricing Information - Enhanced Design */}
+          <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950 dark:via-indigo-950 dark:to-purple-950 p-6 rounded-2xl border border-blue-200 dark:border-blue-800 shadow-sm">
+            <div className="flex items-center mb-6">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center mr-4 shadow-md">
+                <Coins className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Deployment Cost</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">One-time setup fee + daily hosting</p>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Deployment Pricing</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Transparent and affordable bot hosting</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-green-200 dark:border-green-800">
-                <div className="text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Setup Fee</p>
-                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">25 coins</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-500">One-time payment</p>
+            <div className="space-y-4">
+              {/* Setup Fee Card */}
+              <div className="bg-white dark:bg-gray-800/80 p-5 rounded-xl border border-blue-100 dark:border-blue-800/50 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center mr-3">
+                      <Settings className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">Setup Fee</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">One-time deployment cost</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">{deploymentFee}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">coins</p>
+                  </div>
                 </div>
               </div>
-              <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-green-200 dark:border-green-800">
-                <div className="text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Daily Cost</p>
-                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">5 coins</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-500">Per 24 hours</p>
+
+              {/* Daily Cost Card */}
+              <div className="bg-white dark:bg-gray-800/80 p-5 rounded-xl border border-blue-100 dark:border-blue-800/50 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mr-3">
+                      <Rocket className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">Daily Hosting</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Ongoing maintenance cost</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{dailyCharge}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">coins/day</p>
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-green-200 dark:border-green-800">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-700 dark:text-gray-300 font-medium">Your Current Balance</span>
-                <span className={`text-xl font-bold ${(user?.coinBalance || 0) >= 25 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                  {user?.coinBalance || 0} coins
-                </span>
+
+              {/* Balance Card */}
+              <div className={`p-5 rounded-xl border shadow-sm transition-colors ${
+                (user?.coinBalance || 0) >= deploymentFee 
+                  ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800/50' 
+                  : 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/50'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center mr-3 ${
+                      (user?.coinBalance || 0) >= deploymentFee 
+                        ? 'bg-green-100 dark:bg-green-900/50' 
+                        : 'bg-red-100 dark:bg-red-900/50'
+                    }`}>
+                      <Coins className={`w-5 h-5 ${
+                        (user?.coinBalance || 0) >= deploymentFee 
+                          ? 'text-green-600 dark:text-green-400' 
+                          : 'text-red-600 dark:text-red-400'
+                      }`} />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">Your Balance</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Available coins</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-2xl font-bold ${
+                      (user?.coinBalance || 0) >= deploymentFee 
+                        ? 'text-green-600 dark:text-green-400' 
+                        : 'text-red-600 dark:text-red-400'
+                    }`}>
+                      {user?.coinBalance || 0}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">coins</p>
+                  </div>
+                </div>
+                
+                {(user?.coinBalance || 0) < deploymentFee && (
+                  <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                    <div className="flex items-center">
+                      <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 mr-2" />
+                      <p className="text-sm text-red-700 dark:text-red-300 font-medium">
+                        Insufficient balance. Need {deploymentFee - (user?.coinBalance || 0)} more coins to deploy.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {(user?.coinBalance || 0) >= deploymentFee && (
+                  <div className="mt-4 p-3 bg-green-100 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                    <div className="flex items-center">
+                      <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400 mr-2" />
+                      <p className="text-sm text-green-700 dark:text-green-300 font-medium">
+                        Sufficient balance. Ready to deploy!
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
-              {(user?.coinBalance || 0) < 25 && (
-                <p className="text-sm text-red-600 dark:text-red-400 mt-2">
-                  Insufficient balance. You need at least 25 coins to deploy.
-                </p>
-              )}
             </div>
           </div>
 
@@ -407,7 +489,7 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
                 !githubForm.sessionId.trim() || 
                 !githubForm.ownerNumber.trim() ||
                 (branchCheckResult !== null && !branchCheckResult.available) ||
-                (user?.coinBalance || 0) < 25
+                (user?.coinBalance || 0) < deploymentFee
               }
             >
               {githubDeployMutation.isPending ? "Deploying..." : "Deploy Bot"}
