@@ -1089,7 +1089,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ]);
 
       if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
-        return res.status(400).json({ message: 'GitHub settings not configured by admin. Please contact administrator.' });
+        return res.status(400).json({ 
+          message: 'GitHub integration not configured. Administrator needs to set up GitHub token and repository settings.',
+          details: 'Contact support to configure GitHub integration for deployment management.',
+          missingSettings: {
+            token: !githubToken?.value,
+            owner: !repoOwner?.value,  
+            repo: !repoName?.value
+          }
+        });
       }
 
       const generateBranchName = () => {
@@ -2437,7 +2445,16 @@ jobs:
       ]);
 
       if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
-        return res.status(400).json({ message: 'GitHub settings not configured' });
+        // Return deployment info with helpful message instead of error
+        return res.json([{
+          jobId: 1,
+          jobName: 'Configuration Required',
+          logs: 'GitHub integration not configured by administrator.\n\nTo enable deployment monitoring:\n1. Contact your administrator\n2. Ask them to configure GitHub settings in admin panel\n3. Provide GitHub token, repository owner, and repository name\n\nDeployment may still be running, but logs cannot be accessed without GitHub configuration.',
+          status: 'configuration_missing',
+          conclusion: 'neutral',
+          createdAt: deployment.createdAt || new Date().toISOString(),
+          updatedAt: deployment.updatedAt || new Date().toISOString()
+        }]);
       }
 
       const GITHUB_TOKEN = githubToken.value;
@@ -2513,11 +2530,32 @@ jobs:
 
               if (logsResponse.ok) {
                 const logs = await logsResponse.text();
+                
+                // Check if app has started in logs for automatic status detection
+                const hasAppStarted = logs.includes('npm start') || 
+                                    logs.includes('node index.js') || 
+                                    logs.includes('Server is running') ||
+                                    logs.includes('Application started') ||
+                                    logs.includes('listening on port');
+                
+                // Update deployment status if app has started
+                if (hasAppStarted && deployment.status === 'deploying') {
+                  try {
+                    await storage.updateDeploymentStatus(deployment._id.toString(), 'active');
+                    console.log(`Deployment ${deployment._id.toString()} status updated to active - app started detected`);
+                  } catch (updateError) {
+                    console.error('Error updating deployment status:', updateError);
+                  }
+                }
+                
                 detailedLogs.push({
+                  jobId: job.id,
                   jobName: job.name,
                   status: job.status,
                   conclusion: job.conclusion,
-                  logs: logs || 'No logs available'
+                  logs: logs || 'No logs available',
+                  createdAt: job.created_at,
+                  updatedAt: job.completed_at || new Date().toISOString()
                 });
               }
             }
@@ -2527,11 +2565,20 @@ jobs:
         }
       }
 
-      res.json({
-        deployment,
-        workflowRuns,
-        detailedLogs
-      });
+      // Check if we found any logs to show deployment status
+      if (detailedLogs.length === 0) {
+        detailedLogs.push({
+          jobId: 1,
+          jobName: 'Deployment Status',
+          logs: workflowRuns.length > 0 ? 
+            'Deployment workflow found but logs are not yet available.\nThe deployment may still be initializing. Please check back in a few moments.' :
+            'No deployment workflows found for this branch.\nThe deployment may not have started yet or GitHub Actions may not be properly configured.',
+          status: workflowRuns.length > 0 ? 'pending' : 'not_started',
+          conclusion: 'neutral'
+        });
+      }
+
+      res.json(detailedLogs);
     } catch (error) {
       console.error('Error fetching deployment logs:', error);
       res.status(500).json({ message: 'Failed to fetch deployment logs' });
@@ -2561,7 +2608,14 @@ jobs:
       ]);
 
       if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
-        return res.status(400).json({ message: 'GitHub settings not configured' });
+        // Return deployment info with helpful message for specific run logs
+        return res.json([{
+          jobId: parseInt(runId) || 1,
+          jobName: 'Configuration Required',
+          logs: 'GitHub integration not configured by administrator. Cannot access specific workflow run logs.\n\nContact your administrator to configure GitHub settings.',
+          status: 'configuration_missing',
+          conclusion: 'neutral'
+        }]);
       }
 
       const GITHUB_TOKEN = githubToken.value;
