@@ -162,8 +162,9 @@ export default function DeploymentDetails() {
         });
         setLogs(allLogs);
       } else if (data.workflowRuns && data.workflowRuns.length > 0) {
+        const deploymentName = data.deployment?.name || deployment?.name || 'Unknown Deployment';
         setLogs([
-          `Found ${data.workflowRuns.length} workflow runs for deployment "${data.deployment.name}":`,
+          `Found ${data.workflowRuns.length} workflow runs for deployment "${deploymentName}":`,
           "",
           ...data.workflowRuns.map((run: any, index: number) => 
             `${index + 1}. Run #${run.run_number} - ${run.status} (${run.conclusion || 'running'})`
@@ -172,8 +173,9 @@ export default function DeploymentDetails() {
           "Detailed logs are being fetched..."
         ]);
       } else {
+        const deploymentName = data.deployment?.name || deployment?.name || 'Unknown Deployment';
         setLogs([
-          `No workflow runs found for deployment "${data.deployment.name}".`,
+          `No workflow runs found for deployment "${deploymentName}".`,
           "This could mean:",
           "• The deployment hasn't been triggered yet",
           "• GitHub workflow is not configured properly", 
