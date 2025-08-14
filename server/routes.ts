@@ -1088,6 +1088,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getAppSetting('github_repo_name')
       ]);
 
+      // Debug logging to see what we're getting
+      console.log('GitHub settings check:', {
+        token: githubToken ? 'EXISTS' : 'MISSING',
+        owner: repoOwner ? 'EXISTS' : 'MISSING',
+        repo: repoName ? 'EXISTS' : 'MISSING',
+        tokenValue: githubToken?.value ? 'SET' : 'NOT SET',
+        ownerValue: repoOwner?.value ? 'SET' : 'NOT SET',
+        repoValue: repoName?.value ? 'SET' : 'NOT SET'
+      });
+
       if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
         return res.status(400).json({ 
           message: 'GitHub integration not configured. Administrator needs to set up GitHub token and repository settings.',
@@ -2334,13 +2344,20 @@ jobs:
       ];
 
       for (const setting of settings) {
-        const settingData = insertAppSettingsSchema.parse({
-          ...setting,
-          updatedBy: adminId
-        });
-        await storage.setAppSetting(settingData);
+        try {
+          const settingData = insertAppSettingsSchema.parse({
+            ...setting,
+            updatedBy: adminId
+          });
+          await storage.setAppSetting(settingData);
+          console.log(`Successfully saved setting: ${setting.key}`);
+        } catch (parseError) {
+          console.error(`Error parsing setting ${setting.key}:`, parseError);
+          throw parseError;
+        }
       }
 
+      console.log('All GitHub settings updated successfully');
       res.json({ message: 'GitHub settings updated successfully' });
     } catch (error) {
       console.error('Error updating GitHub settings:', error);

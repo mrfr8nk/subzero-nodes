@@ -285,6 +285,16 @@ export default function DeploymentLogsModal({
                                   <RefreshCw className="w-4 h-4 animate-spin" />
                                   <span>{job.logs}</span>
                                 </div>
+                              ) : job.logs.includes('GitHub integration not configured') ? (
+                                <div className="text-orange-400 space-y-2">
+                                  <div className="flex items-center space-x-2">
+                                    <AlertCircle className="w-4 h-4" />
+                                    <span className="font-semibold">Configuration Required</span>
+                                  </div>
+                                  <div className="whitespace-pre-line text-sm leading-relaxed">
+                                    {job.logs}
+                                  </div>
+                                </div>
                               ) : (
                                 formatLogContent(job.logs)
                               )}
