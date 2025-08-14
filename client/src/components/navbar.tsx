@@ -29,6 +29,7 @@ export default function Navbar() {
     { path: "/deployments", label: "Deployments" },
     { path: "/wallet", label: "Wallet" },
     { path: "/referrals", label: "Referrals" },
+    { path: "/premium", label: "⭐ Premium", special: true },
     { path: "/chat", label: "Chat" },
     { path: "/user-settings", label: "Settings" },
     ...(isAdmin ? [
@@ -69,7 +70,9 @@ export default function Navbar() {
                 key={item.path}
                 href={item.path}
                 className={`font-medium transition-colors ${
-                  isActive(item.path)
+                  item.special
+                    ? "text-purple-600 dark:text-purple-400 font-semibold hover:text-purple-700 dark:hover:text-purple-300"
+                    : isActive(item.path)
                     ? "text-blue-600 dark:text-blue-400 font-semibold"
                     : "text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
                 }`}
@@ -138,7 +141,9 @@ export default function Navbar() {
                 href={item.path}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={`block py-2 transition-colors ${
-                  isActive(item.path)
+                  item.special
+                    ? "text-purple-600 dark:text-purple-400 font-semibold hover:text-purple-700 dark:hover:text-purple-300"
+                    : isActive(item.path)
                     ? "text-blue-600 dark:text-blue-400 font-semibold"
                     : "text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
                 }`}

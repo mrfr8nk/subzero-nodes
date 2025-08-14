@@ -29,6 +29,7 @@ import UserSettings from "@/pages/user-settings";
 import Maintenance from "@/pages/maintenance";
 import Chat from "@/pages/chat";
 import Navbar from "@/components/navbar";
+import Premium from "@/pages/premium";
 
 function Router() {
   const { isAuthenticated, isLoading, isAdmin } = useAuth();
@@ -82,6 +83,7 @@ function Router() {
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/wallet" component={Wallet} />
         <Route path="/referrals" component={Referrals} />
+        <Route path="/premium" component={Premium} />
         <Route path="/deployments" component={Deployments} />
         <Route path="/deployments/:id" component={DeploymentDetails} />
         <Route path="/user-settings" component={UserSettings} />
