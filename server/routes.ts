@@ -703,14 +703,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check username availability route
+  app.post('/api/auth/check-username', async (req, res) => {
+    try {
+      const { username } = req.body;
+      
+      if (!username) {
+        return res.status(400).json({ message: 'Username is required' });
+      }
+      
+      if (username.length < 3 || username.length > 20) {
+        return res.status(400).json({ 
+          available: false,
+          message: 'Username must be between 3 and 20 characters' 
+        });
+      }
+      
+      if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+        return res.status(400).json({ 
+          available: false,
+          message: 'Username can only contain letters, numbers, and underscores' 
+        });
+      }
+      
+      const isAvailable = await storage.checkUsernameAvailability(username);
+      
+      res.json({
+        available: isAvailable,
+        message: isAvailable ? 'Username is available' : 'Username is already taken'
+      });
+    } catch (error) {
+      console.error('Error checking username availability:', error);
+      res.status(500).json({ message: 'Error checking username availability' });
+    }
+  });
+
+  // Check device limit route
+  app.post('/api/auth/check-device-limit', async (req, res) => {
+    try {
+      const { deviceFingerprint } = req.body;
+      
+      if (!deviceFingerprint) {
+        return res.status(400).json({ message: 'Device fingerprint is required' });
+      }
+      
+      const existingAccountsFromDevice = await storage.getUsersByDeviceFingerprint(deviceFingerprint);
+      
+      // Get configurable max accounts per device from admin settings (default to 1)
+      const maxAccountsSetting = await storage.getAppSetting('max_accounts_per_device');
+      const maxAccountsPerDevice = maxAccountsSetting?.value || 1;
+      
+      const activeAccounts = existingAccountsFromDevice.filter(user => 
+        user.status !== 'banned' && user.status !== 'restricted'
+      );
+      
+      const allowed = activeAccounts.length < maxAccountsPerDevice;
+      
+      res.json({
+        allowed,
+        currentCount: activeAccounts.length,
+        maxAllowed: maxAccountsPerDevice
+      });
+    } catch (error) {
+      console.error('Error checking device limit:', error);
+      res.status(500).json({ message: 'Error checking device limit' });
+    }
+  });
+
   // Local email signup route
   app.post('/api/auth/local/signup', async (req, res) => {
     try {
-      const { firstName, lastName, email, password, referralCode } = req.body;
+      const { firstName, lastName, username, email, password, referralCode } = req.body;
 
       // Validate required fields
-      if (!firstName || !lastName || !email || !password) {
+      if (!firstName || !lastName || !username || !email || !password) {
         return res.status(400).json({ message: 'All fields are required' });
+      }
+
+      // Check username availability
+      const isUsernameAvailable = await storage.checkUsernameAvailability(username);
+      if (!isUsernameAvailable) {
+        return res.status(400).json({ message: 'Username is already taken' });
       }
 
       // Check if user already exists
@@ -752,6 +825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newUser = await storage.createLocalUser({
         firstName,
         lastName,
+        username,
         email,
         password: hashedPassword,
         verificationToken,
@@ -852,17 +926,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(500).json({ message: 'Login failed' });
         }
         
-        // Track user device fingerprint for login
+        // Track user device fingerprint and create login history
         try {
           const { deviceFingerprint } = req.body;
+          const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
+          const userAgent = req.get('User-Agent') || 'unknown';
+          
           if (deviceFingerprint) {
             await storage.updateUserDeviceFingerprint(user._id.toString(), deviceFingerprint);
           }
+
+          // Create login history entry
+          await storage.createLoginHistory({
+            userId: user._id.toString(),
+            email: user.email,
+            username: user.username,
+            ipAddress,
+            userAgent,
+            deviceFingerprint,
+            loginMethod: 'local',
+            success: true,
+          });
+
+          // Update last login time
+          await storage.updateUserLastLogin(user._id.toString(), ipAddress);
         } catch (error) {
-          console.error('Error tracking user device fingerprint:', error);
+          console.error('Error tracking user device fingerprint and login history:', error);
         }
         
-        res.json({ message: 'Login successful', user: { _id: user._id, email: user.email, firstName: user.firstName, lastName: user.lastName } });
+        res.json({ message: 'Login successful', user: { _id: user._id, email: user.email, firstName: user.firstName, lastName: user.lastName, username: user.username } });
       });
     } catch (error) {
       console.error('Login error:', error);
@@ -998,6 +1090,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Resend verification error:', error);
       res.status(500).json({ message: 'Failed to resend verification email' });
+    }
+  });
+
+  // Check username availability
+  app.post('/api/auth/check-username', async (req, res) => {
+    try {
+      const { username } = req.body;
+      
+      if (!username) {
+        return res.status(400).json({ message: 'Username is required' });
+      }
+
+      if (username.length < 3 || username.length > 20) {
+        return res.status(400).json({ 
+          available: false, 
+          message: 'Username must be between 3 and 20 characters' 
+        });
+      }
+
+      // Check if username contains only valid characters (alphanumeric and underscore)
+      if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+        return res.status(400).json({ 
+          available: false, 
+          message: 'Username can only contain letters, numbers, and underscores' 
+        });
+      }
+
+      const isAvailable = await storage.checkUsernameAvailability(username);
+      res.json({ available: isAvailable });
+    } catch (error) {
+      console.error('Error checking username availability:', error);
+      res.status(500).json({ message: 'Failed to check username availability' });
+    }
+  });
+
+  // Check device account limit
+  app.post('/api/auth/check-device-limit', async (req, res) => {
+    try {
+      const { deviceFingerprint } = req.body;
+      
+      if (!deviceFingerprint) {
+        return res.status(400).json({ message: 'Device fingerprint is required' });
+      }
+
+      const deviceLimit = await storage.checkDeviceAccountLimit(deviceFingerprint);
+      res.json(deviceLimit);
+    } catch (error) {
+      console.error('Error checking device limit:', error);
+      res.status(500).json({ message: 'Failed to check device limit' });
+    }
+  });
+
+  // Get user login history
+  app.get('/api/auth/login-history', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const limit = parseInt(req.query.limit as string) || 50;
+      
+      const loginHistory = await storage.getUserLoginHistory(userId, limit);
+      res.json({ loginHistory });
+    } catch (error) {
+      console.error('Error fetching login history:', error);
+      res.status(500).json({ message: 'Failed to fetch login history' });
+    }
+  });
+
+  // Check branch name availability
+  app.post('/api/deployments/check-branch', isAuthenticated, async (req: any, res) => {
+    try {
+      const { branchName } = req.body;
+      const userId = req.user._id.toString();
+      
+      if (!branchName) {
+        return res.status(400).json({ message: 'Branch name is required' });
+      }
+
+      if (branchName.length < 2 || branchName.length > 50) {
+        return res.status(400).json({ 
+          available: false, 
+          message: 'Branch name must be between 2 and 50 characters' 
+        });
+      }
+
+      // Check if branch name contains only valid characters
+      if (!/^[a-zA-Z0-9_-]+$/.test(branchName)) {
+        return res.status(400).json({ 
+          available: false, 
+          message: 'Branch name can only contain letters, numbers, hyphens, and underscores' 
+        });
+      }
+
+      const isAvailable = await storage.checkBranchNameAvailability(branchName, userId);
+      res.json({ available: isAvailable });
+    } catch (error) {
+      console.error('Error checking branch name availability:', error);
+      res.status(500).json({ message: 'Error checking availability' });
+    }
+  });
+
+  // Get developer info (for public display)
+  app.get('/api/developer-info', async (req, res) => {
+    try {
+      const developerInfo = await storage.getDeveloperInfo();
+      res.json({ developerInfo });
+    } catch (error) {
+      console.error('Error fetching developer info:', error);
+      res.status(500).json({ message: 'Failed to fetch developer info' });
+    }
+  });
+
+  // Set developer info (admin only)
+  app.post('/api/admin/developer-info', requireAdmin, async (req: any, res) => {
+    try {
+      const { name, appName, channels } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ message: 'Developer name is required' });
+      }
+
+      const developerInfo = await storage.setDeveloperInfo({
+        name,
+        appName,
+        channels: channels || {},
+        isActive: true,
+      });
+
+      res.json({ developerInfo });
+    } catch (error) {
+      console.error('Error setting developer info:', error);
+      res.status(500).json({ message: 'Failed to set developer info' });
+    }
+  });
+
+  // Update developer info (admin only)
+  app.put('/api/admin/developer-info/:id', requireAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      await storage.updateDeveloperInfo(id, updates);
+      res.json({ message: 'Developer info updated successfully' });
+    } catch (error) {
+      console.error('Error updating developer info:', error);
+      res.status(500).json({ message: 'Failed to update developer info' });
     }
   });
 

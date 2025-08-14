@@ -12,6 +12,8 @@ import {
   BannedDeviceFingerprint,
   CoinTransfer,
   BannedUser,
+  LoginHistory,
+  DeveloperInfo,
   InsertUser,
   InsertDeployment,
   InsertTransaction,
@@ -23,6 +25,8 @@ import {
   InsertBannedDeviceFingerprint,
   InsertCoinTransfer,
   InsertBannedUser,
+  InsertLoginHistory,
+  InsertDeveloperInfo,
 } from "@shared/schema";
 import { getDb } from "./db";
 import { ObjectId } from "mongodb";
@@ -41,6 +45,7 @@ export interface IStorage {
   resetPassword(userId: string, newPassword: string): Promise<void>;
   updateVerificationToken(email: string, token: string, expiry: Date): Promise<void>;
   upsertUser(user: InsertUser, registrationIp?: string): Promise<User>;
+  checkUsernameAvailability(username: string): Promise<boolean>;
   
   // Deployment operations
   createDeployment(deployment: InsertDeployment): Promise<Deployment>;
@@ -186,6 +191,34 @@ export interface IStorage {
   
   // User password change operations
   changeUserPassword(userId: string, currentPassword: string, newPassword: string): Promise<void>;
+  
+  // Username operations
+  checkUsernameAvailability(username: string): Promise<boolean>;
+  updateUsername(userId: string, username: string): Promise<void>;
+  updateUserLastLogin(userId: string, ipAddress: string): Promise<void>;
+  
+  // Login history operations
+  createLoginHistory(loginHistory: InsertLoginHistory): Promise<LoginHistory>;
+  getUserLoginHistory(userId: string, limit?: number): Promise<LoginHistory[]>;
+  updateLoginSessionEnd(loginId: string, logoutTime: Date, sessionDuration: number): Promise<void>;
+  
+  // Device restriction operations
+  checkDeviceAccountLimit(deviceFingerprint: string): Promise<{ allowed: boolean; currentCount: number; maxAllowed: number }>;
+  incrementDeviceAccountCount(deviceFingerprint: string): Promise<void>;
+  decrementDeviceAccountCount(deviceFingerprint: string): Promise<void>;
+  
+  // Bot limit operations
+  checkUserBotLimit(userId: string): Promise<{ allowed: boolean; currentCount: number; maxAllowed: number }>;
+  incrementUserBotCount(userId: string): Promise<void>;
+  decrementUserBotCount(userId: string): Promise<void>;
+  
+  // Developer info operations
+  getDeveloperInfo(): Promise<DeveloperInfo | undefined>;
+  setDeveloperInfo(developerInfo: InsertDeveloperInfo): Promise<DeveloperInfo>;
+  updateDeveloperInfo(id: string, updates: Partial<DeveloperInfo>): Promise<void>;
+  
+  // Branch name availability
+  checkBranchNameAvailability(branchName: string, userId?: string): Promise<boolean>;
 }
 
 export class MongoStorage implements IStorage {
@@ -239,6 +272,14 @@ export class MongoStorage implements IStorage {
 
   private get bannedUsersCollection() {
     return getDb().collection<BannedUser>("bannedUsers");
+  }
+
+  private get loginHistoryCollection() {
+    return getDb().collection<LoginHistory>("loginHistory");
+  }
+
+  private get developerInfoCollection() {
+    return getDb().collection<DeveloperInfo>("developerInfo");
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -2122,6 +2163,198 @@ export class MongoStorage implements IStorage {
         }
       }
     );
+  }
+
+  // Username operations
+  async checkUsernameAvailability(username: string): Promise<boolean> {
+    const existingUser = await this.usersCollection.findOne({ username });
+    return !existingUser;
+  }
+
+  async updateUsername(userId: string, username: string): Promise<void> {
+    await this.usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $set: { 
+          username,
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
+  async updateUserLastLogin(userId: string, ipAddress: string): Promise<void> {
+    await this.usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $set: { 
+          lastLogin: new Date(),
+          lastLoginIp: ipAddress,
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
+  // Login history operations
+  async createLoginHistory(loginHistory: InsertLoginHistory): Promise<LoginHistory> {
+    const history: LoginHistory = {
+      _id: new ObjectId(),
+      userId: new ObjectId(loginHistory.userId),
+      email: loginHistory.email,
+      username: loginHistory.username,
+      ipAddress: loginHistory.ipAddress,
+      userAgent: loginHistory.userAgent,
+      deviceFingerprint: loginHistory.deviceFingerprint,
+      location: loginHistory.location,
+      loginMethod: loginHistory.loginMethod,
+      success: loginHistory.success,
+      failureReason: loginHistory.failureReason,
+      sessionDuration: loginHistory.sessionDuration,
+      logoutTime: loginHistory.logoutTime,
+      createdAt: new Date(),
+    };
+
+    await this.loginHistoryCollection.insertOne(history);
+    return history;
+  }
+
+  async getUserLoginHistory(userId: string, limit: number = 50): Promise<LoginHistory[]> {
+    return await this.loginHistoryCollection
+      .find({ userId: new ObjectId(userId) })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+  }
+
+  async updateLoginSessionEnd(loginId: string, logoutTime: Date, sessionDuration: number): Promise<void> {
+    await this.loginHistoryCollection.updateOne(
+      { _id: new ObjectId(loginId) },
+      { 
+        $set: { 
+          logoutTime,
+          sessionDuration
+        }
+      }
+    );
+  }
+
+  // Device restriction operations
+  async checkDeviceAccountLimit(deviceFingerprint: string): Promise<{ allowed: boolean; currentCount: number; maxAllowed: number }> {
+    const currentCount = await this.usersCollection.countDocuments({ 
+      deviceFingerprint,
+      status: { $ne: 'banned' }
+    });
+    const maxAllowed = 1; // Default limit of 1 account per device
+    
+    return {
+      allowed: currentCount < maxAllowed,
+      currentCount,
+      maxAllowed
+    };
+  }
+
+  async incrementDeviceAccountCount(deviceFingerprint: string): Promise<void> {
+    await this.usersCollection.updateMany(
+      { deviceFingerprint },
+      { 
+        $inc: { deviceAccountCount: 1 },
+        $set: { updatedAt: new Date() }
+      }
+    );
+  }
+
+  async decrementDeviceAccountCount(deviceFingerprint: string): Promise<void> {
+    await this.usersCollection.updateMany(
+      { deviceFingerprint },
+      { 
+        $inc: { deviceAccountCount: -1 },
+        $set: { updatedAt: new Date() }
+      }
+    );
+  }
+
+  // Bot limit operations
+  async checkUserBotLimit(userId: string): Promise<{ allowed: boolean; currentCount: number; maxAllowed: number }> {
+    const user = await this.usersCollection.findOne({ _id: new ObjectId(userId) });
+    const currentCount = user?.currentBotCount || 0;
+    const maxAllowed = user?.maxBots || 10;
+    
+    return {
+      allowed: currentCount < maxAllowed,
+      currentCount,
+      maxAllowed
+    };
+  }
+
+  async incrementUserBotCount(userId: string): Promise<void> {
+    await this.usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $inc: { currentBotCount: 1 },
+        $set: { updatedAt: new Date() }
+      }
+    );
+  }
+
+  async decrementUserBotCount(userId: string): Promise<void> {
+    await this.usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $inc: { currentBotCount: -1 },
+        $set: { updatedAt: new Date() }
+      }
+    );
+  }
+
+  // Developer info operations
+  async getDeveloperInfo(): Promise<DeveloperInfo | undefined> {
+    const info = await this.developerInfoCollection.findOne({ isActive: true });
+    return info || undefined;
+  }
+
+  async setDeveloperInfo(developerInfo: InsertDeveloperInfo): Promise<DeveloperInfo> {
+    // Deactivate existing developer info
+    await this.developerInfoCollection.updateMany(
+      {},
+      { $set: { isActive: false, updatedAt: new Date() } }
+    );
+
+    const info: DeveloperInfo = {
+      _id: new ObjectId(),
+      name: developerInfo.name,
+      appName: developerInfo.appName,
+      channels: developerInfo.channels,
+      isActive: developerInfo.isActive ?? true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await this.developerInfoCollection.insertOne(info);
+    return info;
+  }
+
+  async updateDeveloperInfo(id: string, updates: Partial<DeveloperInfo>): Promise<void> {
+    await this.developerInfoCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { 
+        $set: { 
+          ...updates,
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
+  // Branch name availability
+  async checkBranchNameAvailability(branchName: string, userId?: string): Promise<boolean> {
+    const query: any = { branchName };
+    if (userId) {
+      query.userId = { $ne: new ObjectId(userId) };
+    }
+    
+    const existingDeployment = await this.deploymentsCollection.findOne(query);
+    return !existingDeployment;
   }
 }
 

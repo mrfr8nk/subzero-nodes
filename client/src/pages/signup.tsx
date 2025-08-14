@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -16,6 +16,7 @@ import { getDeviceFingerprint } from "@/lib/deviceFingerprint";
 const signupSchema = z.object({
   firstName: z.string().min(2, "First name must be at least 2 characters"),
   lastName: z.string().min(2, "Last name must be at least 2 characters"),
+  username: z.string().min(3, "Username must be at least 3 characters").max(20, "Username must be less than 20 characters").regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string(),
@@ -32,6 +33,12 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [usernameStatus, setUsernameStatus] = useState<{
+    checking: boolean;
+    available?: boolean;
+    message?: string;
+  }>({ checking: false });
+  const [deviceLimitError, setDeviceLimitError] = useState<string>("");
 
   // Get referral code from URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -42,6 +49,7 @@ export default function Signup() {
     defaultValues: {
       firstName: "",
       lastName: "",
+      username: "",
       email: "",
       password: "",
       confirmPassword: "",
@@ -57,8 +65,104 @@ export default function Signup() {
     }
   };
 
+  // Check username availability with debouncing
+  const checkUsernameAvailability = async (username: string) => {
+    if (!username || username.length < 3) {
+      setUsernameStatus({ checking: false });
+      return;
+    }
+
+    setUsernameStatus({ checking: true });
+    
+    try {
+      const response = await fetch('/api/auth/check-username', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        setUsernameStatus({
+          checking: false,
+          available: result.available,
+          message: result.available ? 'Username is available' : 'Username is already taken'
+        });
+      } else {
+        setUsernameStatus({
+          checking: false,
+          available: false,
+          message: result.message || 'Error checking username'
+        });
+      }
+    } catch (error) {
+      setUsernameStatus({
+        checking: false,
+        available: false,
+        message: 'Error checking username availability'
+      });
+    }
+  };
+
+  // Check device limit before signup
+  const checkDeviceLimit = async () => {
+    try {
+      const deviceFingerprint = await getDeviceFingerprint();
+      const response = await fetch('/api/auth/check-device-limit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceFingerprint })
+      });
+      
+      const result = await response.json();
+      
+      if (!result.allowed) {
+        setDeviceLimitError(`Only ${result.maxAllowed} account(s) allowed per device. You already have ${result.currentCount} account(s).`);
+        return false;
+      }
+      
+      setDeviceLimitError("");
+      return true;
+    } catch (error) {
+      console.error('Error checking device limit:', error);
+      return true; // Allow signup if check fails
+    }
+  };
+
+  // Debounced username checking
+  useEffect(() => {
+    const username = form.watch('username');
+    if (!username) return;
+
+    const timeoutId = setTimeout(() => {
+      checkUsernameAvailability(username);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [form.watch('username')]);
+
   const onSubmit = async (data: SignupFormData) => {
     setIsLoading(true);
+    
+    // Check device limit first
+    const deviceAllowed = await checkDeviceLimit();
+    if (!deviceAllowed) {
+      setIsLoading(false);
+      return;
+    }
+
+    // Check if username is available
+    if (!usernameStatus.available) {
+      toast({
+        title: "Username Error",
+        description: "Please choose an available username",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+    
     try {
       // Get device fingerprint before signup
       const deviceFingerprint = await getDeviceFingerprint();
@@ -66,6 +170,7 @@ export default function Signup() {
       const payload = {
         firstName: data.firstName,
         lastName: data.lastName,
+        username: data.username,
         email: data.email,
         password: data.password,
         referralCode: referralCode || undefined,
@@ -183,6 +288,27 @@ export default function Signup() {
                 </div>
               </div>
 
+              {/* Device Limit Error */}
+              {deviceLimitError && (
+                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">!</span>
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-red-800 dark:text-red-200">
+                        Account Limit Reached
+                      </h4>
+                      <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                        {deviceLimitError}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Email/Password Form */}
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -225,6 +351,52 @@ export default function Signup() {
                       )}
                     />
                   </div>
+
+                  {/* Username field with availability checking */}
+                  <FormField
+                    control={form.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Username</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              {...field}
+                              placeholder="john_doe"
+                              disabled={isLoading}
+                              className="h-11 pr-10"
+                              data-testid="input-username"
+                            />
+                            {usernameStatus.checking && (
+                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                              </div>
+                            )}
+                            {!usernameStatus.checking && usernameStatus.available !== undefined && (
+                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                {usernameStatus.available ? (
+                                  <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                                    <span className="text-white text-xs">✓</span>
+                                  </div>
+                                ) : (
+                                  <div className="w-4 h-4 rounded-full bg-red-500 flex items-center justify-center">
+                                    <span className="text-white text-xs">✗</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </FormControl>
+                        {usernameStatus.message && (
+                          <p className={`text-xs ${usernameStatus.available ? 'text-green-600' : 'text-red-600'}`}>
+                            {usernameStatus.message}
+                          </p>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}

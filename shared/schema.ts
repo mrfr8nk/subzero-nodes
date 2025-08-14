@@ -49,6 +49,57 @@ export interface User {
   registrationIp?: string; // IP address used during registration
   lastLoginIp?: string; // Last login IP address
   lastLogin?: Date;
+  // Device restrictions
+  maxAccountsPerDevice?: number; // Max accounts allowed per device (default 1)
+  deviceAccountCount?: number; // Current number of accounts on this device
+  // Bot limits
+  maxBots?: number; // Maximum bots allowed (default 10)
+  currentBotCount?: number; // Current number of bots
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Login history interface
+export interface LoginHistory {
+  _id: ObjectId;
+  userId: ObjectId;
+  email: string;
+  username?: string;
+  ipAddress: string;
+  userAgent: string;
+  deviceFingerprint?: string;
+  location?: {
+    country?: string;
+    region?: string;
+    city?: string;
+    timezone?: string;
+  };
+  loginMethod: string; // 'local', 'google', 'github'
+  success: boolean;
+  failureReason?: string;
+  sessionDuration?: number; // Duration in minutes
+  logoutTime?: Date;
+  createdAt: Date;
+}
+
+// Developer info settings interface
+export interface DeveloperInfo {
+  _id: ObjectId;
+  name: string;
+  appName?: string;
+  channels: {
+    youtube?: string;
+    tiktok?: string;
+    instagram?: string;
+    facebook?: string;
+    linkedin?: string;
+    github?: string;
+    whatsapp?: string;
+    discord?: string;
+    telegram?: string;
+    website?: string;
+  };
+  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -252,6 +303,50 @@ export const insertUserSchema = z.object({
     tiktok: z.string().optional(),
     whatsapp: z.string().optional(),
   }).optional(),
+  // Device restrictions
+  maxAccountsPerDevice: z.number().default(1),
+  deviceAccountCount: z.number().default(0),
+  // Bot limits
+  maxBots: z.number().default(10),
+  currentBotCount: z.number().default(0),
+});
+
+export const insertLoginHistorySchema = z.object({
+  userId: z.string(),
+  email: z.string().email(),
+  username: z.string().optional(),
+  ipAddress: z.string(),
+  userAgent: z.string(),
+  deviceFingerprint: z.string().optional(),
+  location: z.object({
+    country: z.string().optional(),
+    region: z.string().optional(),
+    city: z.string().optional(),
+    timezone: z.string().optional(),
+  }).optional(),
+  loginMethod: z.string(),
+  success: z.boolean(),
+  failureReason: z.string().optional(),
+  sessionDuration: z.number().optional(),
+  logoutTime: z.date().optional(),
+});
+
+export const insertDeveloperInfoSchema = z.object({
+  name: z.string(),
+  appName: z.string().optional(),
+  channels: z.object({
+    youtube: z.string().optional(),
+    tiktok: z.string().optional(),
+    instagram: z.string().optional(),
+    facebook: z.string().optional(),
+    linkedin: z.string().optional(),
+    github: z.string().optional(),
+    whatsapp: z.string().optional(),
+    discord: z.string().optional(),
+    telegram: z.string().optional(),
+    website: z.string().optional(),
+  }),
+  isActive: z.boolean().default(true),
 });
 
 export const insertDeploymentSchema = z.object({
@@ -378,6 +473,8 @@ export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type InsertBannedDeviceFingerprint = z.infer<typeof insertBannedDeviceFingerprintSchema>;
 export type InsertCoinTransfer = z.infer<typeof insertCoinTransferSchema>;
 export type InsertBannedUser = z.infer<typeof insertBannedUserSchema>;
+export type InsertLoginHistory = z.infer<typeof insertLoginHistorySchema>;
+export type InsertDeveloperInfo = z.infer<typeof insertDeveloperInfoSchema>;
 
 // For backward compatibility
 export type UpsertUser = InsertUser;
