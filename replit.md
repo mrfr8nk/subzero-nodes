@@ -1,194 +1,75 @@
-# SUBZERO-MD Bot Deployment Platform
+# SUBZERO Deployment Platform
 
-## Overview
+## Project Overview
+A comprehensive deployment platform that enables users to deploy and manage applications through GitHub Actions with real-time monitoring, advanced logging, and automated status tracking.
 
-SUBZERO-MD is a full-stack web application for deploying and managing WhatsApp bots. The platform provides a comprehensive dashboard for users to deploy bots, manage resources through a coin-based system, track referrals, and monitor deployment statistics. Built with a modern React frontend and Express backend, it features Google OAuth authentication and uses MongoDB for data persistence.
+## Recent Changes (August 14, 2025)
+
+### Major Deployment System Overhaul
+✅ **Enhanced GitHub Integration**
+- Fixed "failed to get branch" errors with retry logic (3 attempts with delays)
+- Added advanced waiting and status tracking for GitHub workflow creation
+- Implemented proper error handling for branch creation and workflow triggering
+
+✅ **Real-time Log Streaming** 
+- Created advanced log monitoring system that fetches live GitHub Actions logs
+- Added automatic app status detection (monitors for npm start, node index.js, etc.)
+- Deployment status automatically changes to "active" when app start is detected
+- Implemented WebSocket broadcasting for real-time updates
+
+✅ **Enhanced Terminal Display**
+- Professional terminal-style log viewer with macOS-style window controls
+- Color-coded log lines (errors in red, warnings in yellow, success in green, etc.)
+- Real-time log streaming with auto-refresh every 10 seconds
+- Improved terminal formatting with proper spacing and readability
+
+✅ **Environment Variable Management**
+- Fixed config.js and settings.js updates to properly sync with environment variables
+- When editing deployment variables, both config.js and settings.js are updated
+- Auto-generation of environment variables in config files
+- Proper handling of missing config files (creates them if needed)
+
+✅ **Advanced Workflow Monitoring**
+- Monitors GitHub Actions workflows with 8-second initialization delay
+- Tracks installation progress (npm install), package.json processing
+- Detects when applications become active and updates status automatically
+- WebSocket notifications for workflow completion and status changes
 
 ## User Preferences
+- Non-technical language preferred
+- Focus on functional improvements over technical details
+- Real-time feedback and visual indicators important
+- Terminal-style interfaces preferred for deployment logs
 
-Preferred communication style: Simple, everyday language.
+## Architecture Changes
 
-## System Architecture
+### Backend Enhancements
+- **Enhanced Monitoring System**: Added `getWorkflowRunLogs()` and `detectAppStartInLogs()` functions
+- **Retry Logic**: Implemented robust retry mechanisms for GitHub API calls
+- **Real-time Updates**: WebSocket broadcasting system for live deployment status
+- **Storage Extensions**: Added `getDeploymentByBranchName()` function for deployment lookups
 
-### Frontend Architecture
-- **React SPA**: Single-page application built with React 18 and TypeScript
-- **Routing**: Client-side routing using Wouter for lightweight navigation
-- **State Management**: TanStack Query for server state management and caching
-- **UI Framework**: shadcn/ui components built on Radix UI primitives with Tailwind CSS
-- **Form Handling**: React Hook Form with Zod validation for type-safe form management
-- **Build Tool**: Vite for fast development and optimized production builds
+### Frontend Improvements  
+- **Terminal Component**: Professional terminal-style log viewer with color coding
+- **Real-time Monitoring**: Auto-refresh deployment logs every 10 seconds
+- **Status Detection**: Visual indicators for running, completed, and failed deployments
+- **Enhanced UX**: Improved loading states and error handling
 
-### Backend Architecture  
-- **Express.js Server**: RESTful API server with middleware for logging and error handling
-- **Authentication**: Google OAuth 2.0 integration with Passport.js strategy
-- **Session Management**: Express sessions stored in MongoDB using connect-mongo
-- **Database Layer**: Native MongoDB driver with TypeScript interfaces
-- **API Design**: Resource-based endpoints for deployments, transactions, referrals, and user management
+### Key Technical Features
+1. **GitHub Branch Management**: Automatic branch creation with conflict resolution
+2. **Configuration Sync**: Bidirectional sync between deployment variables and config files
+3. **Status Automation**: Auto-detection of app startup and status updates
+4. **Log Processing**: Advanced log parsing with syntax highlighting
+5. **Error Recovery**: Comprehensive error handling with user-friendly messages
 
-### Database Design
-- **Users Collection**: Stores user profiles with Google ID, coin balance and referral codes
-- **Deployments Collection**: Bot deployment records with status tracking and configuration
-- **Transactions Collection**: Financial transaction history for coin system
-- **Referrals Collection**: User referral relationships and earnings tracking
-- **Sessions Collection**: Express session storage for authentication persistence
+## Next Steps
+- Monitor deployment success rates and optimize retry logic
+- Add deployment analytics and performance tracking
+- Implement deployment rollback functionality
+- Enhance real-time collaboration features
 
-### Authentication & Authorization
-- **Dual Authentication**: Google OAuth 2.0 and email/password authentication with verification
-- **Session-Based Auth**: Server-side sessions with secure cookie management and MongoDB storage
-- **Email Services**: Automated verification emails, welcome emails, and password reset functionality
-- **Protected Routes**: Middleware-based route protection for authenticated endpoints  
-- **User Context**: React context for client-side authentication state
-- **Security Features**: Password hashing with bcrypt, secure token generation, email verification with expiry
-- **Cross-Domain Support**: CORS configuration for development and production deployments
-
-### Key Features
-- **Bot Deployment**: One-click deployment system with configuration options and cost management
-- **Coin Economy**: Virtual currency system for resource management and payments
-- **Referral System**: User referral tracking with automatic reward distribution
-- **Dashboard Analytics**: Real-time statistics for deployments, transactions, and referral performance
-- **Mobile Responsive**: Fully responsive design optimized for mobile devices
-- **Admin Controls**: Comprehensive admin dashboard with user management, cost settings, and super admin capabilities
-- **User Management**: Account settings with self-deletion functionality and admin controls for user management
-- **Configurable Costs**: Admin-controlled deployment and daily charge rates instead of hardcoded values
-- **Device-Based Security**: Advanced device fingerprinting system with configurable account limits per device to prevent abuse
-
-## External Dependencies
-
-### Database & Storage
-- **MongoDB**: Document database with native TypeScript integration
-- **Connect-Mongo**: MongoDB session store for Express sessions
-
-### Authentication Services  
-- **Google OAuth 2.0**: Google's OAuth 2.0/OpenID Connect authentication provider
-- **Passport.js**: Authentication middleware with Google OAuth strategy
-
-### UI & Styling
-- **Radix UI**: Headless UI components for accessibility and customization
-- **Tailwind CSS**: Utility-first CSS framework for responsive design
-- **Lucide Icons**: Consistent icon library for UI elements
-
-### Development Tools
-- **TypeScript**: Type safety across frontend and backend
-- **Vite**: Fast build tool with hot module replacement
-- **TanStack Query**: Server state management with caching and synchronization
-- **Zod**: Schema validation for type-safe data handling
-
-### Production Infrastructure
-- **Replit Hosting**: Integrated hosting environment with development tooling
-- **WebSocket Support**: Real-time connection capabilities for enhanced user experience
-
-## Environment Configuration
-
-### Required Environment Variables
-The application requires several environment variables for proper operation. Reference `.env.example` for the complete list.
-
-**Critical Variables:**
-- `DATABASE_URL`: MongoDB connection string
-- `GOOGLE_CLIENT_ID`: Google OAuth client ID
-- `GOOGLE_CLIENT_SECRET`: Google OAuth client secret
-- `SESSION_SECRET`: Secure session secret key
-
-### Google OAuth Domain Configuration
-The application automatically detects the correct callback URL based on the hosting platform:
-
-**Supported Platforms:**
-- **Replit**: Automatically uses `REPLIT_DEV_DOMAIN`
-- **Render.com**: Automatically uses `RENDER_EXTERNAL_URL` or detects `.onrender.com` domains
-- **Koyeb**: Automatically uses `KOYEB_PUBLIC_DOMAIN`
-- **Vercel**: Automatically uses `VERCEL_URL`
-- **Heroku**: Automatically uses `HEROKU_APP_NAME`
-
-**Manual Configuration (Optional):**
-- Set `CALLBACK_URL` environment variable to override automatic detection
-- Example: `CALLBACK_URL=https://your-domain.com/api/auth/google/callback`
-
-**Google Cloud Console Setup:**
-Add your domain's callback URL to Google Cloud Console OAuth settings:
-- Pattern: `https://your-domain.com/api/auth/google/callback`
-- The application will log the detected URL on startup for verification
-
-### Recent Changes (January 2025)
-
-#### User Profile Enhancement & GitHub Workflow System (January 2025)
-- **Complete Country Selection with Flags**: Added comprehensive country dropdown with 195 countries and flag emojis for enhanced user experience
-- **Social Media Profile Integration**: Added GitHub, Facebook, Instagram, TikTok, and WhatsApp username fields with appropriate icons
-- **Profile Picture Persistence**: Fixed profile pictures to remain visible after page refresh and session changes
-- **Default Wallet Balance Increase**: Changed default user balance from 10 to 20 coins with admin configuration capability
-- **Express.js GitHub Workflow Pattern**: Implemented advanced GitHub API deployment system with auto-restart functionality
-  - SUBZERO-MD-X-MR-FRANK workflow with 18000 timeout and continuous loop
-  - Auto-restart mechanism for crashed bots with sleep 2 recovery
-  - Self-triggering workflow using SUBZERO secret token and curl-based re-triggering
-  - Branch-based deployment with sanitized naming and availability checking
-  - Real-time workflow monitoring with WebSocket status updates
-  - Complete Express.js pattern matching GitHub API standards for branch creation, file updates, and workflow dispatching
-
-#### Device Fingerprinting Migration (January 2025)
-- **Replaced IP-Based with Device Fingerprinting**: Complete overhaul of duplicate account prevention system
-  - Removed all IP tracking, storage, and validation logic from authentication flows  
-  - Implemented advanced device fingerprinting using multiple browser characteristics
-  - Device fingerprints generated using canvas rendering, WebGL info, audio context, screen properties, and browser settings
-  - Updated Google OAuth and local authentication to use device fingerprints instead of IP addresses
-  - Admin notifications now track device-based instead of IP-based duplicate account attempts
-  - Configurable max accounts per device setting (replaces max accounts per IP)
-  - Enhanced privacy through cryptographic hashing of device characteristics
-  - More reliable duplicate detection that works across network changes and VPNs
-- **Enhanced Admin Controls**: Super admins can now demote and delete other existing admins
-- **User Account Management**: Users can delete their own accounts through account settings page
-- **Configurable Cost System**: Deployment costs and daily charges are now configurable through admin settings
-- **Improved Error Handling**: Added ObjectId validation to prevent MongoDB BSON errors and WebSocket connection validation
-- **Security Enhancements**: Admins cannot self-delete through user interface for security
-- **Device Fingerprint-Based Duplicate Account Prevention**: Implemented comprehensive device fingerprinting system to prevent users from creating multiple accounts
-  - Advanced device fingerprinting using canvas, WebGL, audio context, and browser characteristics
-  - Configurable maximum accounts per device (default: 1)
-  - Admin notifications for duplicate device detections  
-  - Error handling for both Google OAuth and local signup flows
-  - Admin controls for device restriction configuration
-  - Fixed unhandled promise rejections with global error handlers
-  - Enhanced WebSocket connection stability with better error handling
-  - Removed legacy IP-based tracking and restrictions in favor of more reliable device fingerprinting
-- **Branding Update**: Replaced WhatsApp logos throughout the application with robot/bot icons to better represent the bot platform branding
-  - Updated all page headers and navigation with Bot icon from Lucide React
-  - Maintained consistent blue gradient styling across all logo instances
-  - Updated website manifest with proper app name and theme colors
-- **Chat Message Tagging System**: Implemented comprehensive tagging system for admin notifications
-  - Added support for @issue, @request, and @query tags in chat messages
-  - Persistent message storage in MongoDB with tag metadata
-  - Automatic admin notifications when users send tagged messages
-  - Visual indicators for tagged messages with color-coded badges
-  - Tag highlighting in message content with special styling
-  - Message history preserved across server restarts and reboots
-  - Enhanced chat UI with tag instructions and feedback indicators
-- **Smart GitHub Account Management**: Overhauled GitHub deployment system for improved reliability
-  - Removed priority-based queue system in favor of intelligent account selection
-  - Implemented real-time GitHub API checks to determine account availability
-  - Automatic switching between GitHub accounts based on current workload
-  - Simplified admin interface with removal of priority and queue length controls
-  - Enhanced deployment reliability through smart load balancing across multiple GitHub accounts
-- **Auto-Logout for Banned Users**: Implemented immediate logout system for account security
-  - Banned users are automatically logged out when accessing protected routes
-  - Enhanced security middleware with forceLogout flag detection
-  - Improved user experience with proper error messaging for banned accounts
-- **Enhanced Dark Theme Support**: Fixed font visibility issues in deployments and referrals sections
-  - Updated text colors to be lighter and more readable in dark mode
-  - Improved contrast for better accessibility across all UI components
-  - Consistent color scheme for dark theme throughout the application
-- **Advanced Chat System Features**: Implemented comprehensive message management capabilities
-  - Message replies with visual threading and context preservation
-  - In-line message editing with edit history tracking
-  - Message deletion for users (own messages) and admins (all messages)
-  - Enhanced dropdown menus for message actions (reply, edit, delete)
-  - Real-time updates for edited and deleted messages across all clients
-  - Improved message tagging system with better visual indicators
-  - Enhanced admin controls for user restriction and moderation
-- **Enhanced GitHub Token Management**: Improved API validation and monitoring system
-  - Removed default GitHub tokens in favor of admin-only configuration
-  - Enhanced API status checking with automatic refresh and last used tracking
-  - Improved deployment cost validation with detailed balance comparison
-  - Real-time token validation status with rate limiting information
-  - Automatic refresh of GitHub account status every 30 seconds
-  - Better error messaging for insufficient funds with exact shortfall amounts
-
-### Deployment Notes
-- Update `FRONTEND_URL` and `BACKEND_URL` in production environment
-- Ensure `CORS_ORIGIN` matches your production domain
-- Use secure session secrets in production
+## Technical Notes
+- All GitHub API calls now include retry logic with exponential backoff
+- WebSocket connections automatically handle deployment monitoring
+- Terminal log display supports full ANSI color code processing
+- Environment variables are synchronized across all configuration files

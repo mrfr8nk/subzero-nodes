@@ -49,14 +49,14 @@ export default function DeploymentLogsModal({
   const { data: runsData, isLoading: runsLoading, refetch: refetchRuns } = useQuery({
     queryKey: [`/api/deployments/${deploymentId}/logs`],
     enabled: isOpen && !!deploymentId,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 15000, // Refetch every 15 seconds for better performance
   });
 
   // Fetch specific run logs when a run is selected
   const { data: runLogsData, isLoading: logsLoading, refetch: refetchLogs } = useQuery({
     queryKey: [`/api/deployments/${deploymentId}/runs/${selectedRunId}/logs`],
     enabled: isOpen && !!selectedRunId,
-    refetchInterval: 10000, // Refetch logs every 10 seconds for live updates
+    refetchInterval: 8000, // Refetch logs every 8 seconds for live updates
   });
 
   const workflowRuns: WorkflowRun[] = (runsData as any)?.workflowRuns || [];
@@ -83,15 +83,35 @@ export default function DeploymentLogsModal({
   };
 
   const formatLogContent = (logs: string) => {
-    // Basic log formatting - remove ANSI codes and format timestamps
+    // Advanced log formatting with better styling and detection
     return logs
       .replace(/\x1b\[[0-9;]*m/g, '') // Remove ANSI color codes
       .split('\n')
-      .map((line, index) => (
-        <div key={index} className="font-mono text-xs leading-relaxed">
-          {line || '\u00A0'} {/* Non-breaking space for empty lines */}
-        </div>
-      ));
+      .map((line, index) => {
+        // Detect different types of log lines
+        const isError = line.toLowerCase().includes('error') || line.includes('ERROR');
+        const isWarning = line.toLowerCase().includes('warn') || line.includes('WARN');
+        const isSuccess = line.toLowerCase().includes('success') || line.includes('✓') || line.includes('complete');
+        const isInstall = line.includes('npm install') || line.includes('installing');
+        const isStart = line.includes('npm start') || line.includes('node index.js') || line.includes('Server is running');
+        const isTimestamp = /^\d{4}-\d{2}-\d{2}|\d{2}:\d{2}:\d{2}/.test(line);
+        
+        // Apply appropriate styling
+        let className = "font-mono text-xs leading-relaxed ";
+        if (isError) className += "text-red-400";
+        else if (isWarning) className += "text-yellow-400";
+        else if (isSuccess) className += "text-green-400";
+        else if (isInstall) className += "text-blue-400";
+        else if (isStart) className += "text-cyan-400 font-semibold";
+        else if (isTimestamp) className += "text-gray-500";
+        else className += "text-green-200";
+
+        return (
+          <div key={index} className={className} data-testid={`log-line-${index}`}>
+            {line || '\u00A0'} {/* Non-breaking space for empty lines */}
+          </div>
+        );
+      });
   };
 
   return (
@@ -225,12 +245,50 @@ export default function DeploymentLogsModal({
                       </CardHeader>
                       <CardContent className="h-[calc(100%-4rem)]">
                         <ScrollArea className="h-full">
-                          <div className="bg-black text-green-400 p-4 rounded font-mono text-sm">
-                            {job.logs === 'No logs available' || job.logs === 'Error fetching logs' ? (
-                              <div className="text-yellow-400">{job.logs}</div>
-                            ) : (
-                              formatLogContent(job.logs)
-                            )}
+                          <div className="bg-black border border-gray-800 rounded-lg p-4 min-h-full">
+                            {/* Terminal header */}
+                            <div className="flex items-center justify-between border-b border-gray-700 pb-2 mb-3">
+                              <div className="flex items-center space-x-2">
+                                <div className="flex space-x-1">
+                                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                </div>
+                                <span className="text-gray-400 text-sm font-mono">{job.jobName}</span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                {(job as any).status === 'in_progress' && (
+                                  <div className="flex items-center space-x-1">
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                                    <span className="text-blue-400 text-xs">Running</span>
+                                  </div>
+                                )}
+                                {(job as any).conclusion === 'success' && (
+                                  <div className="flex items-center space-x-1">
+                                    <CheckCircle className="w-4 h-4 text-green-400" />
+                                    <span className="text-green-400 text-xs">Complete</span>
+                                  </div>
+                                )}
+                                {(job as any).conclusion === 'failure' && (
+                                  <div className="flex items-center space-x-1">
+                                    <XCircle className="w-4 h-4 text-red-400" />
+                                    <span className="text-red-400 text-xs">Failed</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Log content */}
+                            <div className="text-green-400 font-mono text-sm space-y-1" data-testid="terminal-content">
+                              {job.logs === 'No logs available' || job.logs === 'Error fetching logs' || job.logs === 'Logs not yet available' ? (
+                                <div className="text-yellow-400 flex items-center space-x-2">
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                  <span>{job.logs}</span>
+                                </div>
+                              ) : (
+                                formatLogContent(job.logs)
+                              )}
+                            </div>
                           </div>
                         </ScrollArea>
                       </CardContent>

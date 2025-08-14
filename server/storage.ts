@@ -119,6 +119,9 @@ export interface IStorage {
   setAppSetting(setting: InsertAppSettings): Promise<AppSettings>;
   getAllAppSettings(): Promise<AppSettings[]>;
   
+  // Deployment lookup operations
+  getDeploymentByBranchName(branchName: string): Promise<Deployment | undefined>;
+  
   // Maintenance mode operations
   isMaintenanceModeEnabled(): Promise<boolean>;
   setMaintenanceMode(enabled: boolean, adminId: string, message?: string): Promise<void>;
@@ -1007,6 +1010,16 @@ export class MongoStorage implements IStorage {
   }
 
   // Maintenance mode operations
+  async getDeploymentByBranchName(branchName: string): Promise<Deployment | undefined> {
+    try {
+      const deployment = await this.deploymentsCollection.findOne({ branchName });
+      return deployment || undefined;
+    } catch (error) {
+      console.error('Error getting deployment by branch name:', error);
+      return undefined;
+    }
+  }
+
   async isMaintenanceModeEnabled(): Promise<boolean> {
     const setting = await this.getAppSetting('maintenance_mode');
     return setting ? setting.value === true : false;
@@ -1786,9 +1799,7 @@ export class MongoStorage implements IStorage {
         updateData.profilePicture = profileData.profilePicture;
       }
 
-      if (profileData.country !== undefined) {
-        updateData.country = profileData.country;
-      }
+
 
       if (profileData.socialProfiles) {
         updateData.socialProfiles = profileData.socialProfiles;

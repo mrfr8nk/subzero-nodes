@@ -128,6 +128,26 @@ async function monitorWorkflowStatus(branchName: string) {
       
       if (runs.length > 0) {
         const latestRun = runs[0];
+        
+        // Get live logs for this run
+        const logsData = await getWorkflowRunLogs(GITHUB_TOKEN, REPO_OWNER, REPO_NAME, latestRun.id);
+        
+        // Check if npm start is detected in logs
+        const isAppActive = detectAppStartInLogs(logsData);
+        
+        // Update deployment status if app becomes active
+        if (isAppActive) {
+          try {
+            const deployment = await storage.getDeploymentByBranchName(branchName);
+            if (deployment && deployment.status !== 'active') {
+              await storage.updateDeploymentStatus(deployment._id.toString(), 'active');
+              console.log(`App detected as active for branch ${branchName}, status updated to active`);
+            }
+          } catch (error) {
+            console.error(`Error updating deployment status for ${branchName}:`, error);
+          }
+        }
+        
         broadcastToClients('workflow_status_update', {
           branch: branchName,
           run: {
@@ -137,7 +157,9 @@ async function monitorWorkflowStatus(branchName: string) {
             created_at: latestRun.created_at,
             updated_at: latestRun.updated_at,
             html_url: latestRun.html_url
-          }
+          },
+          logs: logsData,
+          isAppActive: isAppActive
         });
 
         // If workflow is complete, stop monitoring
@@ -151,7 +173,8 @@ async function monitorWorkflowStatus(branchName: string) {
           broadcastToClients('workflow_completed', {
             branch: branchName,
             conclusion: latestRun.conclusion,
-            completed_at: latestRun.updated_at
+            completed_at: latestRun.updated_at,
+            isAppActive: isAppActive
           });
         }
       }
@@ -159,6 +182,104 @@ async function monitorWorkflowStatus(branchName: string) {
   } catch (error) {
     console.error(`Error monitoring workflow for ${branchName}:`, error);
   }
+}
+
+// Helper function to get workflow run logs
+async function getWorkflowRunLogs(token: string, owner: string, repo: string, runId: number) {
+  try {
+    // Get jobs for the workflow run
+    const jobsUrl = `https://api.github.com/repos/${owner}/${repo}/actions/runs/${runId}/jobs`;
+    const jobsResponse = await fetch(jobsUrl, {
+      headers: {
+        'Authorization': `token ${token}`,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+
+    if (!jobsResponse.ok) return [];
+
+    const jobsData = await jobsResponse.json();
+    
+    // Get logs for each job
+    const logsPromises = jobsData.jobs.map(async (job: any) => {
+      try {
+        const logsUrl = `https://api.github.com/repos/${owner}/${repo}/actions/jobs/${job.id}/logs`;
+        const logsResponse = await fetch(logsUrl, {
+          headers: {
+            'Authorization': `token ${token}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        });
+        
+        if (logsResponse.ok) {
+          const logs = await logsResponse.text();
+          return { 
+            jobId: job.id, 
+            jobName: job.name, 
+            status: job.status,
+            conclusion: job.conclusion,
+            logs: logs || '',
+            started_at: job.started_at,
+            completed_at: job.completed_at
+          };
+        }
+        return { 
+          jobId: job.id, 
+          jobName: job.name, 
+          status: job.status,
+          conclusion: job.conclusion,
+          logs: 'Logs not yet available',
+          started_at: job.started_at,
+          completed_at: job.completed_at
+        };
+      } catch (error) {
+        return { 
+          jobId: job.id, 
+          jobName: job.name, 
+          status: 'error',
+          conclusion: 'error',
+          logs: 'Error fetching logs',
+          started_at: job.started_at,
+          completed_at: job.completed_at
+        };
+      }
+    });
+
+    return await Promise.all(logsPromises);
+  } catch (error) {
+    console.error('Error fetching workflow logs:', error);
+    return [];
+  }
+}
+
+// Helper function to detect if app has started in logs
+function detectAppStartInLogs(logsData: any[]): boolean {
+  if (!logsData || logsData.length === 0) return false;
+  
+  const appStartIndicators = [
+    'npm start',
+    'node index.js',
+    'Starting application',
+    'Server is running',
+    'App is listening',
+    'Bot is online',
+    'Connected successfully',
+    'Ready to serve',
+    'Application started'
+  ];
+  
+  for (const logEntry of logsData) {
+    if (logEntry.logs) {
+      const logs = logEntry.logs.toLowerCase();
+      for (const indicator of appStartIndicators) {
+        if (logs.includes(indicator.toLowerCase())) {
+          return true;
+        }
+      }
+    }
+  }
+  
+  return false;
 }
 
 // Function to start monitoring a deployment
@@ -501,7 +622,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: user.username,
         bio: user.bio,
         profilePicture: user.profilePicture,
-        ...(user.country && { country: user.country }),
         socialProfiles: user.socialProfiles,
         isAdmin: user.isAdmin,
         role: user.role,
@@ -520,7 +640,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/user/profile', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user._id.toString();
-      const { firstName, lastName, username, bio, profilePicture, country, socialProfiles } = req.body;
+      const { firstName, lastName, username, bio, profilePicture, socialProfiles } = req.body;
 
       if (!firstName || !lastName) {
         return res.status(400).json({ message: 'First name and last name are required' });
@@ -532,7 +652,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: username || '',
         bio: bio || '',
         profilePicture: profilePicture || '',
-        country: country || '',
         socialProfiles: socialProfiles || {}
       });
 
@@ -1305,14 +1424,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Branch doesn't exist, which is what we want - continue with deployment
         }
         
-        // Create branch from main
-        const mainBranchData = await makeGitHubRequest('GET', `git/refs/heads/${MAIN_BRANCH}`);
+        // Create branch from main with retry logic
+        let mainBranchData;
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (attempts < maxAttempts) {
+          try {
+            mainBranchData = await makeGitHubRequest('GET', `git/refs/heads/${MAIN_BRANCH}`);
+            break;
+          } catch (error) {
+            attempts++;
+            if (attempts >= maxAttempts) {
+              throw new Error(`Failed to get main branch after ${maxAttempts} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+            // Wait 2 seconds before retry
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+        
         const mainSha = mainBranchData.object.sha;
         
-        await makeGitHubRequest('POST', 'git/refs', {
-          ref: `refs/heads/${sanitizedBranchName}`,
-          sha: mainSha
-        });
+        // Create branch with retry logic
+        attempts = 0;
+        while (attempts < maxAttempts) {
+          try {
+            await makeGitHubRequest('POST', 'git/refs', {
+              ref: `refs/heads/${sanitizedBranchName}`,
+              sha: mainSha
+            });
+            break;
+          } catch (error) {
+            attempts++;
+            if (attempts >= maxAttempts) {
+              throw new Error(`Failed to create branch after ${maxAttempts} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+            // Wait 3 seconds before retry
+            await new Promise(resolve => setTimeout(resolve, 3000));
+          }
+        }
 
         // 2. Update settings.js (exact same as admin deployment)
         const fileData = await makeGitHubRequest('GET', `contents/settings.js?ref=${sanitizedBranchName}`);
@@ -1328,6 +1478,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sha: fileData.sha,
           branch: sanitizedBranchName
         });
+
+        // 2.5. Update config.js with environment variables (if it exists)
+        try {
+          const configFileData = await makeGitHubRequest('GET', `contents/config.js?ref=${sanitizedBranchName}`);
+          const configContent = `module.exports = {
+  SESSION_ID: "${sessionId}",
+  OWNER_NUMBER: "${ownerNumber}", 
+  PREFIX: "${prefix}",
+  // Auto-generated environment variables
+  NODE_ENV: process.env.NODE_ENV || "production",
+  PORT: process.env.PORT || 3000,
+  DATABASE_URL: process.env.DATABASE_URL || "",
+  // Add any custom environment variables here
+};`;
+          
+          await makeGitHubRequest('PUT', 'contents/config.js', {
+            message: `Update config.js for ${sanitizedBranchName}`,
+            content: Buffer.from(configContent).toString('base64'),
+            sha: configFileData.sha,
+            branch: sanitizedBranchName
+          });
+        } catch (configError) {
+          // config.js doesn't exist, create it
+          const configContent = `module.exports = {
+  SESSION_ID: "${sessionId}",
+  OWNER_NUMBER: "${ownerNumber}", 
+  PREFIX: "${prefix}",
+  // Auto-generated environment variables
+  NODE_ENV: process.env.NODE_ENV || "production",
+  PORT: process.env.PORT || 3000,
+  DATABASE_URL: process.env.DATABASE_URL || "",
+  // Add any custom environment variables here
+};`;
+          
+          await makeGitHubRequest('PUT', 'contents/config.js', {
+            message: `Create config.js for ${sanitizedBranchName}`,
+            content: Buffer.from(configContent).toString('base64'),
+            branch: sanitizedBranchName
+          });
+        }
         
         // 3. Update workflow file (exact same as admin deployment)
         const workflowContent = `name: SUBZERO-MD-X-MR-FRANK
@@ -1385,7 +1575,8 @@ jobs:
           });
         }
         
-        // 4. Trigger workflow (exact same as admin deployment)
+        // 4. Trigger workflow with advanced waiting logic
+        console.log(`Triggering workflow for branch: ${sanitizedBranchName}`);
         await makeGitHubRequest('POST', `actions/workflows/${WORKFLOW_FILE}/dispatches`, {
           ref: sanitizedBranchName
         });
@@ -1407,6 +1598,19 @@ jobs:
         });
 
         const deployment = await storage.createDeployment(deploymentData);
+
+        // Start monitoring this deployment for workflow status
+        startWorkflowMonitoring(sanitizedBranchName);
+        
+        // Wait for GitHub to initialize the workflow (5-10 seconds)
+        setTimeout(async () => {
+          try {
+            console.log(`Checking workflow status for branch: ${sanitizedBranchName}`);
+            await monitorWorkflowStatus(sanitizedBranchName);
+          } catch (error) {
+            console.error(`Error in delayed workflow monitoring for ${sanitizedBranchName}:`, error);
+          }
+        }, 8000);
 
         res.json({ 
           success: true, 
@@ -2747,7 +2951,7 @@ jobs:
       const variableMap = new Map<string, string>();
       
       // Add deployment variables first
-      variables.forEach(v => {
+      variables.forEach((v: any) => {
         variableMap.set(v.key.toUpperCase(), v.value);
       });
       
@@ -2768,6 +2972,16 @@ jobs:
 ${Array.from(variableMap.entries()).map(([key, value]) => `  ${key}: "${value}",`).join('\n')}
 };`;
 
+      // Update config.js with same variables 
+      const configContent = `module.exports = {
+${Array.from(variableMap.entries()).map(([key, value]) => `  ${key}: "${value}",`).join('\n')}
+  // Auto-generated environment variables
+  NODE_ENV: process.env.NODE_ENV || "production",
+  PORT: process.env.PORT || 3000,
+  DATABASE_URL: process.env.DATABASE_URL || "",
+  // Add any custom environment variables here
+};`;
+
       // Update settings.js in the branch
       try {
         // Get current file to get its SHA
@@ -2780,6 +2994,24 @@ ${Array.from(variableMap.entries()).map(([key, value]) => `  ${key}: "${value}",
           sha: currentFile.sha,
           branch: deployment.branchName
         });
+
+        // Also update config.js if it exists
+        try {
+          const configFile = await makeGitHubRequest('GET', `contents/config.js?ref=${deployment.branchName}`);
+          await makeGitHubRequest('PUT', 'contents/config.js', {
+            message: `Update config.js with new variables for ${deployment.name}`,
+            content: Buffer.from(configContent).toString('base64'),
+            sha: configFile.sha,
+            branch: deployment.branchName
+          });
+        } catch (configError) {
+          // config.js doesn't exist, create it
+          await makeGitHubRequest('PUT', 'contents/config.js', {
+            message: `Create config.js with variables for ${deployment.name}`,
+            content: Buffer.from(configContent).toString('base64'),
+            branch: deployment.branchName
+          });
+        }
 
         // Trigger workflow to redeploy
         const workflowFile = await storage.getAppSetting('github_workflow_file');
