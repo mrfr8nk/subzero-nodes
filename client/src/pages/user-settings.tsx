@@ -23,8 +23,11 @@ import {
   Lock,
   Mail,
   Calendar,
-  Globe
+  Globe,
+  Github,
+  MessageCircle
 } from "lucide-react";
+import { FaFacebook, FaInstagram, FaTiktok, FaWhatsapp } from 'react-icons/fa';
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -53,6 +56,7 @@ interface UserProfile {
   username?: string;
   bio?: string;
   profilePicture?: string;
+  country?: string;
   socialProfiles?: {
     github?: string;
     facebook?: string;
@@ -84,6 +88,7 @@ export default function UserSettings() {
     username: "",
     bio: "",
     profilePicture: "",
+    country: "",
     socialProfiles: {
       github: "",
       facebook: "",
@@ -130,6 +135,7 @@ export default function UserSettings() {
         username: fullProfile.username || "",
         bio: fullProfile.bio || "",
         profilePicture: fullProfile.profilePicture || "",
+        country: fullProfile.country || "",
         socialProfiles: {
           github: fullProfile.socialProfiles?.github || "",
           facebook: fullProfile.socialProfiles?.facebook || "",
@@ -513,9 +519,9 @@ export default function UserSettings() {
             <div className="space-y-4">
               <Label className="text-base font-medium">Profile Picture</Label>
               <div className="flex items-center space-x-4">
-                {profilePicturePreview ? (
+                {profilePicturePreview || profileData.profilePicture ? (
                   <img 
-                    src={profilePicturePreview} 
+                    src={profilePicturePreview || profileData.profilePicture} 
                     alt="Profile" 
                     className="w-20 h-20 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600"
                   />
@@ -531,7 +537,7 @@ export default function UserSettings() {
                     onChange={handleProfilePictureChange}
                     className="w-auto"
                   />
-                  {profilePicturePreview && (
+                  {(profilePicturePreview || profileData.profilePicture) && (
                     <Button
                       type="button"
                       variant="outline"
@@ -548,12 +554,67 @@ export default function UserSettings() {
             
             <Separator />
             
+            {/* Country Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="country" className="flex items-center">
+                <Globe className="w-4 h-4 mr-2" />
+                Country
+              </Label>
+              <Select 
+                value={profileData.country} 
+                onValueChange={(value) => setProfileData(prev => ({ ...prev, country: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select your country" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="US">United States</SelectItem>
+                  <SelectItem value="CA">Canada</SelectItem>
+                  <SelectItem value="GB">United Kingdom</SelectItem>
+                  <SelectItem value="DE">Germany</SelectItem>
+                  <SelectItem value="FR">France</SelectItem>
+                  <SelectItem value="ES">Spain</SelectItem>
+                  <SelectItem value="IT">Italy</SelectItem>
+                  <SelectItem value="NL">Netherlands</SelectItem>
+                  <SelectItem value="AU">Australia</SelectItem>
+                  <SelectItem value="JP">Japan</SelectItem>
+                  <SelectItem value="KR">South Korea</SelectItem>
+                  <SelectItem value="CN">China</SelectItem>
+                  <SelectItem value="IN">India</SelectItem>
+                  <SelectItem value="BR">Brazil</SelectItem>
+                  <SelectItem value="MX">Mexico</SelectItem>
+                  <SelectItem value="AR">Argentina</SelectItem>
+                  <SelectItem value="ZA">South Africa</SelectItem>
+                  <SelectItem value="NG">Nigeria</SelectItem>
+                  <SelectItem value="EG">Egypt</SelectItem>
+                  <SelectItem value="RU">Russia</SelectItem>
+                  <SelectItem value="TR">Turkey</SelectItem>
+                  <SelectItem value="SA">Saudi Arabia</SelectItem>
+                  <SelectItem value="AE">United Arab Emirates</SelectItem>
+                  <SelectItem value="ID">Indonesia</SelectItem>
+                  <SelectItem value="TH">Thailand</SelectItem>
+                  <SelectItem value="VN">Vietnam</SelectItem>
+                  <SelectItem value="PH">Philippines</SelectItem>
+                  <SelectItem value="MY">Malaysia</SelectItem>
+                  <SelectItem value="SG">Singapore</SelectItem>
+                  <SelectItem value="BD">Bangladesh</SelectItem>
+                  <SelectItem value="PK">Pakistan</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Separator />
+            
             {/* Social Profiles Section */}
             <div className="space-y-4">
               <Label className="text-base font-medium">Social Profiles</Label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="github">GitHub Username</Label>
+                  <Label htmlFor="github" className="flex items-center">
+                    <Github className="w-4 h-4 mr-2" />
+                    GitHub Username
+                  </Label>
                   <Input
                     id="github"
                     value={profileData.socialProfiles.github}
@@ -566,7 +627,10 @@ export default function UserSettings() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="facebook">Facebook Username</Label>
+                  <Label htmlFor="facebook" className="flex items-center">
+                    <FaFacebook className="w-4 h-4 mr-2 text-blue-600" />
+                    Facebook Username
+                  </Label>
                   <Input
                     id="facebook"
                     value={profileData.socialProfiles.facebook}
@@ -579,7 +643,10 @@ export default function UserSettings() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="instagram">Instagram Username</Label>
+                  <Label htmlFor="instagram" className="flex items-center">
+                    <FaInstagram className="w-4 h-4 mr-2 text-pink-500" />
+                    Instagram Username
+                  </Label>
                   <Input
                     id="instagram"
                     value={profileData.socialProfiles.instagram}
@@ -592,7 +659,10 @@ export default function UserSettings() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="tiktok">TikTok Username</Label>
+                  <Label htmlFor="tiktok" className="flex items-center">
+                    <FaTiktok className="w-4 h-4 mr-2 text-black dark:text-white" />
+                    TikTok Username
+                  </Label>
                   <Input
                     id="tiktok"
                     value={profileData.socialProfiles.tiktok}
@@ -605,7 +675,10 @@ export default function UserSettings() {
                 </div>
                 
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="whatsapp">WhatsApp Number</Label>
+                  <Label htmlFor="whatsapp" className="flex items-center">
+                    <FaWhatsapp className="w-4 h-4 mr-2 text-green-500" />
+                    WhatsApp Number
+                  </Label>
                   <Input
                     id="whatsapp"
                     value={profileData.socialProfiles.whatsapp}

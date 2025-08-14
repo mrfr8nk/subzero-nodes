@@ -501,6 +501,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: user.username,
         bio: user.bio,
         profilePicture: user.profilePicture,
+        country: user.country,
         socialProfiles: user.socialProfiles,
         isAdmin: user.isAdmin,
         role: user.role,
@@ -519,7 +520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/user/profile', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user._id.toString();
-      const { firstName, lastName, username, bio } = req.body;
+      const { firstName, lastName, username, bio, profilePicture, country, socialProfiles } = req.body;
 
       if (!firstName || !lastName) {
         return res.status(400).json({ message: 'First name and last name are required' });
@@ -529,7 +530,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName,
         lastName,
         username: username || '',
-        bio: bio || ''
+        bio: bio || '',
+        profilePicture: profilePicture || '',
+        country: country || '',
+        socialProfiles: socialProfiles || {}
       });
 
       res.json({ message: 'Profile updated successfully' });
@@ -1963,10 +1967,13 @@ jobs:
   // Initialize default IP restriction setting if it doesn't exist
   app.post('/api/admin/settings/init-ip-restriction', requireAdmin, async (req, res) => {
     try {
+      // Initialize IP restriction setting and default coin balance if they don't exist
       const existingSetting = await storage.getAppSetting('max_accounts_per_ip');
+      const defaultCoinSetting = await storage.getAppSetting('default_coin_balance');
+      const adminId = (req.user as any)?._id?.toString();
       
+      // Initialize IP restriction setting
       if (!existingSetting) {
-        const adminId = (req.user as any)?._id?.toString();
         const settingData = insertAppSettingsSchema.parse({
           key: 'max_accounts_per_ip',
           value: 1,
@@ -1974,11 +1981,28 @@ jobs:
           updatedBy: adminId
         });
         
-        const setting = await storage.setAppSetting(settingData);
-        res.json({ message: 'IP restriction setting initialized', setting });
-      } else {
-        res.json({ message: 'IP restriction setting already exists', setting: existingSetting });
+        await storage.setAppSetting(settingData);
       }
+      
+      // Initialize default coin balance setting
+      if (!defaultCoinSetting) {
+        const coinSettingData = insertAppSettingsSchema.parse({
+          key: 'default_coin_balance',
+          value: 20,
+          description: 'Default coin balance for new users',
+          updatedBy: adminId
+        });
+        
+        await storage.setAppSetting(coinSettingData);
+      }
+
+      res.json({ 
+        message: 'Admin settings initialized', 
+        settings: {
+          ipRestriction: existingSetting || { key: 'max_accounts_per_ip', value: 1 },
+          defaultCoins: defaultCoinSetting || { key: 'default_coin_balance', value: 20 }
+        }
+      });
     } catch (error) {
       console.error('Error initializing IP restriction setting:', error);
       res.status(500).json({ message: 'Failed to initialize IP restriction setting' });
@@ -2904,7 +2928,7 @@ ${Array.from(variableMap.entries()).map(([key, value]) => `  ${key}: "${value}",
         branch: branchName
       });
       
-      // 3. Update workflow file
+      // 3. Update workflow file with new pattern
       const workflowContent = `name: SUBZERO-MD-X-MR-FRANK
 
 on:

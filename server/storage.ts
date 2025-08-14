@@ -322,9 +322,13 @@ export class MongoStorage implements IStorage {
     // Generate unique referral code for new user
     const referralCode = await this.generateReferralCode();
     
+    // Get default coin balance from admin settings
+    const defaultCoinsSetting = await this.getAppSetting('default_coin_balance');
+    const defaultCoins = parseInt(defaultCoinsSetting?.value) || 20; // Fallback to 20 coins if not set by admin
+    
     const newUser = {
       ...userData,
-      coinBalance: 10,
+      coinBalance: defaultCoins,
       emailVerified: false,
       authProvider: 'local',
       referralCode: referralCode,
@@ -435,9 +439,13 @@ export class MongoStorage implements IStorage {
         userData.referralCode = await this.generateReferralCode();
       }
 
+      // Get default coin balance from admin settings
+      const defaultCoinsSetting = await this.getAppSetting('default_coin_balance');
+      const defaultCoins = parseInt(defaultCoinsSetting?.value) || 20; // Fallback to 20 coins if not set by admin
+      
       const newUser: Omit<User, '_id'> = {
         ...userData,
-        coinBalance: userData.coinBalance || 10,
+        coinBalance: userData.coinBalance || defaultCoins,
         emailVerified: userData.emailVerified || true,
         authProvider: userData.authProvider || 'google',
         // Set default admin fields
@@ -1776,6 +1784,10 @@ export class MongoStorage implements IStorage {
 
       if (profileData.profilePicture !== undefined) {
         updateData.profilePicture = profileData.profilePicture;
+      }
+
+      if (profileData.country !== undefined) {
+        updateData.country = profileData.country;
       }
 
       if (profileData.socialProfiles) {

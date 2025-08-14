@@ -45,7 +45,7 @@ export interface User {
     timezone: string;
   };
   // Location data
-  country?: string; // User's country from IP geolocation
+  country?: string; // User's country - can be set by user or from IP geolocation
   registrationIp?: string; // IP address used during registration
   lastLoginIp?: string; // Last login IP address
   lastLogin?: Date;
