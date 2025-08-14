@@ -500,6 +500,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: user.email,
         username: user.username,
         bio: user.bio,
+        profilePicture: user.profilePicture,
+        socialProfiles: user.socialProfiles,
         isAdmin: user.isAdmin,
         role: user.role,
         status: user.status,
@@ -873,6 +875,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Resend verification error:', error);
       res.status(500).json({ message: 'Failed to resend verification email' });
+    }
+  });
+
+  // Get any user's profile by ID (for profile modal)
+  app.get('/api/user/profile/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await storage.getUserProfileById(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Return public profile information
+      const publicProfile = {
+        _id: user._id.toString(),
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        username: user.username,
+        bio: user.bio,
+        profilePicture: user.profilePicture,
+        socialProfiles: user.socialProfiles,
+        isAdmin: user.isAdmin,
+        role: user.role,
+        status: user.status,
+        createdAt: user.createdAt.toISOString(),
+        lastLogin: user.lastLogin?.toISOString()
+      };
+
+      res.json(publicProfile);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      res.status(500).json({ message: 'Failed to fetch user profile' });
     }
   });
 

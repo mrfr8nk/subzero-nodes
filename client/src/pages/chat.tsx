@@ -17,6 +17,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { getDeviceFingerprint } from "@/lib/deviceFingerprint";
 import { apiRequest } from "@/lib/queryClient";
+import UserProfileModal from "@/components/user-profile-modal";
 
 interface ChatMessage {
   _id: string;
@@ -64,6 +65,9 @@ export default function Chat() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [showUserProfile, setShowUserProfile] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedUsername, setSelectedUsername] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);

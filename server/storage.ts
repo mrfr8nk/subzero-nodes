@@ -1751,28 +1751,56 @@ export class MongoStorage implements IStorage {
     firstName: string; 
     lastName: string; 
     username: string; 
-    bio: string; 
+    bio: string;
+    profilePicture?: string;
+    socialProfiles?: {
+      github?: string;
+      facebook?: string;
+      instagram?: string;
+      tiktok?: string;
+      whatsapp?: string;
+    };
   }): Promise<void> {
     try {
       if (!userId || typeof userId !== 'string' || userId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(userId)) {
         throw new Error('Invalid user ID format');
       }
 
+      const updateData: any = {
+        firstName: profileData.firstName,
+        lastName: profileData.lastName,
+        username: profileData.username,
+        bio: profileData.bio,
+        updatedAt: new Date()
+      };
+
+      if (profileData.profilePicture !== undefined) {
+        updateData.profilePicture = profileData.profilePicture;
+      }
+
+      if (profileData.socialProfiles) {
+        updateData.socialProfiles = profileData.socialProfiles;
+      }
+
       await this.usersCollection.updateOne(
         { _id: new ObjectId(userId) },
-        { 
-          $set: {
-            firstName: profileData.firstName,
-            lastName: profileData.lastName,
-            username: profileData.username,
-            bio: profileData.bio,
-            updatedAt: new Date()
-          }
-        }
+        { $set: updateData }
       );
     } catch (error) {
       console.error('Error updating user profile:', error);
       throw error;
+    }
+  }
+
+  async getUserProfileById(userId: string): Promise<User | null> {
+    try {
+      if (!userId || typeof userId !== 'string' || userId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(userId)) {
+        throw new Error('Invalid user ID format');
+      }
+      return await this.usersCollection.findOne({ _id: new ObjectId(userId) });
+    } catch (error) {
+      console.error('Error getting user profile:', error);
+      return null;
     }
   }
 

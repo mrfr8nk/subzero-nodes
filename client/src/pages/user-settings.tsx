@@ -52,6 +52,14 @@ interface UserProfile {
   email: string;
   username?: string;
   bio?: string;
+  profilePicture?: string;
+  socialProfiles?: {
+    github?: string;
+    facebook?: string;
+    instagram?: string;
+    tiktok?: string;
+    whatsapp?: string;
+  };
   isAdmin: boolean;
   role?: string;
   status: string;
@@ -75,7 +83,19 @@ export default function UserSettings() {
     lastName: user?.lastName || "",
     username: "",
     bio: "",
+    profilePicture: "",
+    socialProfiles: {
+      github: "",
+      facebook: "",
+      instagram: "",
+      tiktok: "",
+      whatsapp: "",
+    },
   });
+  
+  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
+  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
+  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
@@ -109,7 +129,19 @@ export default function UserSettings() {
         lastName: fullProfile.lastName || "",
         username: fullProfile.username || "",
         bio: fullProfile.bio || "",
+        profilePicture: fullProfile.profilePicture || "",
+        socialProfiles: {
+          github: fullProfile.socialProfiles?.github || "",
+          facebook: fullProfile.socialProfiles?.facebook || "",
+          instagram: fullProfile.socialProfiles?.instagram || "",
+          tiktok: fullProfile.socialProfiles?.tiktok || "",
+          whatsapp: fullProfile.socialProfiles?.whatsapp || "",
+        },
       });
+      
+      if (fullProfile.profilePicture) {
+        setProfilePicturePreview(fullProfile.profilePicture);
+      }
       
       setPreferences({
         emailNotifications: fullProfile.preferences?.emailNotifications ?? true,
@@ -120,10 +152,58 @@ export default function UserSettings() {
     }
   }, [fullProfile]);
 
+  // Handle profile picture change
+  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast({
+          title: "File too large",
+          description: "Profile picture must be less than 5MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setProfilePictureFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setProfilePicturePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeProfilePicture = () => {
+    setProfilePictureFile(null);
+    setProfilePicturePreview(null);
+    setProfileData(prev => ({ ...prev, profilePicture: "" }));
+  };
+
   // Update profile mutation
   const updateProfileMutation = useMutation({
     mutationFn: async (data: typeof profileData) => {
-      return await apiRequest("/api/user/profile", "PUT", data);
+      let updatedData = { ...data };
+      
+      // Handle profile picture upload if a new file is selected
+      if (profilePictureFile) {
+        setIsUploadingPicture(true);
+        const formData = new FormData();
+        formData.append('image', profilePictureFile);
+        
+        try {
+          const uploadResponse = await apiRequest('/api/chat/upload-image', 'POST', formData);
+          const uploadData = await uploadResponse.json();
+          updatedData.profilePicture = uploadData.imageData;
+        } catch (error) {
+          setIsUploadingPicture(false);
+          throw new Error('Failed to upload profile picture');
+        } finally {
+          setIsUploadingPicture(false);
+        }
+      }
+      
+      return await apiRequest("/api/user/profile", "PUT", updatedData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/profile"] });
@@ -427,13 +507,125 @@ export default function UserSettings() {
               />
             </div>
             
+            <Separator />
+            
+            {/* Profile Picture Section */}
+            <div className="space-y-4">
+              <Label className="text-base font-medium">Profile Picture</Label>
+              <div className="flex items-center space-x-4">
+                {profilePicturePreview ? (
+                  <img 
+                    src={profilePicturePreview} 
+                    alt="Profile" 
+                    className="w-20 h-20 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                    <UserCircle className="w-12 h-12 text-gray-400" />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfilePictureChange}
+                    className="w-auto"
+                  />
+                  {profilePicturePreview && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={removeProfilePicture}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      Remove Picture
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <Separator />
+            
+            {/* Social Profiles Section */}
+            <div className="space-y-4">
+              <Label className="text-base font-medium">Social Profiles</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="github">GitHub Username</Label>
+                  <Input
+                    id="github"
+                    value={profileData.socialProfiles.github}
+                    onChange={(e) => setProfileData(prev => ({ 
+                      ...prev, 
+                      socialProfiles: { ...prev.socialProfiles, github: e.target.value }
+                    }))}
+                    placeholder="your-github-username"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="facebook">Facebook Username</Label>
+                  <Input
+                    id="facebook"
+                    value={profileData.socialProfiles.facebook}
+                    onChange={(e) => setProfileData(prev => ({ 
+                      ...prev, 
+                      socialProfiles: { ...prev.socialProfiles, facebook: e.target.value }
+                    }))}
+                    placeholder="your-facebook-username"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="instagram">Instagram Username</Label>
+                  <Input
+                    id="instagram"
+                    value={profileData.socialProfiles.instagram}
+                    onChange={(e) => setProfileData(prev => ({ 
+                      ...prev, 
+                      socialProfiles: { ...prev.socialProfiles, instagram: e.target.value }
+                    }))}
+                    placeholder="your-instagram-username"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="tiktok">TikTok Username</Label>
+                  <Input
+                    id="tiktok"
+                    value={profileData.socialProfiles.tiktok}
+                    onChange={(e) => setProfileData(prev => ({ 
+                      ...prev, 
+                      socialProfiles: { ...prev.socialProfiles, tiktok: e.target.value }
+                    }))}
+                    placeholder="your-tiktok-username"
+                  />
+                </div>
+                
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="whatsapp">WhatsApp Number</Label>
+                  <Input
+                    id="whatsapp"
+                    value={profileData.socialProfiles.whatsapp}
+                    onChange={(e) => setProfileData(prev => ({ 
+                      ...prev, 
+                      socialProfiles: { ...prev.socialProfiles, whatsapp: e.target.value }
+                    }))}
+                    placeholder="+1234567890"
+                  />
+                </div>
+              </div>
+            </div>
+            
             <Button 
               onClick={handleProfileUpdate}
-              disabled={updateProfileMutation.isPending}
+              disabled={updateProfileMutation.isPending || isUploadingPicture}
               className="flex items-center"
             >
               <Save className="w-4 h-4 mr-2" />
-              {updateProfileMutation.isPending ? "Updating..." : "Update Profile"}
+              {isUploadingPicture ? "Uploading..." : updateProfileMutation.isPending ? "Updating..." : "Update Profile"}
             </Button>
           </CardContent>
         </Card>

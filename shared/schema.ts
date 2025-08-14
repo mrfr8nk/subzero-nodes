@@ -30,6 +30,14 @@ export interface User {
   deviceHistory?: string[]; // History of device fingerprints
   username?: string;
   bio?: string;
+  profilePicture?: string; // Base64 encoded profile picture
+  socialProfiles?: {
+    github?: string;
+    facebook?: string;
+    instagram?: string;
+    tiktok?: string;
+    whatsapp?: string;
+  };
   preferences?: {
     emailNotifications: boolean;
     darkMode: boolean;
@@ -60,6 +68,9 @@ export interface Deployment {
   deploymentReason?: string; // Reason for current status
   deploymentNumber?: number; // Sequential deployment number for user
   totalDeployments?: number; // Total deployments count for this user
+  githubToken?: string; // GitHub token used for this deployment
+  githubOwner?: string; // GitHub owner/org used for this deployment
+  githubRepo?: string; // GitHub repository used for this deployment
   createdAt: Date;
   updatedAt: Date;
 }
@@ -231,6 +242,16 @@ export const insertUserSchema = z.object({
   restrictions: z.string().array().default([]),
   deviceFingerprint: z.string().optional(),
   deviceHistory: z.string().array().default([]),
+  username: z.string().optional(),
+  bio: z.string().optional(),
+  profilePicture: z.string().optional(),
+  socialProfiles: z.object({
+    github: z.string().optional(),
+    facebook: z.string().optional(),
+    instagram: z.string().optional(),
+    tiktok: z.string().optional(),
+    whatsapp: z.string().optional(),
+  }).optional(),
 });
 
 export const insertDeploymentSchema = z.object({
@@ -240,6 +261,9 @@ export const insertDeploymentSchema = z.object({
   status: z.string().default("active"),
   configuration: z.string().default("standard"),
   cost: z.number().default(10),
+  githubToken: z.string().optional(),
+  githubOwner: z.string().optional(),
+  githubRepo: z.string().optional(),
   lastChargeDate: z.date().optional(),
   nextChargeDate: z.date().optional(),
 });
