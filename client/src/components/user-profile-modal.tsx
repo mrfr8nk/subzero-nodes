@@ -40,6 +40,7 @@ interface UserProfileData {
   username?: string;
   bio?: string;
   profilePicture?: string;
+  country?: string;
   socialProfiles?: {
     github?: string;
     facebook?: string;
@@ -50,7 +51,6 @@ interface UserProfileData {
   isAdmin: boolean;
   role?: string;
   status: string;
-  coinBalance: number;
   createdAt: string;
   lastLogin?: string;
 }
@@ -60,6 +60,13 @@ export default function UserProfileModal({ isOpen, onClose, userId, username }: 
   
   const { data: userProfile, isLoading } = useQuery<UserProfileData>({
     queryKey: ["/api/user/profile", userId],
+    queryFn: async () => {
+      const response = await fetch(`/api/user/profile/${userId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch user profile');
+      }
+      return response.json();
+    },
     enabled: isOpen && !!userId,
   });
 
@@ -182,6 +189,17 @@ export default function UserProfileModal({ isOpen, onClose, userId, username }: 
                   {formatDate(userProfile.createdAt)}
                 </span>
               </div>
+              
+              {userProfile.country && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Country
+                  </span>
+                  <span className="text-sm font-medium">
+                    {userProfile.country}
+                  </span>
+                </div>
+              )}
               
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600 dark:text-gray-400">

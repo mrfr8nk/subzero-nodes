@@ -652,7 +652,9 @@ export default function Chat() {
                     </div>
                   )}
                   
-                  <div className="flex items-start space-x-3">
+                  <div className={`flex items-start space-x-3 ${
+                    msg.userId === (user?._id?.toString() || user?.email) ? 'flex-row-reverse space-x-reverse' : ''
+                  }`}>
                     {/* Selection checkbox */}
                     {isSelectionMode && (
                       <Checkbox
@@ -662,85 +664,129 @@ export default function Chat() {
                       />
                     )}
                     
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${
-                      msg.isAdmin ? 'bg-blue-600' : 'bg-gray-600'
-                    }`}>
-                      {msg.username.charAt(0).toUpperCase()}
+                    {/* Profile Picture - clickable to show user info */}
+                    <div 
+                      className="w-8 h-8 rounded-full cursor-pointer hover:opacity-80 transition-opacity overflow-hidden"
+                      onClick={() => {
+                        setSelectedUserId(msg.userId);
+                        setSelectedUsername(msg.username);
+                        setShowUserProfile(true);
+                      }}
+                      data-testid={`avatar-${msg.userId}`}
+                    >
+                      {/* Check if user has a profile picture - this would need to be added to the message data */}
+                      <div className={`w-full h-full flex items-center justify-center text-white text-sm font-medium ${
+                        msg.isAdmin ? 'bg-blue-600' : 'bg-gray-600'
+                      }`}>
+                        {msg.username.charAt(0).toUpperCase()}
+                      </div>
                     </div>
                     
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <span className="font-medium text-gray-900 dark:text-gray-100">{msg.username}</span>
-                        {getRoleBadge(msg.role, msg.isAdmin)}
-                        {msg.isEdited && (
-                          <span className="text-xs text-muted-foreground">(edited)</span>
+                    {/* WhatsApp-style message bubble */}
+                    <div className={`flex-1 min-w-0 max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg ${
+                      msg.userId === (user?._id?.toString() || user?.email) ? 'items-end' : 'items-start'
+                    }`}>
+                      <div className={`relative px-4 py-2 rounded-2xl shadow-sm ${
+                        msg.userId === (user?._id?.toString() || user?.email) 
+                          ? 'bg-blue-500 text-white rounded-br-md' 
+                          : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-bl-md border border-gray-200 dark:border-gray-600'
+                      }`}>
+                        {/* Message header - only show for others' messages */}
+                        {msg.userId !== (user?._id?.toString() || user?.email) && (
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="font-medium text-sm">{msg.username}</span>
+                            {getRoleBadge(msg.role, msg.isAdmin)}
+                            {msg.isEdited && (
+                              <span className="text-xs opacity-70">(edited)</span>
+                            )}
+                          </div>
                         )}
-                        <span className="text-xs text-muted-foreground">
-                          {formatTime(msg.createdAt)}
-                        </span>
-                      </div>
                       
-                      {editingMessage === msg._id ? (
-                        <div className="space-y-2">
-                          <Input
-                            value={editContent}
-                            onChange={(e) => setEditContent(e.target.value)}
-                            className="text-sm"
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter') {
-                                saveEdit();
-                              }
-                              if (e.key === 'Escape') {
+                        {editingMessage === msg._id ? (
+                          <div className="space-y-2">
+                            <Input
+                              value={editContent}
+                              onChange={(e) => setEditContent(e.target.value)}
+                              className="text-sm bg-transparent border-white/20"
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter') {
+                                  saveEdit();
+                                }
+                                if (e.key === 'Escape') {
+                                  setEditingMessage(null);
+                                  setEditContent("");
+                                }
+                              }}
+                            />
+                            <div className="flex space-x-2">
+                              <Button size="sm" variant="secondary" onClick={saveEdit}>Save</Button>
+                              <Button size="sm" variant="outline" onClick={() => {
                                 setEditingMessage(null);
                                 setEditContent("");
-                              }
-                            }}
-                          />
-                          <div className="flex space-x-2">
-                            <Button size="sm" onClick={saveEdit}>Save</Button>
-                            <Button size="sm" variant="outline" onClick={() => {
-                              setEditingMessage(null);
-                              setEditContent("");
-                            }}>Cancel</Button>
+                              }}>Cancel</Button>
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {/* Image display */}
-                          {msg.messageType === 'image' && (msg.imageUrl || msg.imageData) && (
-                            <div className="max-w-sm">
-                              <img
-                                src={msg.imageData || msg.imageUrl}
-                                alt={msg.fileName || 'Shared image'}
-                                className="rounded-lg border max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
-                                onClick={() => {
-                                  const imageUrl = msg.imageData || msg.imageUrl;
-                                  if (imageUrl) {
-                                    window.open(imageUrl, '_blank');
-                                  }
-                                }}
-                                onLoad={() => {
-                                  // Add loading state complete indicator if needed
-                                }}
-                                data-testid={`img-chat-${msg._id}`}
-                              />
-                              {msg.fileName && (
-                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                  {msg.fileName} {msg.fileSize && `(${(msg.fileSize / 1024).toFixed(1)} KB)`}
-                                </div>
-                              )}
+                        ) : (
+                          <div className="space-y-2">
+                            {/* Image display */}
+                            {msg.messageType === 'image' && (msg.imageUrl || msg.imageData) && (
+                              <div className="max-w-sm">
+                                <img
+                                  src={msg.imageData || msg.imageUrl}
+                                  alt={msg.fileName || 'Shared image'}
+                                  className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                                  onClick={() => {
+                                    const imageUrl = msg.imageData || msg.imageUrl;
+                                    if (imageUrl) {
+                                      window.open(imageUrl, '_blank');
+                                    }
+                                  }}
+                                  data-testid={`img-chat-${msg._id}`}
+                                />
+                                {msg.fileName && (
+                                  <div className={`text-xs mt-1 ${
+                                    msg.userId === (user?._id?.toString() || user?.email) 
+                                      ? 'text-blue-100' 
+                                      : 'text-gray-500 dark:text-gray-400'
+                                  }`}>
+                                    {msg.fileName} {msg.fileSize && `(${(msg.fileSize / 1024).toFixed(1)} KB)`}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            
+                            {/* Text message */}
+                            {msg.message && (
+                              <div className={`text-sm leading-relaxed ${
+                                msg.userId === (user?._id?.toString() || user?.email) 
+                                  ? 'text-white' 
+                                  : 'text-gray-800 dark:text-gray-200'
+                              }`}>
+                                {highlightTags(msg.message)}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Message timestamp and status - bottom right */}
+                        <div className={`flex items-center justify-end space-x-1 mt-1 text-xs ${
+                          msg.userId === (user?._id?.toString() || user?.email) 
+                            ? 'text-blue-100' 
+                            : 'text-gray-500 dark:text-gray-400'
+                        }`}>
+                          {msg.isEdited && (
+                            <span className="opacity-70">(edited)</span>
+                          )}
+                          <span>{formatTime(msg.createdAt)}</span>
+                          {msg.userId === (user?._id?.toString() || user?.email) && (
+                            <div className="text-blue-100">
+                              ✓✓ {/* WhatsApp-style read status */}
                             </div>
                           )}
-                          
-                          {/* Text message */}
-                          {msg.message && (
-                            <div className="text-gray-800 dark:text-gray-200 text-sm leading-relaxed">
-                              {highlightTags(msg.message)}
-                            </div>
-                          )}
                         </div>
-                      )}
+                      </div>
                       
+                      {/* Tags outside the bubble */}
                       {msg.tags && msg.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
                           {msg.tags.map((tag, index) => (
@@ -752,7 +798,10 @@ export default function Chat() {
                       )}
                     </div>
                     
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Message actions - positioned based on message ownership */}
+                    <div className={`opacity-0 group-hover:opacity-100 transition-opacity ${
+                      msg.userId === (user?._id?.toString() || user?.email) ? 'order-first' : ''
+                    }`}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -948,6 +997,18 @@ export default function Chat() {
           </CardContent>
         </Card>
       </div>
+
+      {/* User Profile Modal */}
+      <UserProfileModal
+        isOpen={showUserProfile}
+        onClose={() => {
+          setShowUserProfile(false);
+          setSelectedUserId("");
+          setSelectedUsername("");
+        }}
+        userId={selectedUserId}
+        username={selectedUsername}
+      />
     </div>
   );
 }

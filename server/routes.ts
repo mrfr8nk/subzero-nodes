@@ -501,7 +501,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: user.username,
         bio: user.bio,
         profilePicture: user.profilePicture,
-        country: user.country,
+        ...(user.country && { country: user.country }),
         socialProfiles: user.socialProfiles,
         isAdmin: user.isAdmin,
         role: user.role,
