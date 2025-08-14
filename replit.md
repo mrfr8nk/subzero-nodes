@@ -109,6 +109,19 @@ Add your domain's callback URL to Google Cloud Console OAuth settings:
 
 ### Recent Changes (January 2025)
 
+#### User Profile Enhancement & GitHub Workflow System (January 2025)
+- **Complete Country Selection with Flags**: Added comprehensive country dropdown with 195 countries and flag emojis for enhanced user experience
+- **Social Media Profile Integration**: Added GitHub, Facebook, Instagram, TikTok, and WhatsApp username fields with appropriate icons
+- **Profile Picture Persistence**: Fixed profile pictures to remain visible after page refresh and session changes
+- **Default Wallet Balance Increase**: Changed default user balance from 10 to 20 coins with admin configuration capability
+- **Express.js GitHub Workflow Pattern**: Implemented advanced GitHub API deployment system with auto-restart functionality
+  - SUBZERO-MD-X-MR-FRANK workflow with 18000 timeout and continuous loop
+  - Auto-restart mechanism for crashed bots with sleep 2 recovery
+  - Self-triggering workflow using SUBZERO secret token and curl-based re-triggering
+  - Branch-based deployment with sanitized naming and availability checking
+  - Real-time workflow monitoring with WebSocket status updates
+  - Complete Express.js pattern matching GitHub API standards for branch creation, file updates, and workflow dispatching
+
 #### Device Fingerprinting Migration (January 2025)
 - **Replaced IP-Based with Device Fingerprinting**: Complete overhaul of duplicate account prevention system
   - Removed all IP tracking, storage, and validation logic from authentication flows  
