@@ -30,6 +30,8 @@ import Maintenance from "@/pages/maintenance";
 import Chat from "@/pages/chat";
 import Navbar from "@/components/navbar";
 import Premium from "@/pages/premium";
+import Terms from "@/pages/terms";
+import Privacy from "@/pages/privacy";
 
 function Router() {
   const { isAuthenticated, isLoading, isAdmin } = useAuth();
@@ -69,6 +71,8 @@ function Router() {
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/resend-verification" component={ResendVerification} />
+        <Route path="/terms" component={Terms} />
+        <Route path="/privacy" component={Privacy} />
         <Route path="/admin/login" component={AdminLogin} />
         <Route component={Landing} />
       </Switch>
@@ -89,6 +93,8 @@ function Router() {
         <Route path="/user-settings" component={UserSettings} />
         <Route path="/account-settings" component={AccountSettings} />
         <Route path="/chat" component={Chat} />
+        <Route path="/terms" component={Terms} />
+        <Route path="/privacy" component={Privacy} />
         {isAdmin && <Route path="/admin/dashboard" component={AdminDashboard} />}
         {isAdmin && <Route path="/admin/github" component={AdminGitHub} />}
         {isAdmin && <Route path="/admin/api-test" component={AdminApiTest} />}

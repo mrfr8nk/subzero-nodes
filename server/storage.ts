@@ -428,7 +428,7 @@ export class MongoStorage implements IStorage {
         if (referrer && result.insertedId.toString() !== referrer._id.toString()) {
           // Get referral bonus from admin settings
           const referralBonusSetting = await this.getAppSetting('referral_bonus');
-          const referralBonus = referralBonusSetting?.value || 10;
+          const referralBonus = parseInt(referralBonusSetting?.value) || 10;
           
           await this.createReferral({
             referrerId: referrer._id.toString(),
@@ -511,7 +511,7 @@ export class MongoStorage implements IStorage {
         );
         
         if (activeAccounts.length >= maxAccountsPerDevice) {
-          throw new Error(`Multiple accounts detected from this device. Only ${maxAccountsPerDevice} account(s) allowed per device. Contact support if you believe this is an error.`);
+          throw new Error(`Only 1 account allowed per device. Contact support if you believe this is an error.`);
         }
         
         // Set device fingerprint in user data
@@ -551,7 +551,7 @@ export class MongoStorage implements IStorage {
         try {
           // Get referral bonus from admin settings
           const referralBonusSetting = await this.getAppSetting('referral_bonus');
-          const referralBonus = referralBonusSetting?.value || 10;
+          const referralBonus = parseInt(referralBonusSetting?.value) || 10;
           
           await this.createReferral({
             referrerId: userData.referredById,

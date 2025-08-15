@@ -571,7 +571,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (!alreadyReferred) {
               // Get referral bonus from admin settings
               const referralBonusSetting = await storage.getAppSetting('referral_bonus');
-              const referralBonus = referralBonusSetting?.value || 10;
+              const referralBonus = parseInt(referralBonusSetting?.value) || 10;
               
               await storage.createReferral({
                 referrerId: referrer._id.toString(),
@@ -931,7 +931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (activeAccounts.length >= maxAccountsPerDevice) {
           return res.status(400).json({ 
-            message: `Multiple accounts detected from this device. Only ${maxAccountsPerDevice} account(s) allowed per device. Contact support if you believe this is an error.`
+            message: `Only 1 account allowed per device. Contact support if you believe this is an error.`
           });
         }
       }
@@ -2161,7 +2161,7 @@ jobs:
 
       // Get admin-configured claim amount
       const claimAmountSetting = await storage.getAppSetting('daily_claim_amount');
-      const claimAmount = claimAmountSetting?.value || 50; // Default 50 coins
+      const claimAmount = parseInt(claimAmountSetting?.value) || 50; // Default 50 coins
 
       res.json({
         canClaim,
@@ -2198,7 +2198,7 @@ jobs:
 
       // Get admin-configured claim amount
       const claimAmountSetting = await storage.getAppSetting('daily_claim_amount');
-      const claimAmount = claimAmountSetting?.value || 50;
+      const claimAmount = parseInt(claimAmountSetting?.value) || 50;
 
       // Update user's last claim date and coin balance
       await storage.updateUserClaimDate(userId, now);

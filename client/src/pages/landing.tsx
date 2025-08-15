@@ -27,8 +27,8 @@ export default function Landing() {
   const features = [
     {
       icon: Rocket,
-      title: "Lightning Fast Deployment",
-      description: "Deploy your SUBZERO-MD bots in under 60 seconds with SUBZERO NODES!",
+      title: "Instant SUBZERO-MD Deployment",
+      description: "Deploy your SUBZERO-MD bots instantly with our specialized platform - no configuration needed!",
       gradient: "from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900",
       iconColor: "text-blue-600 dark:text-blue-400",
       bgColor: "bg-gradient-to-r from-blue-500 to-blue-600",
@@ -36,40 +36,40 @@ export default function Landing() {
     },
     {
       icon: Coins,
-      title: "Smart Coin Economy",
-      description: "Transparent pricing with our integrated coin system. Pay only for what you use.",
+      title: "SUBZERO-MD Optimized",
+      description: "Specialized infrastructure built specifically for SUBZERO-MD bots with optimized performance.",
       gradient: "from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900",
       iconColor: "text-emerald-600 dark:text-emerald-400",
       bgColor: "bg-gradient-to-r from-emerald-500 to-emerald-600"
     },
     {
       icon: Users,
-      title: "Referral Rewards",
-      description: "Earn up to 50 coins for each friend you refer. Build your network and profit together.",
+      title: "Dedicated SUBZERO Nodes",
+      description: "Your SUBZERO-MD bots run on dedicated nodes optimized for maximum uptime and performance.",
       gradient: "from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900",
       iconColor: "text-purple-600 dark:text-purple-400",
       bgColor: "bg-gradient-to-r from-purple-500 to-purple-600"
     },
     {
       icon: ChartLine,
-      title: "Real-time Analytics",
-      description: "Advanced dashboard with live metrics, performance insights, and detailed reports.",
+      title: "SUBZERO-MD Management",
+      description: "Complete SUBZERO-MD bot management with real-time status monitoring and easy controls.",
       gradient: "from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900",
       iconColor: "text-amber-600 dark:text-amber-400",
       bgColor: "bg-gradient-to-r from-amber-500 to-amber-600"
     },
     {
       icon: Globe,
-      title: "Global Infrastructure",
-      description: "99.9% uptime with servers worldwide. Your bots run 24/7 without interruption.",
+      title: "SUBZERO Network",
+      description: "Global SUBZERO network ensures your MD bots stay online 24/7 with 99.9% uptime guarantee.",
       gradient: "from-cyan-50 to-cyan-100 dark:from-cyan-950 dark:to-cyan-900",
       iconColor: "text-cyan-600 dark:text-cyan-400",
       bgColor: "bg-gradient-to-r from-cyan-500 to-cyan-600"
     },
     {
       icon: Shield,
-      title: "Enterprise Security",
-      description: "Bank-grade encryption and security. Your data and bots are completely protected.",
+      title: "Secure SUBZERO Hosting",
+      description: "Enterprise-grade security designed specifically for SUBZERO-MD bot hosting and data protection.",
       gradient: "from-rose-50 to-rose-100 dark:from-rose-950 dark:to-rose-900",
       iconColor: "text-rose-600 dark:text-rose-400",
       bgColor: "bg-gradient-to-r from-rose-500 to-rose-600"
@@ -134,13 +134,13 @@ export default function Landing() {
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             <div>
               <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold mb-6 leading-tight">
-                Deploy Your
-                <span className="text-blue-200 block">WhatsApp Bot</span>
-                in Minutes
+                Deploy
+                <span className="text-blue-200 block">SUBZERO-MD</span>
+                Instantly
               </h1>
               <p className="text-lg sm:text-xl text-blue-100 mb-8 leading-relaxed">
-                Launch powerful SUBZERO-MD WhatsApp bots with our intuitive platform. 
-                Manage deployments, track usage, and earn through our referral system.
+                The ultimate SUBZERO-MD deployment platform. Built exclusively for SUBZERO-MD bots with 
+                specialized infrastructure, instant deployment, and dedicated support.
               </p>
               <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
                 <Button 
@@ -181,12 +181,12 @@ export default function Landing() {
               Industry Leading Features
             </Badge>
             <h2 className="text-3xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-6">
-              Everything You Need to
-              <span className="block text-blue-600 dark:text-blue-400">Dominate WhatsApp</span>
+              Everything You Need for
+              <span className="block text-blue-600 dark:text-blue-400">SUBZERO-MD Deployment</span>
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Built by developers, for developers. Our platform combines cutting-edge technology 
-              with intuitive design to give you the ultimate bot deployment experience.
+              Built specifically for SUBZERO-MD. Our platform provides specialized infrastructure 
+              and tools designed exclusively for SUBZERO-MD bot deployment and management.
             </p>
           </div>
 
@@ -228,10 +228,10 @@ export default function Landing() {
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl lg:text-5xl font-bold mb-6">
-            Ready to Deploy Your First Bot?
+            Ready to Deploy SUBZERO-MD?
           </h2>
           <p className="text-xl lg:text-2xl text-blue-100 mb-12 max-w-2xl mx-auto">
-            Join thousands of developers and start deploying powerful WhatsApp bots in under 60 seconds.
+            Join the SUBZERO community and deploy your MD bots with the platform built exclusively for them.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
@@ -248,7 +248,7 @@ export default function Landing() {
             <div className="text-center">
               <div className="text-blue-100 text-sm">
                 <CheckCircle className="w-4 h-4 inline mr-2" />
-                10 free coins included • No setup fees • Cancel anytime
+                SUBZERO-MD optimized • Instant deployment • 24/7 support
               </div>
             </div>
           </div>
@@ -279,11 +279,15 @@ export default function Landing() {
               </div>
             </div>
             <div className="text-center md:text-right">
-              <div className="text-gray-400 text-sm">
+              <div className="text-gray-400 text-sm mb-2">
                 © 2025 SUBZERO-NODEZ. All rights reserved.
               </div>
-              <div className="text-gray-500 text-xs mt-1">
-                Built with ❤️ by Team Subzero
+              <div className="flex flex-col md:flex-row md:space-x-4 space-y-2 md:space-y-0 text-xs">
+                <a href="/terms" className="text-blue-400 hover:text-blue-300 transition-colors">Terms of Service</a>
+                <a href="/privacy" className="text-blue-400 hover:text-blue-300 transition-colors">Privacy Policy</a>
+                <div className="text-gray-500">
+                  Built with ❤️ by Team Subzero
+                </div>
               </div>
             </div>
           </div>
