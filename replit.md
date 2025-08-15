@@ -5,6 +5,16 @@ A comprehensive deployment platform that enables users to deploy and manage appl
 
 ## Recent Changes (August 15, 2025)
 
+### Major UI Redesign Completed
+✅ **Navy Blue Theme Implementation for SUBZERO MD**
+- Completely redesigned landing page with navy blue color scheme (slate-900, blue-900, indigo-600)
+- Updated branding from "SUBZERO" to "SUBZERO MD" as requested
+- Changed logo icon from Cloud to Bot icon (matching login/signup pages)
+- Implemented professional navy blue gradient backgrounds and floating orbs
+- Updated all text colors for proper contrast on navy blue backgrounds
+- Enhanced all buttons, badges, and cards with consistent navy blue styling
+- Improved visual hierarchy with blue-tinted gradients throughout
+
 ### Major Bug Fixes and Feature Enhancements Completed
 ✅ **WhatsApp-Like Message Count System Fixed**
 - Fixed unread message count API endpoints (getUserUnreadMessageCount, markAllMessagesAsRead)
