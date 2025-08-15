@@ -38,8 +38,21 @@ function MaintenanceCountdown({ endTime }: { endTime: string }) {
         setTimeLeft(countdown);
       } else {
         setTimeLeft('Maintenance completed');
-        // Auto-refresh when countdown reaches zero
-        setTimeout(() => window.location.reload(), 2000);
+        // Auto-disable maintenance mode when countdown reaches zero
+        setTimeout(async () => {
+          try {
+            await fetch('/api/admin/maintenance/toggle', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ enabled: false }),
+              credentials: 'include'
+            });
+            window.location.href = '/';
+          } catch (error) {
+            console.error('Failed to disable maintenance mode:', error);
+            window.location.reload();
+          }
+        }, 2000);
       }
     };
 

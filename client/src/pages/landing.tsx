@@ -5,9 +5,16 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { SiGoogle } from "react-icons/si";
 import { Rocket, Coins, Users, ChartLine, Smartphone, Shield, Clock, CheckCircle, Star, ArrowRight, Play, Zap, Globe, Award, Bot } from "lucide-react";
 import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 
 export default function Landing() {
   const [, setLocation] = useLocation();
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
   
   const handleGoogleLogin = () => {
     window.location.href = "/api/auth/google";

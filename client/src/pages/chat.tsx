@@ -87,8 +87,9 @@ export default function Chat() {
   // Fetch unread message count when user loads chat
   const fetchUnreadMessageCount = async () => {
     try {
-      const response = await apiRequest('/api/chat/unread-count', 'GET') as { count: number };
-      setUnreadMessageCount(response.count || 0);
+      const response = await apiRequest('/api/chat/unread-count', 'GET') as any;
+      const unreadData = response as { count: number };
+      setUnreadMessageCount(unreadData.count || 0);
     } catch (error) {
       console.error('Error fetching unread message count:', error);
     }

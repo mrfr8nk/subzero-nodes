@@ -40,7 +40,8 @@ import {
   Hash,
   Search,
   Calendar,
-  CheckCircle
+  CheckCircle,
+  MessageCircle
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -2896,7 +2897,7 @@ export default function AdminDashboard() {
                     <Label htmlFor="repo-owner">Repository Owner</Label>
                     <Input
                       id="repo-owner"
-                      placeholder="e.g., d33l"
+                      placeholder="e.g., your-username"
                       value={githubSettings.repoOwner}
                       onChange={(e) => setGithubSettings(prev => ({ ...prev, repoOwner: e.target.value }))}
                       data-testid="input-repo-owner"

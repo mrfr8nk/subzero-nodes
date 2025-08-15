@@ -6,7 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
-import Landing from "@/pages/landing";
+import Landing from "@/pages/animated-landing";
 import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import VerifyEmail from "@/pages/verify-email";

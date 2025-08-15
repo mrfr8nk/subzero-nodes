@@ -2135,11 +2135,24 @@ export class MongoStorage implements IStorage {
   }
 
   async getBannedUsers(limit: number = 100): Promise<BannedUser[]> {
-    return await this.bannedUsersCollection
-      .find({ isActive: true })
-      .sort({ bannedAt: -1 })
+    // Get users with banned status from the users collection
+    const bannedUsers = await this.usersCollection
+      .find({ status: 'banned' })
+      .sort({ updatedAt: -1 })
       .limit(limit)
       .toArray();
+    
+    // Transform to match BannedUser interface
+    return bannedUsers.map(user => ({
+      _id: user._id,
+      userId: user._id,
+      email: user.email,
+      username: `${user.firstName} ${user.lastName}`,
+      reason: (user as any).banReason || 'No reason specified',
+      bannedAt: (user as any).bannedAt || user.updatedAt || new Date().toISOString(),
+      bannedBy: (user as any).bannedBy || 'System',
+      isActive: true
+    }));
   }
 
   async removeBannedUser(userId: string): Promise<void> {

@@ -519,6 +519,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Chat: Get unread message count
+  app.get('/api/chat/unread-count', isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)._id;
+      const unreadCount = await storage.getUserUnreadMessageCount(userId.toString());
+      res.json({ count: unreadCount });
+    } catch (error) {
+      console.error('Error getting unread message count:', error);
+      res.status(500).json({ error: 'Failed to get unread message count' });
+    }
+  });
+
+  // Chat: Mark all messages as read
+  app.post('/api/chat/mark-all-read', isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any)._id;
+      await storage.markAllMessagesAsRead(userId.toString());
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+      res.status(500).json({ error: 'Failed to mark messages as read' });
+    }
+  });
+
   // Google OAuth routes
   app.get('/api/auth/google', (req, res, next) => {
     // Store referral code in session if provided
