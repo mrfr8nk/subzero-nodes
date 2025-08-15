@@ -3,7 +3,35 @@
 ## Project Overview
 A comprehensive deployment platform that enables users to deploy and manage applications through GitHub Actions with real-time monitoring, advanced logging, and automated status tracking.
 
-## Recent Changes (August 14, 2025)
+## Recent Changes (August 15, 2025)
+
+### WhatsApp-Like Chat Features Implementation
+✅ **Unread Message Count System**
+- Added WhatsApp-style message count notifications that appear in chat header
+- Message count badge disappears automatically when user opens chat (after 1 second)
+- Badge shows count up to 99, displays "99+" for higher numbers
+- Uses red pulsing badge for visual attention
+
+✅ **Automatic Cleanup System**
+- Scheduled cleanup runs every 24 hours automatically
+- Deletes inactive user accounts after 3 months of inactivity
+- Removes group chat messages older than 1 month
+- Admin notifications for cleanup failures
+- Background cleanup statistics tracking
+
+✅ **Device Cookie Management System**
+- Implemented device fingerprinting and cookie tracking
+- Device restriction system to limit account creation (2 accounts per device)
+- Separate tracking for Gmail OAuth and password signups
+- Device cookie persistence across browser sessions
+
+✅ **Enhanced Database Schema**
+- Added MessageRead tracking for unread count functionality
+- DeviceRestriction collection for account limit enforcement
+- Enhanced User model with device history and activity tracking
+- Automatic cleanup of orphaned records
+
+### Previous Changes (August 14, 2025)
 
 ### Critical Deployment System Fixes Completed
 ✅ **GitHub Settings Database Integration**

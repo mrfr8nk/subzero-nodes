@@ -140,6 +140,11 @@ export async function setupAuth(app: Express) {
         restrictions: [],
         ipHistory: [],
         deviceHistory: [],
+        // Device and bot limits
+        maxAccountsPerDevice: 1,
+        deviceAccountCount: 0,
+        maxBots: 10,
+        currentBotCount: 0,
       };
 
       // Note: We can't access req object here in the strategy callback
@@ -173,40 +178,37 @@ export async function setupAuth(app: Express) {
     passport.authenticate('google', { failureRedirect: '/login' }),
     async (req, res) => {
       try {
-        // Handle device fingerprint tracking for new users
+        // Handle enhanced device tracking for new users
         const user = req.user as any;
         if (user) {
-          // Get device fingerprint from session if available (set by frontend)
+          // Get device fingerprint and cookie from session (set by frontend)
           const deviceFingerprint = (req.session as any)?.deviceFingerprint;
+          const deviceCookie = (req.session as any)?.deviceCookie;
           
-          if (deviceFingerprint && !user.deviceFingerprint) {
-            // This is a new user, check for duplicate accounts
-            const existingAccountsFromDevice = await storage.getUsersByDeviceFingerprint(deviceFingerprint);
+          if (deviceFingerprint && deviceCookie) {
+            // Check device restrictions using the new system
+            const deviceCheck = await storage.checkDeviceAccountCreationLimit(deviceFingerprint, deviceCookie);
             
-            // Get configurable max accounts per device from admin settings (default to 1)
-            const maxAccountsSetting = await storage.getAppSetting('max_accounts_per_device');
-            const maxAccountsPerDevice = maxAccountsSetting?.value || 1;
-            
-            const activeAccounts = existingAccountsFromDevice.filter(existingUser => 
-              existingUser.status !== 'banned' && 
-              existingUser.status !== 'restricted' &&
-              existingUser._id.toString() !== user._id.toString() // Exclude current user
-            );
-            
-            if (activeAccounts.length >= maxAccountsPerDevice) {
-              // Delete the newly created user account
+            if (!deviceCheck.allowed) {
+              // Delete the newly created user account if device is blocked
               await storage.deleteUser(user._id.toString(), 'system');
               
-              // Log out and redirect with error
+              // Log out and redirect with specific error
               req.logout((err) => {
                 if (err) console.error('Logout error:', err);
-                res.redirect('/login?error=multiple_accounts');
+                res.redirect(`/login?error=multiple_accounts&reason=${encodeURIComponent(deviceCheck.reason || 'Device blocked')}`);
               });
               return;
             }
             
+            // Register this account with the device
+            await storage.addAccountToDevice(deviceFingerprint, user._id.toString());
+            
             // Update user device fingerprint for valid users
             await storage.updateUserDeviceFingerprint(user._id.toString(), deviceFingerprint);
+            
+            // Update user activity
+            await storage.updateUserActivity(user._id.toString());
           }
         }
       } catch (error) {

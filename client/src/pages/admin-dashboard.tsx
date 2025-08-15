@@ -150,6 +150,276 @@ interface CurrencySettings {
   symbol: string;
 }
 
+// Cleanup Management Component for WhatsApp-like auto-cleanup features
+function CleanupManagement() {
+  const { toast } = useToast();
+  const [cleanupStats, setCleanupStats] = useState<any>(null);
+  
+  // Manual cleanup mutations
+  const manualInactiveUserCleanupMutation = useMutation({
+    mutationFn: async (months: number) => {
+      return await apiRequest('/api/admin/cleanup/inactive-users', 'POST', { months });
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Cleanup Successful",
+        description: `${data.deletedCount} inactive users deleted`,
+      });
+      fetchCleanupStats();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Cleanup Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const manualMessageCleanupMutation = useMutation({
+    mutationFn: async (days: number) => {
+      return await apiRequest('/api/admin/cleanup/old-messages', 'POST', { days });
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Message Cleanup Successful", 
+        description: `${data.deletedCount} old messages deleted`,
+      });
+      fetchCleanupStats();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Message Cleanup Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const fetchCleanupStats = async () => {
+    try {
+      const stats = await apiRequest('/api/admin/cleanup/stats', 'GET');
+      setCleanupStats(stats);
+    } catch (error) {
+      console.error('Failed to fetch cleanup stats:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchCleanupStats();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Manual Cleanup Controls */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Trash2 className="w-5 h-5 mr-2" />
+              Manual Cleanup
+            </CardTitle>
+            <CardDescription>
+              Manually trigger cleanup tasks for inactive users and old messages
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <div className="p-4 border rounded-lg">
+                <h4 className="font-medium mb-3">Clean Up Inactive Users</h4>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Remove user accounts that haven't been active for the specified time period
+                </p>
+                <div className="flex items-center space-x-2">
+                  <Input
+                    type="number"
+                    placeholder="3"
+                    min="1"
+                    max="12"
+                    defaultValue="3"
+                    className="w-20"
+                    id="inactive-months"
+                  />
+                  <span className="text-sm">months</span>
+                  <Button
+                    onClick={() => {
+                      const input = document.getElementById('inactive-months') as HTMLInputElement;
+                      const months = parseInt(input.value) || 3;
+                      manualInactiveUserCleanupMutation.mutate(months);
+                    }}
+                    disabled={manualInactiveUserCleanupMutation.isPending}
+                    variant="destructive"
+                    size="sm"
+                  >
+                    {manualInactiveUserCleanupMutation.isPending ? (
+                      <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <UserX className="w-4 h-4 mr-2" />
+                    )}
+                    Clean Users
+                  </Button>
+                </div>
+              </div>
+
+              <div className="p-4 border rounded-lg">
+                <h4 className="font-medium mb-3">Clean Up Old Messages</h4>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Remove group chat messages older than the specified time period
+                </p>
+                <div className="flex items-center space-x-2">
+                  <Input
+                    type="number"
+                    placeholder="30"
+                    min="1"
+                    max="365"
+                    defaultValue="30"
+                    className="w-20"
+                    id="message-days"
+                  />
+                  <span className="text-sm">days</span>
+                  <Button
+                    onClick={() => {
+                      const input = document.getElementById('message-days') as HTMLInputElement;
+                      const days = parseInt(input.value) || 30;
+                      manualMessageCleanupMutation.mutate(days);
+                    }}
+                    disabled={manualMessageCleanupMutation.isPending}
+                    variant="destructive"
+                    size="sm"
+                  >
+                    {manualMessageCleanupMutation.isPending ? (
+                      <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                    )}
+                    Clean Messages
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Cleanup Statistics */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Activity className="w-5 h-5 mr-2" />
+              Cleanup Statistics
+            </CardTitle>
+            <CardDescription>
+              View automatic cleanup system status and statistics
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {cleanupStats ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <div className="text-xl font-bold text-green-600">
+                      {JSON.parse(cleanupStats.lastCleanupStats || '{}').usersDeleted || 0}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Users Cleaned (Last Run)</div>
+                  </div>
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <div className="text-xl font-bold text-blue-600">
+                      {JSON.parse(cleanupStats.lastCleanupStats || '{}').messagesDeleted || 0}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Messages Cleaned (Last Run)</div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Last Cleanup:</span>
+                    <span className="font-medium">
+                      {cleanupStats.lastCleanup ? 
+                        format(new Date(JSON.parse(cleanupStats.lastCleanupStats).lastCleanup), 'PPp') : 
+                        'Never'
+                      }
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Next Cleanup:</span>
+                    <span className="font-medium text-blue-600">
+                      In ~{Math.ceil(24 - (Date.now() - new Date(JSON.parse(cleanupStats.lastCleanupStats || '{}').lastCleanup || Date.now()).getTime()) / (1000 * 60 * 60))} hours
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Loading cleanup statistics...
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Auto-Cleanup Configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Clock className="w-5 h-5 mr-2" />
+            Automatic Cleanup Settings
+          </CardTitle>
+          <CardDescription>
+            Configure automated cleanup intervals and behavior (WhatsApp-like features)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Alert>
+            <Activity className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Auto-cleanup is currently active!</strong> The system runs every 24 hours and:
+              <br />• Deletes user accounts inactive for 3+ months
+              <br />• Removes group messages older than 30 days  
+              <br />• Cleans up orphaned database records
+              <br />• Updates database statistics for monitoring
+            </AlertDescription>
+          </Alert>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h4 className="font-medium">User Account Cleanup</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Inactive Period:</span>
+                  <Badge variant="secondary">3 months</Badge>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Cleanup Frequency:</span>
+                  <Badge variant="secondary">Daily (24h)</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  User accounts are automatically deleted if they haven't logged in for 3+ months to maintain database efficiency
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="font-medium">Message Cleanup</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Message Age Limit:</span>
+                  <Badge variant="secondary">30 days</Badge>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Cleanup Frequency:</span>
+                  <Badge variant="secondary">Daily (24h)</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Group chat messages older than 30 days are automatically deleted to prevent database bloat
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [selectedSection, setSelectedSection] = useState("users");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -988,6 +1258,12 @@ export default function AdminDashboard() {
                   <div className="flex items-center">
                     <Coins className="w-4 h-4 mr-2" />
                     Coin Management
+                  </div>
+                </SelectItem>
+                <SelectItem value="cleanup-management">
+                  <div className="flex items-center">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Auto Cleanup
                   </div>
                 </SelectItem>
                 <SelectItem value="github">
@@ -1959,6 +2235,10 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {selectedSection === "cleanup-management" && (
+          <CleanupManagement />
         )}
 
         {selectedSection === "device-management" && (

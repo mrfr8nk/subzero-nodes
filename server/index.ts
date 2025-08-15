@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
+import { startScheduledCleanup } from "./scheduledCleanup";
 
 // Function to check if maintenance mode should end
 async function checkMaintenanceEndTime(storage: any) {
@@ -103,6 +104,9 @@ app.use((req, res, next) => {
       console.error('Error processing startup deployment charges:', error);
     }
   }, 10000); // Wait 10 seconds after startup
+
+  // Start scheduled cleanup system for WhatsApp-like features
+  startScheduledCleanup();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     // Prevent sending multiple responses

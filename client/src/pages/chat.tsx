@@ -18,6 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { getDeviceFingerprint } from "@/lib/deviceFingerprint";
 import { apiRequest } from "@/lib/queryClient";
 import UserProfileModal from "@/components/user-profile-modal";
+import deviceCookieManager from "@/lib/deviceCookie";
 
 interface ChatMessage {
   _id: string;
@@ -68,9 +69,12 @@ export default function Chat() {
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedUsername, setSelectedUsername] = useState("");
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [isFirstVisit, setIsFirstVisit] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [lastVisibleMessage, setLastVisibleMessage] = useState<string | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -79,6 +83,45 @@ export default function Chat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Fetch unread message count when user loads chat
+  const fetchUnreadMessageCount = async () => {
+    try {
+      const response = await apiRequest('/api/chat/unread-count', 'GET') as { count: number };
+      setUnreadMessageCount(response.count || 0);
+    } catch (error) {
+      console.error('Error fetching unread message count:', error);
+    }
+  };
+
+  // Mark all messages as read when user opens chat
+  const markAllMessagesAsRead = async () => {
+    try {
+      await apiRequest('/api/chat/mark-all-read', 'POST');
+      setUnreadMessageCount(0);
+      setIsFirstVisit(false);
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+    }
+  };
+
+  // Effect to fetch unread count on component mount
+  useEffect(() => {
+    if (user && isFirstVisit) {
+      fetchUnreadMessageCount();
+    }
+  }, [user, isFirstVisit]);
+
+  // Effect to mark messages as read when user opens chat
+  useEffect(() => {
+    if (user && isFirstVisit && messages.length > 0) {
+      const timer = setTimeout(() => {
+        markAllMessagesAsRead();
+      }, 1000); // Mark as read after 1 second of viewing
+
+      return () => clearTimeout(timer);
+    }
+  }, [user, isFirstVisit, messages.length]);
 
   useEffect(() => {
     if (!user) return;
@@ -92,22 +135,25 @@ export default function Chat() {
     ws.onopen = async () => {
       setIsConnected(true);
       
-      // Generate device fingerprint for device ban checking
+      // Generate device fingerprint and cookie for enhanced security
       let deviceFingerprint: string | undefined;
+      let deviceCookie: string | undefined;
       try {
         deviceFingerprint = await getDeviceFingerprint();
+        deviceCookie = await deviceCookieManager.getOrCreateDeviceCookie();
       } catch (error) {
-        console.error('Error generating device fingerprint:', error);
+        console.error('Error generating device fingerprint/cookie:', error);
       }
       
-      // Join chat room
+      // Join chat room with enhanced device tracking
       ws.send(JSON.stringify({
         type: 'join_chat',
         userId: user._id?.toString() || user.email || '',
         username: user.firstName || user.email?.split('@')[0] || 'User',
         isAdmin: !!isAdmin,
         role: user.role || (isAdmin ? 'admin' : 'user'),
-        deviceFingerprint
+        deviceFingerprint,
+        deviceCookie
       }));
     };
 
@@ -525,7 +571,18 @@ export default function Chat() {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <MessageCircle className="w-5 h-5 text-blue-600" />
-                <CardTitle>Community Chat</CardTitle>
+                <CardTitle className="flex items-center space-x-2">
+                  <span>Community Chat</span>
+                  {/* WhatsApp-like unread message count badge */}
+                  {isFirstVisit && unreadMessageCount > 0 && (
+                    <Badge 
+                      variant="destructive" 
+                      className="bg-red-500 text-white text-xs px-2 py-1 rounded-full min-w-[20px] h-5 flex items-center justify-center animate-pulse"
+                    >
+                      {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                    </Badge>
+                  )}
+                </CardTitle>
                 <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
               </div>
               

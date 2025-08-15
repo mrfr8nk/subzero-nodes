@@ -421,6 +421,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(userStatusMiddleware);
 
+  // Device restriction check API
+  app.post('/api/auth/check-device-limit', async (req, res) => {
+    try {
+      const { deviceFingerprint, cookieValue } = req.body;
+      
+      if (!deviceFingerprint || !cookieValue) {
+        return res.status(400).json({ 
+          allowed: false, 
+          reason: 'Invalid device fingerprint or cookie' 
+        });
+      }
+
+      const result = await storage.checkDeviceAccountCreationLimit(deviceFingerprint, cookieValue);
+      res.json(result);
+    } catch (error) {
+      console.error('Error checking device limit:', error);
+      res.status(500).json({ 
+        allowed: false, 
+        reason: 'Server error checking device restrictions' 
+      });
+    }
+  });
+
+  // Chat API routes for unread message tracking
+  app.get('/api/chat/unread-count', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const unreadCount = await storage.getUserUnreadMessageCount(userId);
+      res.json({ count: unreadCount });
+    } catch (error) {
+      console.error('Error getting unread message count:', error);
+      res.status(500).json({ error: 'Failed to get unread message count' });
+    }
+  });
+
+  app.post('/api/chat/mark-all-read', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      await storage.markAllMessagesAsRead(userId);
+      
+      // Update user activity
+      await storage.updateUserActivity(userId);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+      res.status(500).json({ error: 'Failed to mark messages as read' });
+    }
+  });
+
+  // Admin routes for chat cleanup and user management
+  app.post('/api/admin/cleanup/inactive-users', requireSuperAdmin, async (req, res) => {
+    try {
+      const months = req.body.months || 3; // Default to 3 months
+      const deletedCount = await storage.deleteInactiveUsers(months);
+      
+      res.json({ 
+        success: true, 
+        message: `Deleted ${deletedCount} inactive users (inactive for ${months} months)`,
+        deletedCount 
+      });
+    } catch (error) {
+      console.error('Error cleaning up inactive users:', error);
+      res.status(500).json({ error: 'Failed to clean up inactive users' });
+    }
+  });
+
+  app.post('/api/admin/cleanup/old-messages', requireSuperAdmin, async (req, res) => {
+    try {
+      const days = req.body.days || 30; // Default to 30 days for group messages
+      const reason = req.body.reason || 'admin_cleanup';
+      const deletedCount = await storage.deleteMessagesOlderThan(days, reason);
+      
+      res.json({ 
+        success: true, 
+        message: `Deleted ${deletedCount} messages older than ${days} days`,
+        deletedCount 
+      });
+    } catch (error) {
+      console.error('Error cleaning up old messages:', error);
+      res.status(500).json({ error: 'Failed to clean up old messages' });
+    }
+  });
+
+  app.get('/api/admin/cleanup/stats', requireSuperAdmin, async (req, res) => {
+    try {
+      const lastCleanupStats = await storage.getAppSetting('last_cleanup_stats');
+      
+      res.json({
+        lastCleanupStats: lastCleanupStats?.value || '{}',
+        lastCleanup: lastCleanupStats?.value ? JSON.parse(lastCleanupStats.value).lastCleanup : null
+      });
+    } catch (error) {
+      console.error('Error getting cleanup stats:', error);
+      res.status(500).json({ error: 'Failed to get cleanup statistics' });
+    }
+  });
+
   // Google OAuth routes
   app.get('/api/auth/google', (req, res, next) => {
     // Store referral code in session if provided

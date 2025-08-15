@@ -14,6 +14,8 @@ import {
   BannedUser,
   LoginHistory,
   DeveloperInfo,
+  UserMessageRead,
+  DeviceRestriction,
   InsertUser,
   InsertDeployment,
   InsertTransaction,
@@ -221,6 +223,27 @@ export interface IStorage {
   
   // Branch name availability
   checkBranchNameAvailability(branchName: string, userId?: string): Promise<boolean>;
+  
+  // Enhanced chat operations for message count and read tracking
+  getUserUnreadMessageCount(userId: string): Promise<number>;
+  markMessageAsRead(userId: string, messageId: string): Promise<void>;
+  markAllMessagesAsRead(userId: string): Promise<void>;
+  deleteMessagesOlderThan(days: number, reason: string): Promise<number>;
+  
+  // Device restriction and cookie-based blocking
+  createDeviceRestriction(deviceFingerprint: string, cookieValue: string): Promise<DeviceRestriction>;
+  getDeviceRestriction(deviceFingerprint: string): Promise<DeviceRestriction | undefined>;
+  updateDeviceRestrictionCookie(deviceFingerprint: string, cookieValue: string): Promise<void>;
+  checkDeviceAccountCreationLimit(deviceFingerprint: string, cookieValue: string): Promise<{ allowed: boolean; reason?: string }>;
+  addAccountToDevice(deviceFingerprint: string, userId: string): Promise<void>;
+  
+  // User activity and cleanup operations
+  updateUserActivity(userId: string): Promise<void>;
+  getInactiveUsers(months: number): Promise<User[]>;
+  deleteInactiveUsers(months: number): Promise<number>;
+  
+  // Group chat message cleanup (for future group chat functionality)
+  deleteGroupChatMessagesOlderThan(days: number): Promise<number>;
 }
 
 export class MongoStorage implements IStorage {
@@ -2363,6 +2386,267 @@ export class MongoStorage implements IStorage {
     
     const existingDeployment = await this.deploymentsCollection.findOne(query);
     return !existingDeployment;
+  }
+
+  // Enhanced chat operations for message count and read tracking
+  private get userMessageReadsCollection() {
+    return getDb().collection<UserMessageRead>("userMessageReads");
+  }
+
+  private get deviceRestrictionsCollection() {
+    return getDb().collection<DeviceRestriction>("deviceRestrictions");
+  }
+
+  async getUserUnreadMessageCount(userId: string): Promise<number> {
+    try {
+      // Get the last message the user read
+      const lastRead = await this.userMessageReadsCollection
+        .findOne({ userId: new ObjectId(userId) }, { sort: { readAt: -1 } });
+      
+      if (!lastRead) {
+        // If user has never read any message, count all messages
+        return await this.chatMessagesCollection.countDocuments({});
+      }
+
+      // Count messages created after the last read message
+      const lastReadMessage = await this.getChatMessage(lastRead.messageId.toString());
+      if (!lastReadMessage) {
+        return 0;
+      }
+
+      return await this.chatMessagesCollection.countDocuments({
+        createdAt: { $gt: lastReadMessage.createdAt },
+        userId: { $ne: new ObjectId(userId) } // Don't count user's own messages
+      });
+    } catch (error) {
+      console.error('Error getting unread message count:', error);
+      return 0;
+    }
+  }
+
+  async markMessageAsRead(userId: string, messageId: string): Promise<void> {
+    try {
+      await this.userMessageReadsCollection.updateOne(
+        { 
+          userId: new ObjectId(userId),
+          messageId: new ObjectId(messageId)
+        },
+        {
+          $set: {
+            userId: new ObjectId(userId),
+            messageId: new ObjectId(messageId),
+            readAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+    }
+  }
+
+  async markAllMessagesAsRead(userId: string): Promise<void> {
+    try {
+      // Get the latest message
+      const latestMessage = await this.chatMessagesCollection
+        .findOne({}, { sort: { createdAt: -1 } });
+      
+      if (latestMessage) {
+        await this.markMessageAsRead(userId, latestMessage._id.toString());
+      }
+    } catch (error) {
+      console.error('Error marking all messages as read:', error);
+    }
+  }
+
+  async deleteMessagesOlderThan(days: number, reason: string): Promise<number> {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+
+      const result = await this.chatMessagesCollection.deleteMany({
+        createdAt: { $lt: cutoffDate }
+      });
+
+      // Also cleanup related read records
+      await this.userMessageReadsCollection.deleteMany({
+        messageId: { 
+          $in: await this.chatMessagesCollection
+            .find({ createdAt: { $lt: cutoffDate } })
+            .map(msg => msg._id)
+            .toArray()
+        }
+      });
+
+      console.log(`Deleted ${result.deletedCount} messages older than ${days} days (reason: ${reason})`);
+      return result.deletedCount || 0;
+    } catch (error) {
+      console.error('Error deleting old messages:', error);
+      return 0;
+    }
+  }
+
+  // Device restriction and cookie-based blocking
+  async createDeviceRestriction(deviceFingerprint: string, cookieValue: string): Promise<DeviceRestriction> {
+    const deviceRestriction: DeviceRestriction = {
+      _id: new ObjectId(),
+      deviceFingerprint,
+      cookieValue,
+      accountsCreated: [],
+      maxAccountsAllowed: 1,
+      firstAccountCreated: new Date(),
+      lastActivity: new Date(),
+      isBlocked: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    await this.deviceRestrictionsCollection.insertOne(deviceRestriction);
+    return deviceRestriction;
+  }
+
+  async getDeviceRestriction(deviceFingerprint: string): Promise<DeviceRestriction | undefined> {
+    const restriction = await this.deviceRestrictionsCollection.findOne({ deviceFingerprint });
+    return restriction || undefined;
+  }
+
+  async updateDeviceRestrictionCookie(deviceFingerprint: string, cookieValue: string): Promise<void> {
+    await this.deviceRestrictionsCollection.updateOne(
+      { deviceFingerprint },
+      { 
+        $set: { 
+          cookieValue,
+          lastActivity: new Date(),
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
+  async checkDeviceAccountCreationLimit(deviceFingerprint: string, cookieValue: string): Promise<{ allowed: boolean; reason?: string }> {
+    try {
+      let deviceRestriction = await this.getDeviceRestriction(deviceFingerprint);
+      
+      if (!deviceRestriction) {
+        // Create new device restriction record
+        deviceRestriction = await this.createDeviceRestriction(deviceFingerprint, cookieValue);
+        return { allowed: true };
+      }
+
+      // Check if device is blocked
+      if (deviceRestriction.isBlocked) {
+        return { allowed: false, reason: deviceRestriction.blockedReason || 'Device is blocked' };
+      }
+
+      // Check cookie matching
+      if (deviceRestriction.cookieValue !== cookieValue) {
+        // Different cookie value could indicate device tampering
+        console.warn(`Cookie mismatch for device ${deviceFingerprint}`);
+      }
+
+      // Check account limit
+      const activeAccountCount = deviceRestriction.accountsCreated.length;
+      if (activeAccountCount >= deviceRestriction.maxAccountsAllowed) {
+        return { allowed: false, reason: `Maximum ${deviceRestriction.maxAccountsAllowed} account(s) allowed per device` };
+      }
+
+      return { allowed: true };
+    } catch (error) {
+      console.error('Error checking device account creation limit:', error);
+      return { allowed: false, reason: 'Error checking device restrictions' };
+    }
+  }
+
+  async addAccountToDevice(deviceFingerprint: string, userId: string): Promise<void> {
+    await this.deviceRestrictionsCollection.updateOne(
+      { deviceFingerprint },
+      { 
+        $addToSet: { accountsCreated: new ObjectId(userId) },
+        $set: { 
+          lastActivity: new Date(),
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
+  // User activity and cleanup operations
+  async updateUserActivity(userId: string): Promise<void> {
+    await this.usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $set: { 
+          lastActivity: new Date(),
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
+  async getInactiveUsers(months: number): Promise<User[]> {
+    const cutoffDate = new Date();
+    cutoffDate.setMonth(cutoffDate.getMonth() - months);
+
+    return await this.usersCollection.find({
+      $or: [
+        { lastActivity: { $lt: cutoffDate } },
+        { 
+          lastActivity: { $exists: false },
+          lastLogin: { $lt: cutoffDate }
+        },
+        {
+          lastActivity: { $exists: false },
+          lastLogin: { $exists: false },
+          createdAt: { $lt: cutoffDate }
+        }
+      ],
+      status: { $ne: 'banned' } // Don't delete banned users
+    }).toArray();
+  }
+
+  async deleteInactiveUsers(months: number): Promise<number> {
+    const inactiveUsers = await this.getInactiveUsers(months);
+    
+    if (inactiveUsers.length === 0) {
+      return 0;
+    }
+
+    const userIds = inactiveUsers.map(user => user._id);
+    
+    // Delete user data
+    await this.usersCollection.deleteMany({ _id: { $in: userIds } });
+    
+    // Delete related data
+    await this.deploymentsCollection.deleteMany({ userId: { $in: userIds } });
+    await this.transactionsCollection.deleteMany({ userId: { $in: userIds } });
+    await this.chatMessagesCollection.deleteMany({ userId: { $in: userIds } });
+    await this.chatRestrictionsCollection.deleteMany({ userId: { $in: userIds } });
+    await this.loginHistoryCollection.deleteMany({ userId: { $in: userIds } });
+    await this.userMessageReadsCollection.deleteMany({ userId: { $in: userIds } });
+    
+    console.log(`Deleted ${inactiveUsers.length} inactive users (inactive for ${months} months)`);
+    return inactiveUsers.length;
+  }
+
+  // Group chat message cleanup (for future group chat functionality)
+  async deleteGroupChatMessagesOlderThan(days: number): Promise<number> {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+
+      // For now, this will work on all chat messages
+      // In the future, this can be modified to work with specific groups
+      const result = await this.chatMessagesCollection.deleteMany({
+        createdAt: { $lt: cutoffDate },
+        autoDeleteReason: 'group_chat_retention'
+      });
+
+      console.log(`Deleted ${result.deletedCount} group chat messages older than ${days} days`);
+      return result.deletedCount || 0;
+    } catch (error) {
+      console.error('Error deleting old group chat messages:', error);
+      return 0;
+    }
   }
 }
 

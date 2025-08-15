@@ -55,6 +55,11 @@ export interface User {
   // Bot limits
   maxBots?: number; // Maximum bots allowed (default 10)
   currentBotCount?: number; // Current number of bots
+  // Activity tracking
+  lastActivity?: Date; // Last time user was active (login, message, etc.)
+  // Read message tracking
+  unreadMessageCount?: number; // Number of unread messages in chat
+  lastReadMessage?: ObjectId; // ID of last message user read
   createdAt: Date;
   updatedAt: Date;
 }
@@ -202,6 +207,34 @@ export interface ChatMessage {
   imageData?: string; // Base64 encoded image data
   fileName?: string; // Original file name for file messages
   fileSize?: number; // File size in bytes
+  // Auto-deletion settings
+  expiresAt?: Date; // When this message should be auto-deleted
+  autoDeleteReason?: 'group_chat_retention' | 'inactive_user' | 'admin_cleanup'; // Why it will be deleted
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Track user read status for messages
+export interface UserMessageRead {
+  _id: ObjectId;
+  userId: ObjectId;
+  messageId: ObjectId;
+  readAt: Date;
+  // For group chats - track which group the read status is for
+  groupId?: ObjectId; // Future use for group chat functionality
+}
+
+// Store device-specific information to prevent multiple accounts
+export interface DeviceRestriction {
+  _id: ObjectId;
+  deviceFingerprint: string;
+  cookieValue: string; // Stored cookie value for device identification
+  accountsCreated: ObjectId[]; // List of user accounts created on this device
+  maxAccountsAllowed: number; // Maximum accounts allowed (configurable by admin)
+  firstAccountCreated: Date; // When the first account was created on this device
+  lastActivity: Date; // Last activity on this device
+  isBlocked: boolean; // Whether this device is blocked from creating new accounts
+  blockedReason?: string; // Reason for blocking
   createdAt: Date;
   updatedAt: Date;
 }
@@ -460,6 +493,21 @@ export const insertBannedDeviceFingerprintSchema = z.object({
   affectedUsers: z.string().array().default([]),
 });
 
+export const insertUserMessageReadSchema = z.object({
+  userId: z.string(),
+  messageId: z.string(),
+  groupId: z.string().optional(),
+});
+
+export const insertDeviceRestrictionSchema = z.object({
+  deviceFingerprint: z.string(),
+  cookieValue: z.string(),
+  accountsCreated: z.string().array().default([]),
+  maxAccountsAllowed: z.number().default(1),
+  isBlocked: z.boolean().default(false),
+  blockedReason: z.string().optional(),
+});
+
 // Insert types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertDeployment = z.infer<typeof insertDeploymentSchema>;
@@ -475,6 +523,8 @@ export type InsertCoinTransfer = z.infer<typeof insertCoinTransferSchema>;
 export type InsertBannedUser = z.infer<typeof insertBannedUserSchema>;
 export type InsertLoginHistory = z.infer<typeof insertLoginHistorySchema>;
 export type InsertDeveloperInfo = z.infer<typeof insertDeveloperInfoSchema>;
+export type InsertUserMessageRead = z.infer<typeof insertUserMessageReadSchema>;
+export type InsertDeviceRestriction = z.infer<typeof insertDeviceRestrictionSchema>;
 
 // For backward compatibility
 export type UpsertUser = InsertUser;
