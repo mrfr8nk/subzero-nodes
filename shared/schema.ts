@@ -300,6 +300,20 @@ export interface BannedUser {
   isActive: boolean; // Can be unbanned by setting to false
 }
 
+export interface VoucherCode {
+  _id: ObjectId;
+  code: string; // Unique voucher code
+  coinAmount: number; // Amount of coins to give
+  createdBy: ObjectId; // Admin who created this voucher
+  expiresAt?: Date; // Optional expiry date
+  isActive: boolean; // Whether the voucher can be used
+  usageCount: number; // How many times it has been used
+  maxUsage?: number; // Optional: maximum number of uses (default: 1)
+  usedBy: ObjectId[]; // Array of user IDs who have used this voucher
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Zod schemas for validation
 export const insertUserSchema = z.object({
   googleId: z.string().optional(),
@@ -435,6 +449,15 @@ export const insertBannedUserSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
+export const insertVoucherCodeSchema = z.object({
+  code: z.string().min(3).max(50),
+  coinAmount: z.number().positive(),
+  createdBy: z.string(),
+  expiresAt: z.date().optional(),
+  isActive: z.boolean().default(true),
+  maxUsage: z.number().positive().optional().default(1),
+});
+
 export const insertReferralSchema = z.object({
   referrerId: z.string(),
   referredId: z.string(),
@@ -521,6 +544,7 @@ export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type InsertBannedDeviceFingerprint = z.infer<typeof insertBannedDeviceFingerprintSchema>;
 export type InsertCoinTransfer = z.infer<typeof insertCoinTransferSchema>;
 export type InsertBannedUser = z.infer<typeof insertBannedUserSchema>;
+export type InsertVoucherCode = z.infer<typeof insertVoucherCodeSchema>;
 export type InsertLoginHistory = z.infer<typeof insertLoginHistorySchema>;
 export type InsertDeveloperInfo = z.infer<typeof insertDeveloperInfoSchema>;
 export type InsertUserMessageRead = z.infer<typeof insertUserMessageReadSchema>;

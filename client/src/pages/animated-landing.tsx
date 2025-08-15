@@ -178,31 +178,23 @@ export default function AnimatedLanding() {
               transition={{ duration: 0.2 }}
             >
               <motion.div 
-                className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-xl border border-blue-400/30"
+                className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg"
                 whileHover={{ rotate: 360 }}
                 transition={{ duration: 0.5 }}
               >
-                <Bot className="h-7 w-7 text-white" />
+                <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
               </motion.div>
               <div>
-                <h1 className="text-lg font-bold bg-gradient-to-r from-slate-800 to-slate-900 dark:from-blue-300 dark:to-indigo-300 bg-clip-text text-transparent">
-                  SUBZERO NODES
+                <h1 className="text-lg font-bold text-slate-900 dark:text-white">
+                  SUBZERO-MD
                 </h1>
-                <div className="text-xs text-blue-200 font-medium dark:text-blue-200 text-slate-600">DEPLOYMENT PLATFORM</div>
+                <div className="text-xs text-slate-600 dark:text-slate-300 font-medium">Bot Platform</div>
               </div>
             </motion.div>
             
             <div className="flex items-center space-x-4">
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={() => setLocation("/")}
-                  className="h-9 w-9 text-slate-700 hover:bg-slate-100 dark:text-blue-100 dark:hover:bg-blue-500/10"
-                >
-                  <Home className="h-4 w-4" />
-                </Button>
-              </motion.div>
               <ThemeToggle />
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button 

@@ -1273,6 +1273,12 @@ export default function AdminDashboard() {
                     GitHub
                   </div>
                 </SelectItem>
+                <SelectItem value="vouchers">
+                  <div className="flex items-center">
+                    <Gift className="w-4 h-4 mr-2" />
+                    Voucher Management
+                  </div>
+                </SelectItem>
                 <SelectItem value="deployments-mgmt">
                   <div className="flex items-center">
                     <Rocket className="w-4 h-4 mr-2" />
@@ -2961,6 +2967,30 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
           </div>
+        )}
+
+        {selectedSection === "vouchers" && (
+          <Card data-testid="card-voucher-management">
+            <CardHeader>
+              <CardTitle>Voucher Management</CardTitle>
+              <CardDescription>Manage voucher codes for coin distribution</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Gift className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Voucher Management</h3>
+                <p className="text-muted-foreground mb-4">
+                  Create and manage voucher codes for users to redeem coins
+                </p>
+                <Button asChild>
+                  <a href="/admin/vouchers" className="inline-flex items-center">
+                    <Gift className="mr-2 h-4 w-4" />
+                    Go to Voucher Management
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
 

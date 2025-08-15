@@ -16,6 +16,7 @@ import {
   DeveloperInfo,
   UserMessageRead,
   DeviceRestriction,
+  VoucherCode,
   InsertUser,
   InsertDeployment,
   InsertTransaction,
@@ -29,6 +30,7 @@ import {
   InsertBannedUser,
   InsertLoginHistory,
   InsertDeveloperInfo,
+  InsertVoucherCode,
 } from "@shared/schema";
 import { getDb } from "./db";
 import { ObjectId } from "mongodb";
@@ -244,6 +246,14 @@ export interface IStorage {
   
   // Group chat message cleanup (for future group chat functionality)
   deleteGroupChatMessagesOlderThan(days: number): Promise<number>;
+  
+  // Voucher operations
+  createVoucherCode(voucher: InsertVoucherCode): Promise<VoucherCode>;
+  getVoucherByCode(code: string): Promise<VoucherCode | undefined>;
+  getAllVouchers(): Promise<VoucherCode[]>;
+  redeemVoucher(code: string, userId: string): Promise<{ success: boolean; message: string; coinAmount?: number }>;
+  updateVoucherStatus(id: string, isActive: boolean): Promise<void>;
+  deleteVoucher(id: string): Promise<void>;
 }
 
 export class MongoStorage implements IStorage {
@@ -305,6 +315,10 @@ export class MongoStorage implements IStorage {
 
   private get developerInfoCollection() {
     return getDb().collection<DeveloperInfo>("developerInfo");
+  }
+
+  private get voucherCodesCollection() {
+    return getDb().collection<VoucherCode>("voucherCodes");
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -2660,6 +2674,120 @@ export class MongoStorage implements IStorage {
       console.error('Error deleting old group chat messages:', error);
       return 0;
     }
+  }
+
+  // Voucher operations
+  async createVoucherCode(voucher: InsertVoucherCode): Promise<VoucherCode> {
+    const now = new Date();
+    const newVoucher = {
+      ...voucher,
+      _id: new ObjectId(),
+      createdBy: new ObjectId(voucher.createdBy),
+      usageCount: 0,
+      usedBy: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const result = await this.voucherCodesCollection.insertOne(newVoucher);
+    return { ...newVoucher, _id: result.insertedId };
+  }
+
+  async getVoucherByCode(code: string): Promise<VoucherCode | undefined> {
+    const voucher = await this.voucherCodesCollection.findOne({ code });
+    return voucher || undefined;
+  }
+
+  async getAllVouchers(): Promise<VoucherCode[]> {
+    return await this.voucherCodesCollection.find({}).sort({ createdAt: -1 }).toArray();
+  }
+
+  async redeemVoucher(code: string, userId: string): Promise<{ success: boolean; message: string; coinAmount?: number }> {
+    const session = getDb().client.startSession();
+    
+    try {
+      const result = await session.withTransaction(async () => {
+        // Find the voucher
+        const voucher = await this.voucherCodesCollection.findOne({ code }, { session });
+        
+        if (!voucher) {
+          return { success: false, message: "Voucher code not found" };
+        }
+
+        if (!voucher.isActive) {
+          return { success: false, message: "Voucher code is no longer active" };
+        }
+
+        if (voucher.expiresAt && voucher.expiresAt < new Date()) {
+          return { success: false, message: "Voucher code has expired" };
+        }
+
+        // Check if user has already used this voucher
+        const userObjectId = new ObjectId(userId);
+        if (voucher.usedBy.some(id => id.equals(userObjectId))) {
+          return { success: false, message: "You have already used this voucher code" };
+        }
+
+        // Check usage limit
+        if (voucher.maxUsage && voucher.usageCount >= voucher.maxUsage) {
+          return { success: false, message: "Voucher code has reached its maximum usage limit" };
+        }
+
+        // Update user's coin balance
+        await this.usersCollection.updateOne(
+          { _id: userObjectId },
+          { $inc: { coinBalance: voucher.coinAmount } },
+          { session }
+        );
+
+        // Update voucher usage
+        await this.voucherCodesCollection.updateOne(
+          { _id: voucher._id },
+          {
+            $inc: { usageCount: 1 },
+            $push: { usedBy: userObjectId },
+            $set: { updatedAt: new Date() }
+          },
+          { session }
+        );
+
+        // Create transaction record
+        await this.transactionsCollection.insertOne({
+          _id: new ObjectId(),
+          userId: userObjectId,
+          type: "voucher_redemption",
+          amount: voucher.coinAmount,
+          description: `Redeemed voucher: ${code}`,
+          relatedId: voucher._id,
+          createdAt: new Date()
+        }, { session });
+
+        return { success: true, message: `Successfully redeemed voucher! You received ${voucher.coinAmount} coins.`, coinAmount: voucher.coinAmount };
+      });
+
+      return result;
+    } catch (error) {
+      console.error("Error redeeming voucher:", error);
+      return { success: false, message: "An error occurred while redeeming the voucher" };
+    } finally {
+      await session.endSession();
+    }
+  }
+
+  async updateVoucherStatus(id: string, isActive: boolean): Promise<void> {
+    await this.voucherCodesCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { 
+        $set: { 
+          isActive,
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
+  async deleteVoucher(id: string): Promise<void> {
+    await this.voucherCodesCollection.deleteOne({ _id: new ObjectId(id) });
   }
 }
 

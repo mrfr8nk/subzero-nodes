@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import CoinTransferModal from "@/components/coin-transfer-modal";
+import VoucherRedeem from "@/components/voucher-redeem";
 
 interface Transaction {
   _id: string;
@@ -209,6 +210,16 @@ export default function Wallet() {
                 )}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Voucher Redemption */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Redeem Voucher</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <VoucherRedeem />
           </CardContent>
         </Card>
       </div>

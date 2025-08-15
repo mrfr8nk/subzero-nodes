@@ -5,7 +5,7 @@ import cors from "cors";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./googleAuth";
 import { adminLogin, requireAdmin, requireSuperAdmin } from "./adminAuth";
-import { insertDeploymentSchema, insertTransactionSchema, insertAppSettingsSchema, insertCoinTransferSchema, insertBannedUserSchema } from "@shared/schema";
+import { insertDeploymentSchema, insertTransactionSchema, insertAppSettingsSchema, insertCoinTransferSchema, insertBannedUserSchema, insertVoucherCodeSchema } from "@shared/schema";
 import { sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail } from "./emailService";
 import bcrypt from "bcryptjs";
 import { WebSocketServer, WebSocket } from 'ws';
@@ -4902,6 +4902,90 @@ jobs:
     } catch (error) {
       console.error('Error removing user from banned list:', error);
       res.status(500).json({ message: 'Failed to unban user' });
+    }
+  });
+
+  // Voucher Management Routes
+  
+  // Admin: Create voucher code
+  app.post('/api/admin/vouchers', requireAdmin, async (req: any, res) => {
+    try {
+      const data = insertVoucherCodeSchema.parse(req.body);
+      
+      // Check if voucher code already exists
+      const existingVoucher = await storage.getVoucherByCode(data.code);
+      if (existingVoucher) {
+        return res.status(400).json({ message: 'Voucher code already exists' });
+      }
+
+      const voucher = await storage.createVoucherCode({
+        ...data,
+        createdBy: req.user.id
+      });
+
+      res.json({ message: 'Voucher created successfully', voucher });
+    } catch (error) {
+      console.error('Error creating voucher:', error);
+      res.status(500).json({ message: 'Failed to create voucher' });
+    }
+  });
+
+  // Admin: Get all vouchers
+  app.get('/api/admin/vouchers', requireAdmin, async (req, res) => {
+    try {
+      const vouchers = await storage.getAllVouchers();
+      res.json(vouchers);
+    } catch (error) {
+      console.error('Error fetching vouchers:', error);
+      res.status(500).json({ message: 'Failed to fetch vouchers' });
+    }
+  });
+
+  // Admin: Update voucher status
+  app.patch('/api/admin/vouchers/:id/status', requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isActive } = req.body;
+
+      await storage.updateVoucherStatus(id, isActive);
+      res.json({ message: 'Voucher status updated successfully' });
+    } catch (error) {
+      console.error('Error updating voucher status:', error);
+      res.status(500).json({ message: 'Failed to update voucher status' });
+    }
+  });
+
+  // Admin: Delete voucher
+  app.delete('/api/admin/vouchers/:id', requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteVoucher(id);
+      res.json({ message: 'Voucher deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting voucher:', error);
+      res.status(500).json({ message: 'Failed to delete voucher' });
+    }
+  });
+
+  // User: Redeem voucher code
+  app.post('/api/vouchers/redeem', isAuthenticated, async (req: any, res) => {
+    try {
+      const { code } = req.body;
+
+      if (!code || typeof code !== 'string') {
+        return res.status(400).json({ message: 'Voucher code is required' });
+      }
+
+      const result = await storage.redeemVoucher(code.trim().toUpperCase(), req.user.id);
+      
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error('Error redeeming voucher:', error);
+      res.status(500).json({ message: 'Failed to redeem voucher' });
     }
   });
 
