@@ -89,7 +89,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-slate-950 dark:to-blue-950">
       {/* Navigation */}
-      <nav className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-blue-200/50 dark:border-slate-700/50 sticky top-0 z-50 shadow-lg">
+      <nav className="nav-professional sticky top-0 z-50 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
@@ -97,8 +97,8 @@ export default function Landing() {
                 <Bot className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
-                <span className="text-lg sm:text-xl font-bold" style="color: #000000 !important;">SUBZERO-MD</span>
-                <span className="text-xs font-medium" style="color: #6366f1 !important;">Bot Platform</span>
+                <span className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">SUBZERO-MD</span>
+                <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Bot Platform</span>
               </div>
             </div>
             
@@ -243,11 +243,11 @@ export default function Landing() {
               <Award className="w-3 h-3 mr-1" />
               Industry Leading Features
             </Badge>
-            <h2 className="text-3xl lg:text-5xl font-bold mb-6" style="color: #000000 !important;">
+            <h2 className="text-3xl lg:text-5xl font-bold mb-6 text-gray-900 dark:text-white">
               Everything You Need for
               <span className="block bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">SUBZERO-MD Deployment</span>
             </h2>
-            <p className="text-xl max-w-3xl mx-auto" style="color: #374151 !important;">
+            <p className="text-xl max-w-3xl mx-auto text-gray-600 dark:text-gray-300">
               Built specifically for SUBZERO-MD. Our platform provides specialized infrastructure 
               and tools designed exclusively for SUBZERO-MD bot deployment and management.
             </p>
