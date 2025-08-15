@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SiGoogle } from "react-icons/si";
-import { Rocket, Coins, Users, ChartLine, Smartphone, Shield, Clock, CheckCircle, Star, ArrowRight, Play, Zap, Globe, Award, Bot } from "lucide-react";
+import { Rocket, Coins, Users, ChartLine, Smartphone, Shield, Clock, CheckCircle, Star, ArrowRight, Play, Zap, Globe, Award, Bot, Cpu, HardDrive, Server, Settings, Cog, Wrench, Factory } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -162,8 +162,79 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Floating Logos Section - Like Railway */}
+      <section className="py-16 bg-white dark:bg-slate-900 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-4">TRUSTED BY ENGINEERING TEAMS</p>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-8">Powering SUBZERO-MD deployments for technical teams worldwide</h3>
+          </div>
+          
+          {/* Floating Machine-Related Logos */}
+          <div className="relative h-32 overflow-hidden">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="floating-logo float-1 absolute left-[10%] top-[20%]">
+                <div className="flex items-center space-x-2 bg-gray-100 dark:bg-slate-800 px-4 py-2 rounded-lg shadow-md">
+                  <Cpu className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">INTEL.SYS</span>
+                </div>
+              </div>
+              
+              <div className="floating-logo float-2 absolute right-[15%] top-[10%]">
+                <div className="flex items-center space-x-2 bg-gray-100 dark:bg-slate-800 px-4 py-2 rounded-lg shadow-md">
+                  <Factory className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">AUTOMATE</span>
+                </div>
+              </div>
+              
+              <div className="floating-logo float-3 absolute left-[25%] bottom-[15%]">
+                <div className="flex items-center space-x-2 bg-gray-100 dark:bg-slate-800 px-4 py-2 rounded-lg shadow-md">
+                  <Server className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">SERVERTECH</span>
+                </div>
+              </div>
+              
+              <div className="floating-logo float-4 absolute right-[25%] bottom-[25%]">
+                <div className="flex items-center space-x-2 bg-gray-100 dark:bg-slate-800 px-4 py-2 rounded-lg shadow-md">
+                  <Cog className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">GEAR.IO</span>
+                </div>
+              </div>
+              
+              <div className="floating-logo float-5 absolute left-[45%] top-[5%]">
+                <div className="flex items-center space-x-2 bg-gray-100 dark:bg-slate-800 px-4 py-2 rounded-lg shadow-md">
+                  <HardDrive className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">DATACORE</span>
+                </div>
+              </div>
+              
+              <div className="floating-logo float-6 absolute right-[5%] top-[45%]">
+                <div className="flex items-center space-x-2 bg-gray-100 dark:bg-slate-800 px-4 py-2 rounded-lg shadow-md">
+                  <Wrench className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">TOOLSHED</span>
+                </div>
+              </div>
+              
+              <div className="floating-logo float-1 absolute left-[5%] bottom-[35%]">
+                <div className="flex items-center space-x-2 bg-gray-100 dark:bg-slate-800 px-4 py-2 rounded-lg shadow-md">
+                  <Settings className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">CONFIG.LAB</span>
+                </div>
+              </div>
+              
+              <div className="floating-logo float-3 absolute right-[35%] top-[35%]">
+                <div className="flex items-center space-x-2 bg-gray-100 dark:bg-slate-800 px-4 py-2 rounded-lg shadow-md">
+                  <Bot className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">ROBOTICS</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Features Section */}
-      <section className="py-20 bg-white dark:bg-slate-900">
+      <section className="py-20 bg-gray-50 dark:bg-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <Badge className="mb-6 bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300 border-0">

@@ -6,19 +6,19 @@
 
 :root {
   --background: hsl(0 0% 98%);
-  --foreground: hsl(222 30% 5%);
+  --foreground: hsl(0 0% 0%);
   --card: hsl(0 0% 100%);
-  --card-foreground: hsl(222 30% 5%);
+  --card-foreground: hsl(0 0% 0%);
   --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(222 30% 5%);
+  --popover-foreground: hsl(0 0% 0%);
   --primary: hsl(217.2 91.2% 59.8%);
   --primary-foreground: hsl(0 0% 100%);
   --secondary: hsl(210 40% 96%);
-  --secondary-foreground: hsl(222.2 84% 4.9%);
+  --secondary-foreground: hsl(0 0% 0%);
   --muted: hsl(210 40% 94%);
-  --muted-foreground: hsl(215.4 16.3% 40%);
+  --muted-foreground: hsl(0 0% 30%);
   --accent: hsl(210 40% 96%);
-  --accent-foreground: hsl(222.2 84% 4.9%);
+  --accent-foreground: hsl(0 0% 0%);
   --destructive: hsl(0 84.2% 60.2%);
   --destructive-foreground: hsl(0 0% 100%);
   --border: hsl(214.3 31.8% 87%);
@@ -30,11 +30,11 @@
   --chart-4: hsl(147.1429 78.5047% 41.9608%);
   --chart-5: hsl(341.4894 75.2000% 50.9804%);
   --sidebar: hsl(0 0% 100%);
-  --sidebar-foreground: hsl(222 30% 5%);
+  --sidebar-foreground: hsl(0 0% 0%);
   --sidebar-primary: hsl(217.2 91.2% 59.8%);
   --sidebar-primary-foreground: hsl(0 0% 100%);
   --sidebar-accent: hsl(210 40% 96%);
-  --sidebar-accent-foreground: hsl(222.2 84% 4.9%);
+  --sidebar-accent-foreground: hsl(0 0% 0%);
   --sidebar-border: hsl(214.3 31.8% 87%);
   --sidebar-ring: hsl(217.2 91.2% 59.8%);
   --font-sans: 'Inter', sans-serif;
@@ -89,11 +89,20 @@
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold;
-    color: hsl(222 30% 8%) !important;
+    color: hsl(0 0% 0%) !important;
   }
   
   .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
-    color: hsl(210 12% 95%) !important;
+    color: hsl(0 0% 100%) !important;
+  }
+  
+  /* Force dark text for all headings and important text in light mode */
+  .text-gray-900 {
+    color: hsl(0 0% 0%) !important;
+  }
+  
+  .dark .text-gray-900 {
+    color: hsl(0 0% 100%) !important;
   }
 }
 
@@ -160,3 +169,60 @@
   background: linear-gradient(135deg, hsl(217.2 91.2% 70%) 0%, hsl(221.2 83.2% 63%) 100%);
   box-shadow: 0 8px 25px rgba(59, 130, 246, 0.5);
 }
+
+/* Floating logos animation like Railway */
+@keyframes float-1 {
+  0%, 100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+  25% { transform: translateY(-10px) translateX(5px) rotate(1deg); }
+  50% { transform: translateY(-20px) translateX(-5px) rotate(-1deg); }
+  75% { transform: translateY(-10px) translateX(10px) rotate(2deg); }
+}
+
+@keyframes float-2 {
+  0%, 100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+  33% { transform: translateY(-15px) translateX(-8px) rotate(-2deg); }
+  66% { transform: translateY(-25px) translateX(8px) rotate(1deg); }
+}
+
+@keyframes float-3 {
+  0%, 100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+  20% { transform: translateY(-8px) translateX(12px) rotate(1.5deg); }
+  40% { transform: translateY(-18px) translateX(-6px) rotate(-1deg); }
+  60% { transform: translateY(-12px) translateX(15px) rotate(2deg); }
+  80% { transform: translateY(-5px) translateX(-10px) rotate(-0.5deg); }
+}
+
+@keyframes float-4 {
+  0%, 100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+  30% { transform: translateY(-12px) translateX(-15px) rotate(-1.5deg); }
+  60% { transform: translateY(-22px) translateX(8px) rotate(1deg); }
+}
+
+@keyframes float-5 {
+  0%, 100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+  25% { transform: translateY(-6px) translateX(8px) rotate(0.5deg); }
+  50% { transform: translateY(-16px) translateX(-12px) rotate(-1.5deg); }
+  75% { transform: translateY(-10px) translateX(18px) rotate(1deg); }
+}
+
+@keyframes float-6 {
+  0%, 100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+  40% { transform: translateY(-14px) translateX(6px) rotate(1.2deg); }
+  80% { transform: translateY(-8px) translateX(-14px) rotate(-0.8deg); }
+}
+
+.floating-logo {
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.floating-logo:hover {
+  opacity: 1;
+}
+
+.float-1 { animation: float-1 6s ease-in-out infinite; }
+.float-2 { animation: float-2 8s ease-in-out infinite; }
+.float-3 { animation: float-3 7s ease-in-out infinite; }
+.float-4 { animation: float-4 9s ease-in-out infinite; }
+.float-5 { animation: float-5 5s ease-in-out infinite; }
+.float-6 { animation: float-6 8.5s ease-in-out infinite; }
