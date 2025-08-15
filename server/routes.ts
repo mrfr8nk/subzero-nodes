@@ -162,20 +162,17 @@ async function monitorWorkflowStatus(branchName: string) {
           isAppActive: isAppActive
         });
 
-        // If workflow is complete, stop monitoring
+        // For infinite-running workflows, don't stop monitoring when complete
+        // The workflow will auto-restart itself, so we continue monitoring
         if (latestRun.status === 'completed') {
-          const timeoutId = monitoringDeployments.get(branchName);
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-            monitoringDeployments.delete(branchName);
-          }
-          
           broadcastToClients('workflow_completed', {
             branch: branchName,
             conclusion: latestRun.conclusion,
             completed_at: latestRun.updated_at,
-            isAppActive: isAppActive
+            isAppActive: isAppActive,
+            autoRestarting: true
           });
+          // Continue monitoring as the workflow will restart automatically
         }
       }
     }
@@ -290,15 +287,18 @@ function startWorkflowMonitoring(branchName: string) {
     clearTimeout(existingTimeout);
   }
 
-  // Monitor every 30 seconds for up to 30 minutes
+  // Monitor every 30 seconds indefinitely for auto-restarting workflows
   let attempts = 0;
-  const maxAttempts = 60; // 30 minutes
+  const maxAttempts = 9999; // Effectively infinite for auto-restarting workflows
   
   const monitor = () => {
     if (attempts >= maxAttempts) {
-      monitoringDeployments.delete(branchName);
-      broadcastToClients('monitoring_timeout', { branch: branchName });
-      return;
+      // For auto-restarting workflows, reset attempts counter instead of stopping
+      attempts = 0;
+      broadcastToClients('monitoring_reset', { 
+        branch: branchName, 
+        message: 'Monitoring reset - workflow continues auto-restarting' 
+      });
     }
     
     monitorWorkflowStatus(branchName);

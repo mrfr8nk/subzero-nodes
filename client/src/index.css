@@ -6,17 +6,17 @@
 
 :root {
   --background: hsl(0 0% 98%);
-  --foreground: hsl(222 20% 10%);
+  --foreground: hsl(222 30% 5%);
   --card: hsl(0 0% 100%);
-  --card-foreground: hsl(222 20% 10%);
+  --card-foreground: hsl(222 30% 5%);
   --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(222 20% 10%);
+  --popover-foreground: hsl(222 30% 5%);
   --primary: hsl(217.2 91.2% 59.8%);
   --primary-foreground: hsl(0 0% 100%);
   --secondary: hsl(210 40% 96%);
   --secondary-foreground: hsl(222.2 84% 4.9%);
   --muted: hsl(210 40% 94%);
-  --muted-foreground: hsl(215.4 16.3% 46.9%);
+  --muted-foreground: hsl(215.4 16.3% 40%);
   --accent: hsl(210 40% 96%);
   --accent-foreground: hsl(222.2 84% 4.9%);
   --destructive: hsl(0 84.2% 60.2%);
@@ -30,7 +30,7 @@
   --chart-4: hsl(147.1429 78.5047% 41.9608%);
   --chart-5: hsl(341.4894 75.2000% 50.9804%);
   --sidebar: hsl(0 0% 100%);
-  --sidebar-foreground: hsl(222 20% 10%);
+  --sidebar-foreground: hsl(222 30% 5%);
   --sidebar-primary: hsl(217.2 91.2% 59.8%);
   --sidebar-primary-foreground: hsl(0 0% 100%);
   --sidebar-accent: hsl(210 40% 96%);
@@ -89,6 +89,11 @@
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold;
+    color: hsl(222 30% 8%) !important;
+  }
+  
+  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+    color: hsl(210 12% 95%) !important;
   }
 }
 

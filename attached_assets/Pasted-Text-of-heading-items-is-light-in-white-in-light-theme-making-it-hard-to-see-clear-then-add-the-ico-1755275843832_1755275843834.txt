@@ -1,0 +1,222 @@
+Text of heading items is light in white in light theme making it hard to see clear  then add the icon top left corner like that on log in page and signup
+
+
+Tell me whyy the current setup doesn't make it reruns after the time of worflow is over after crash please make it reruns like this the branch created should run infinitely like this please 
+
+require('dotenv').config();
+const express = require('express');
+const axios = require('axios');
+const cors = require('cors');
+const path = require('path');
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// Serve static files from frontend
+app.use(express.static(path.join(__dirname, '../frontend')));
+
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const REPO_OWNER = "d33l";
+const REPO_NAME = "SUBZERO-MD";
+const MAIN_BRANCH = "main";
+const WORKFLOW_FILE = "SUBZERO.yml";
+
+async function makeGitHubRequest(method, endpoint, data = null) {
+    const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/${endpoint}`;
+    const config = {
+        method,
+        url,
+        headers: {
+            'Authorization': `token ${GITHUB_TOKEN}`,
+            'Accept': 'application/vnd.github.v3+json'
+        }
+    };
+    
+    if (data) config.data = data;
+    
+    try {
+        const response = await axios(config);
+        return response.data;
+    } catch (error) {
+        if (error.response && error.response.status === 404) {
+            return null; // Branch doesn't exist
+        }
+        console.error('GitHub API Error:', error.response?.data || error.message);
+        throw error;
+    }
+}
+
+function generateBranchName() {
+    const prefix = 'subzero-';
+    const randomChars = Math.random().toString(36).substring(2, 8);
+    return prefix + randomChars;
+}
+
+app.get('/api/check-branch', async (req, res) => {
+    try {
+        const { branchName } = req.query;
+        
+        if (!branchName || branchName.trim() === '') {
+            const generatedName = generateBranchName();
+            return res.json({ 
+                available: true, 
+                suggested: generatedName,
+                message: `Try this available name: ${generatedName}`
+            });
+        }
+
+        const branchExists = await makeGitHubRequest('GET', `git/ref/heads/${branchName}`);
+        
+        if (branchExists) {
+            const suggestedName = `${branchName}-${Math.floor(Math.random() * 1000)}`;
+            return res.json({ 
+                available: false, 
+                suggested: suggestedName,
+                message: `Name taken. Try: ${suggestedName}`
+            });
+        } else {
+            return res.json({ 
+                available: true,
+                message: 'Name available!'
+            });
+        }
+    } catch (error) {
+        console.error('Branch check error:', error);
+        res.status(500).json({ 
+            error: error.response?.data?.message || error.message 
+        });
+    }
+});
+
+async function updateWorkflowFile(branchName) {
+    try {
+        // Define the exact workflow content with the new branch name
+        // Using template literals but properly escaping the GitHub Actions syntax
+        const workflowContent = `name: SUBZERO-MD-X-MR-FRANK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  loop-task:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Bot (loop & auto-restart if crash)
+        run: |
+          echo "Running SUBZERO-MD in auto-restart mode..."
+          timeout 18000 bash -c 'while true; do npm start || echo "Bot crashed, restarting..."; sleep 2; done'
+
+      - name: Re-Trigger Workflow
+        if: always()
+        run: |
+          echo "Re-running workflow..."
+          curl -X POST \\
+            -H "Authorization: Bearer \${{ secrets.SUBZERO }}" \\
+            -H "Accept: application/vnd.github.v3+json" \\
+            https://api.github.com/repos/\${{ github.repository }}/actions/workflows/SUBZERO.yml/dispatches \\
+            -d '{"ref":"${branchName}"}'`;
+
+        // Check if file exists in the new branch
+        try {
+            const existingFile = await makeGitHubRequest('GET', `contents/.github/workflows/${WORKFLOW_FILE}?ref=${branchName}`);
+            
+            // Update existing file
+            await makeGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
+                message: `Update workflow to use ${branchName} branch`,
+                content: Buffer.from(workflowContent).toString('base64'),
+                sha: existingFile.sha,
+                branch: branchName
+            });
+        } catch (error) {
+            // Create new file if it doesn't exist
+            await makeGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
+                message: `Create workflow for ${branchName} branch`,
+                content: Buffer.from(workflowContent).toString('base64'),
+                branch: branchName
+            });
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Error updating workflow file:', error);
+        throw error;
+    }
+}
+
+app.post('/api/deploy', async (req, res) => {
+    try {
+        let { branchName, sessionId, ownerNumber, prefix } = req.body;
+        
+        if (!branchName || branchName.trim() === '') {
+            branchName = generateBranchName();
+        }
+
+        if (!sessionId || !ownerNumber || !prefix) {
+            throw new Error('All fields are required');
+        }
+
+        // 1. Create branch
+        const mainRef = await makeGitHubRequest('GET', `git/ref/heads/${MAIN_BRANCH}`);
+        await makeGitHubRequest('POST', 'git/refs', {
+            ref: `refs/heads/${branchName}`,
+            sha: mainRef.object.sha
+        });
+        
+        // 2. Update settings.js
+        const fileData = await makeGitHubRequest('GET', `contents/settings.js?ref=${branchName}`);
+        const newContent = `module.exports = {
+  SESSION_ID: "${sessionId}",
+  OWNER_NUMBER: "${ownerNumber}", 
+  PREFIX: "${prefix}"
+};`;
+        
+        await makeGitHubRequest('PUT', 'contents/settings.js', {
+            message: `Update settings.js for ${branchName}`,
+            content: Buffer.from(newContent).toString('base64'),
+            sha: fileData.sha,
+            branch: branchName
+        });
+        
+        // 3. Update workflow file
+        await updateWorkflowFile(branchName);
+        
+        // 4. Trigger workflow
+        await makeGitHubRequest('POST', `actions/workflows/${WORKFLOW_FILE}/dispatches`, {
+            ref: branchName
+        });
+        
+        res.json({ 
+            success: true, 
+            message: 'Deployment successful!',
+            branch: branchName,
+            workflowUpdated: true
+        });
+    } catch (error) {
+        console.error('Deployment error:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.response?.data?.message || error.message,
+            details: error.response?.data?.errors || null
+        });
+    }
+});
+
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/index.html'));
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
