@@ -897,16 +897,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Local email login route
   app.post('/api/auth/local/login', async (req, res) => {
     try {
-      const { email, password } = req.body;
+      const { emailOrUsername, password } = req.body;
 
-      if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required' });
+      if (!emailOrUsername || !password) {
+        return res.status(400).json({ message: 'Email/username and password are required' });
       }
 
-      const user = await storage.getUserByEmail(email);
+      const user = await storage.getUserByEmailOrUsername(emailOrUsername);
       
       if (!user || !user.password) {
-        return res.status(401).json({ message: 'Invalid email or password' });
+        return res.status(401).json({ message: 'Invalid email/username or password' });
       }
 
       if (!user.isVerified) {
@@ -916,7 +916,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isValidPassword = await bcrypt.compare(password, user.password);
       
       if (!isValidPassword) {
-        return res.status(401).json({ message: 'Invalid email or password' });
+        return res.status(401).json({ message: 'Invalid email/username or password' });
       }
 
       // Log the user in using passport session
@@ -1156,7 +1156,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Check branch name availability
+  // Check branch name availability (GET for frontend compatibility)
+  app.get('/api/deployments/check-branch', isAuthenticated, async (req: any, res) => {
+    try {
+      const { branchName } = req.query;
+      const userId = req.user._id.toString();
+      
+      if (!branchName) {
+        return res.status(400).json({ message: 'Branch name is required' });
+      }
+
+      if (branchName.length < 2 || branchName.length > 50) {
+        return res.status(400).json({ 
+          available: false, 
+          message: 'Branch name must be between 2 and 50 characters' 
+        });
+      }
+
+      // Check if branch name contains only valid characters
+      if (!/^[a-zA-Z0-9_-]+$/.test(branchName)) {
+        return res.status(400).json({ 
+          available: false, 
+          message: 'Branch name can only contain letters, numbers, hyphens, and underscores' 
+        });
+      }
+
+      const isAvailable = await storage.checkBranchNameAvailability(branchName, userId);
+      res.json({ available: isAvailable });
+    } catch (error) {
+      console.error('Error checking branch name availability:', error);
+      res.status(500).json({ message: 'Error checking availability' });
+    }
+  });
+
+  // Also support POST for backward compatibility
   app.post('/api/deployments/check-branch', isAuthenticated, async (req: any, res) => {
     try {
       const { branchName } = req.body;

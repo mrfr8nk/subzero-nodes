@@ -16,7 +16,7 @@ import { useLocation } from "wouter";
 import { getDeviceFingerprint } from "@/lib/deviceFingerprint";
 
 const loginSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
+  emailOrUsername: z.string().min(1, "Email or username is required"),
   password: z.string().min(1, "Password is required"),
 });
 
@@ -61,7 +61,7 @@ export default function Login() {
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
+      emailOrUsername: "",
       password: "",
     },
   });
@@ -114,7 +114,7 @@ export default function Login() {
       } else {
         // Check if it's an email verification error
         if (result.message === "Please verify your email before signing in") {
-          setUnverifiedEmail(data.email);
+          setUnverifiedEmail(data.emailOrUsername);
           setShowResendVerification(true);
         }
         
@@ -273,20 +273,19 @@ export default function Login() {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
-                  name="email"
+                  name="emailOrUsername"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-gray-700 dark:text-gray-300">Email Address</FormLabel>
+                      <FormLabel className="text-gray-700 dark:text-gray-300">Email or Username</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                           <Input
                             {...field}
-                            type="email"
-                            placeholder="Enter your email"
+                            placeholder="Enter your email or username"
                             className="pl-10 h-12 bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400"
                             disabled={isSubmitting}
-                            data-testid="input-email"
+                            data-testid="input-email-username"
                           />
                         </div>
                       </FormControl>

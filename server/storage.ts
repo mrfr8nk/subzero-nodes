@@ -36,6 +36,8 @@ export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmailOrUsername(emailOrUsername: string): Promise<User | undefined>;
   getUserByGoogleId(googleId: string): Promise<User | undefined>;
   getUserByVerificationToken(token: string): Promise<User | undefined>;
   getUserByResetToken(token: string): Promise<User | undefined>;
@@ -300,6 +302,20 @@ export class MongoStorage implements IStorage {
 
   async getUserByEmail(email: string): Promise<User | undefined> {
     const user = await this.usersCollection.findOne({ email });
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const user = await this.usersCollection.findOne({ username });
+    return user || undefined;
+  }
+
+  async getUserByEmailOrUsername(emailOrUsername: string): Promise<User | undefined> {
+    // Try to find user by email first, then by username
+    let user = await this.usersCollection.findOne({ email: emailOrUsername });
+    if (!user) {
+      user = await this.usersCollection.findOne({ username: emailOrUsername });
+    }
     return user || undefined;
   }
 
@@ -1799,15 +1815,7 @@ export class MongoStorage implements IStorage {
 
 
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    try {
-      const user = await this.usersCollection.findOne({ username });
-      return user || undefined;
-    } catch (error) {
-      console.error('Error getting user by username:', error);
-      return undefined;
-    }
-  }
+
 
   async updateUserProfile(userId: string, profileData: { 
     firstName: string; 
