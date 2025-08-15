@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SiGoogle } from "react-icons/si";
-import { Rocket, Users, Shield, Globe, ArrowRight, Play, Bot, Terminal, Database, Server, Cpu, Cloud, Zap, Monitor, GitBranch, Activity } from "lucide-react";
+import { Rocket, Users, Shield, Globe, ArrowRight, Play, Bot, Terminal, Database, Server, Cpu, Cloud, Zap, Monitor, GitBranch, Activity, Home } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState, useEffect, useRef } from "react";
 import { motion, useScroll, useTransform, useInView, useMotionValue, useSpring } from "framer-motion";
@@ -109,7 +109,7 @@ export default function AnimatedLanding() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 text-white relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 dark:from-slate-900 dark:via-blue-900 dark:to-slate-800 text-slate-900 dark:text-white relative overflow-hidden">
       {/* Animated Background Grid */}
       <div className="fixed inset-0">
         <div 
@@ -165,7 +165,7 @@ export default function AnimatedLanding() {
 
       {/* Header */}
       <motion.header 
-        className="relative z-50 border-b border-blue-500/20 backdrop-blur-xl bg-slate-900/60"
+        className="relative z-50 border-b border-blue-500/20 backdrop-blur-xl bg-slate-900/60 dark:bg-slate-900/60 bg-white/80"
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.6, ease: "easeOut" }}
@@ -185,20 +185,30 @@ export default function AnimatedLanding() {
                 <Bot className="h-7 w-7 text-white" />
               </motion.div>
               <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-300 to-indigo-300 bg-clip-text text-transparent">
+                <h1 className="text-lg font-bold bg-gradient-to-r from-slate-800 to-slate-900 dark:from-blue-300 dark:to-indigo-300 bg-clip-text text-transparent">
                   SUBZERO NODES
                 </h1>
-                <div className="text-xs text-blue-200 font-medium">DEPLOYMENT PLATFORM</div>
+                <div className="text-xs text-blue-200 font-medium dark:text-blue-200 text-slate-600">DEPLOYMENT PLATFORM</div>
               </div>
             </motion.div>
             
             <div className="flex items-center space-x-4">
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => setLocation("/")}
+                  className="h-9 w-9 text-slate-700 hover:bg-slate-100 dark:text-blue-100 dark:hover:bg-blue-500/10"
+                >
+                  <Home className="h-4 w-4" />
+                </Button>
+              </motion.div>
               <ThemeToggle />
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button 
                   variant="outline" 
                   onClick={() => setLocation("/login")}
-                  className="border-blue-400/30 text-blue-100 hover:bg-blue-500/10 backdrop-blur-sm"
+                  className="border-blue-400/30 text-blue-100 hover:bg-blue-500/10 backdrop-blur-sm dark:border-blue-400/30 dark:text-blue-100 dark:hover:bg-blue-500/10 border-slate-300 text-slate-700 hover:bg-slate-100"
                 >
                   Sign In
                 </Button>
@@ -228,8 +238,8 @@ export default function AnimatedLanding() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
           >
-            <Badge className="mb-8 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 text-blue-100 border-blue-400/40 backdrop-blur-sm px-4 py-2">
-              <Zap className="w-4 h-4 mr-2 text-blue-300" />
+            <Badge className="mb-8 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 dark:text-blue-100 text-blue-700 border-blue-400/40 backdrop-blur-sm px-4 py-2">
+              <Zap className="w-4 h-4 mr-2 text-blue-300 dark:text-blue-300 text-blue-600" />
               Deploy in seconds, not minutes
             </Badge>
             
@@ -239,17 +249,17 @@ export default function AnimatedLanding() {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.8, delay: 0.4 }}
             >
-              <span className="bg-gradient-to-r from-white via-blue-100 to-blue-200 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-slate-800 via-slate-900 to-blue-900 dark:from-white dark:via-blue-100 dark:to-blue-200 bg-clip-text text-transparent">
                 Deploy
               </span>
               <br />
-              <span className="bg-gradient-to-r from-blue-300 via-indigo-300 to-slate-300 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-700 dark:from-blue-300 dark:via-indigo-300 dark:to-slate-300 bg-clip-text text-transparent">
                 Anything
               </span>
             </motion.h1>
             
             <motion.p 
-              className="text-xl md:text-2xl text-blue-100 mb-12 max-w-3xl mx-auto leading-relaxed"
+              className="text-xl md:text-2xl text-slate-600 dark:text-blue-100 mb-12 max-w-3xl mx-auto leading-relaxed"
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.6 }}
