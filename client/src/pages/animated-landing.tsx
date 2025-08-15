@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SiGoogle } from "react-icons/si";
-import { Rocket, Coins, Users, ChartLine, Shield, Clock, CheckCircle, Star, ArrowRight, Play, Zap, Globe, Award, Bot, Terminal, Code, Database, Server } from "lucide-react";
+import { Rocket, Users, Shield, Globe, ArrowRight, Play, Bot, Terminal, Database, Server, Cpu, Cloud, Zap, Monitor, GitBranch, Activity } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
@@ -30,40 +30,44 @@ export default function AnimatedLanding() {
 
   const features = [
     {
-      icon: Rocket,
+      icon: Zap,
       title: "Lightning Fast Deployment",
-      description: "Deploy your WhatsApp bots in seconds with our advanced infrastructure",
-      gradient: "from-blue-500/20 to-blue-600/20",
-      border: "border-blue-500/30"
+      description: "Deploy your applications in seconds with our advanced infrastructure and optimized deployment pipeline",
+      gradient: "from-blue-500/20 to-cyan-500/20",
+      border: "border-blue-500/30",
+      iconColor: "text-blue-400"
     },
     {
-      icon: Terminal,
+      icon: Monitor,
       title: "Real-time Monitoring",
-      description: "Watch your deployments come alive with live logs and status updates",
-      gradient: "from-green-500/20 to-green-600/20",
-      border: "border-green-500/30"
+      description: "Comprehensive monitoring with live logs, performance metrics, and intelligent alerts",
+      gradient: "from-emerald-500/20 to-green-500/20",
+      border: "border-emerald-500/30",
+      iconColor: "text-emerald-400"
     },
     {
-      icon: Database,
+      icon: Cpu,
       title: "Smart Resource Management",
-      description: "Intelligent scaling and resource allocation based on usage patterns",
-      gradient: "from-purple-500/20 to-purple-600/20",
-      border: "border-purple-500/30"
+      description: "Intelligent auto-scaling and resource allocation based on real-time usage patterns",
+      gradient: "from-purple-500/20 to-violet-500/20",
+      border: "border-purple-500/30",
+      iconColor: "text-purple-400"
     },
     {
       icon: Shield,
       title: "Enterprise Security",
-      description: "Bank-grade security with advanced monitoring and threat protection",
-      gradient: "from-red-500/20 to-red-600/20",
-      border: "border-red-500/30"
+      description: "Bank-grade security with advanced threat protection, encryption, and compliance",
+      gradient: "from-orange-500/20 to-red-500/20",
+      border: "border-orange-500/30",
+      iconColor: "text-orange-400"
     }
   ];
 
   const stats = [
-    { label: "Deployments", value: "15K+", icon: Rocket },
-    { label: "Users", value: "8.5K+", icon: Users },
-    { label: "Uptime", value: "99.9%", icon: Shield },
-    { label: "Countries", value: "50+", icon: Globe }
+    { label: "Deployments", value: "15K+", icon: Rocket, iconColor: "text-blue-400" },
+    { label: "Active Users", value: "8.5K+", icon: Users, iconColor: "text-emerald-400" },
+    { label: "Uptime", value: "99.9%", icon: Activity, iconColor: "text-green-400" },
+    { label: "Countries", value: "50+", icon: Globe, iconColor: "text-purple-400" }
   ];
 
   return (
@@ -136,17 +140,17 @@ export default function AnimatedLanding() {
               transition={{ duration: 0.2 }}
             >
               <motion.div 
-                className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center shadow-xl"
+                className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center shadow-xl"
                 whileHover={{ rotate: 360 }}
                 transition={{ duration: 0.5 }}
               >
-                <Bot className="h-6 w-6 text-white" />
+                <Cloud className="h-7 w-7 text-white" />
               </motion.div>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                   SUBZERO
                 </h1>
-                <div className="text-xs text-gray-400 font-medium">DEPLOYMENT PLATFORM</div>
+                <div className="text-xs text-gray-200 font-medium">DEPLOYMENT PLATFORM</div>
               </div>
             </motion.div>
             
@@ -186,8 +190,9 @@ export default function AnimatedLanding() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
           >
-            <Badge className="mb-8 bg-white/10 text-white border-white/20 backdrop-blur-sm">
-              🚀 Deploy in seconds, not minutes
+            <Badge className="mb-8 bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-white border-blue-400/30 backdrop-blur-sm px-4 py-2">
+              <Zap className="w-4 h-4 mr-2" />
+              Deploy in seconds, not minutes
             </Badge>
             
             <motion.h1 
@@ -206,7 +211,7 @@ export default function AnimatedLanding() {
             </motion.h1>
             
             <motion.p 
-              className="text-xl md:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed"
+              className="text-xl md:text-2xl text-gray-100 mb-12 max-w-3xl mx-auto leading-relaxed"
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.6 }}
@@ -270,12 +275,12 @@ export default function AnimatedLanding() {
                 whileHover={{ scale: 1.05, y: -10 }}
               >
                 <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl flex items-center justify-center border border-white/10 backdrop-blur-sm">
-                  <stat.icon className="h-8 w-8 text-blue-400" />
+                  <stat.icon className={`h-8 w-8 ${stat.iconColor}`} />
                 </div>
                 <div className="text-3xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
                   {stat.value}
                 </div>
-                <div className="text-gray-400 text-sm">{stat.label}</div>
+                <div className="text-gray-200 text-sm font-medium">{stat.label}</div>
               </motion.div>
             ))}
           </motion.div>
@@ -301,7 +306,7 @@ export default function AnimatedLanding() {
                 Developers
               </span>
             </h2>
-            <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+            <p className="text-xl text-gray-100 max-w-2xl mx-auto">
               Everything you need to deploy, monitor, and scale your applications with confidence.
             </p>
           </motion.div>
@@ -320,12 +325,12 @@ export default function AnimatedLanding() {
                 <Card className={`bg-black/40 border ${feature.border} backdrop-blur-xl p-8 h-full transition-all duration-300 group-hover:shadow-2xl group-hover:shadow-blue-500/10`}>
                   <CardContent className="p-0">
                     <div className={`w-16 h-16 mb-6 ${feature.gradient} rounded-2xl flex items-center justify-center border border-white/10`}>
-                      <feature.icon className="h-8 w-8 text-white" />
+                      <feature.icon className={`h-8 w-8 ${feature.iconColor}`} />
                     </div>
                     <h3 className="text-2xl font-bold mb-4 text-white group-hover:text-blue-300 transition-colors">
                       {feature.title}
                     </h3>
-                    <p className="text-gray-300 leading-relaxed">
+                    <p className="text-gray-100 leading-relaxed">
                       {feature.description}
                     </p>
                   </CardContent>
@@ -356,7 +361,7 @@ export default function AnimatedLanding() {
                 Ready to deploy?
               </span>
             </h2>
-            <p className="text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
+            <p className="text-xl text-gray-100 mb-12 max-w-2xl mx-auto">
               Join thousands of developers who are building the future with SUBZERO.
             </p>
             
@@ -385,7 +390,7 @@ export default function AnimatedLanding() {
         transition={{ duration: 0.8 }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-gray-400">
+          <p className="text-gray-200">
             © 2025 SUBZERO. Built with ❤️ for developers worldwide.
           </p>
         </div>
