@@ -5,8 +5,46 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { SiGoogle } from "react-icons/si";
 import { Rocket, Users, Shield, Globe, ArrowRight, Play, Bot, Terminal, Database, Server, Cpu, Cloud, Zap, Monitor, GitBranch, Activity } from "lucide-react";
 import { useLocation } from "wouter";
-import { useState, useEffect } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
+import { motion, useScroll, useTransform, useInView, useMotionValue, useSpring } from "framer-motion";
+
+// Animated Counter Component
+function AnimatedCounter({ value, suffix = "", duration = 2 }: { value: number; suffix?: string; duration?: number }) {
+  const countRef = useRef<HTMLDivElement>(null);
+  const isInView = useInView(countRef, { once: true });
+  const motionValue = useMotionValue(0);
+  const springValue = useSpring(motionValue, { duration: duration * 1000 });
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    if (isInView) {
+      motionValue.set(value);
+    }
+  }, [isInView, value, motionValue]);
+
+  useEffect(() => {
+    const unsubscribe = springValue.on("change", (latest) => {
+      setDisplayValue(Math.floor(latest));
+    });
+    return unsubscribe;
+  }, [springValue]);
+
+  const formatValue = (val: number) => {
+    if (suffix === "K+") {
+      return `${(val / 1000).toFixed(1)}K+`;
+    }
+    if (suffix === "%") {
+      return `${(val / 10).toFixed(1)}%`;
+    }
+    return `${val}${suffix}`;
+  };
+
+  return (
+    <div ref={countRef} className="text-3xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
+      {formatValue(displayValue)}
+    </div>
+  );
+}
 
 export default function AnimatedLanding() {
   const [, setLocation] = useLocation();
@@ -64,10 +102,10 @@ export default function AnimatedLanding() {
   ];
 
   const stats = [
-    { label: "Deployments", value: "15K+", icon: Rocket, iconColor: "text-blue-400" },
-    { label: "Active Users", value: "8.5K+", icon: Users, iconColor: "text-emerald-400" },
-    { label: "Uptime", value: "99.9%", icon: Activity, iconColor: "text-green-400" },
-    { label: "Countries", value: "50+", icon: Globe, iconColor: "text-purple-400" }
+    { label: "Deployments", value: 15000, suffix: "K+", icon: Rocket, iconColor: "text-blue-400" },
+    { label: "Active Users", value: 8500, suffix: "K+", icon: Users, iconColor: "text-emerald-400" },
+    { label: "Uptime", value: 999, suffix: "%", icon: Activity, iconColor: "text-green-400" },
+    { label: "Countries", value: 50, suffix: "+", icon: Globe, iconColor: "text-purple-400" }
   ];
 
   return (
@@ -148,7 +186,7 @@ export default function AnimatedLanding() {
               </motion.div>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-300 to-indigo-300 bg-clip-text text-transparent">
-                  SUBZERO MD
+                  SUBZERO NODES
                 </h1>
                 <div className="text-xs text-blue-200 font-medium">DEPLOYMENT PLATFORM</div>
               </div>
@@ -277,9 +315,11 @@ export default function AnimatedLanding() {
                 <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 rounded-2xl flex items-center justify-center border border-blue-400/20 backdrop-blur-sm">
                   <stat.icon className={`h-8 w-8 ${stat.iconColor}`} />
                 </div>
-                <div className="text-3xl md:text-4xl font-bold mb-2 bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
-                  {stat.value}
-                </div>
+                <AnimatedCounter 
+                  value={stat.value} 
+                  suffix={stat.suffix}
+                  duration={2 + index * 0.2}
+                />
                 <div className="text-blue-200 text-sm font-medium">{stat.label}</div>
               </motion.div>
             ))}
@@ -362,7 +402,7 @@ export default function AnimatedLanding() {
               </span>
             </h2>
             <p className="text-xl text-blue-100 mb-12 max-w-2xl mx-auto">
-              Join thousands of developers who are building the future with SUBZERO MD.
+              Join thousands of developers who are building the future with SUBZERO NODES.
             </p>
             
             <motion.div 
@@ -391,7 +431,7 @@ export default function AnimatedLanding() {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-blue-200">
-            © 2025 SUBZERO MD. Built with ❤️ for developers worldwide.
+            © 2025 SUBZERO NODES. Built with ❤️ for developers worldwide.
           </p>
         </div>
       </motion.footer>
