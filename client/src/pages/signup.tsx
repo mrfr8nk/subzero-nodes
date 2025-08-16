@@ -224,7 +224,7 @@ export default function Signup() {
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform p-1">
                 <img 
                   src="/icon.svg" 
-                  alt="SUBZERO-MD Bot" 
+                  alt="SUBZERO NODES" 
                   className="w-full h-full rounded object-contain"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
@@ -235,8 +235,8 @@ export default function Signup() {
                 <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-white hidden" />
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
-                <span className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white tracking-wide">SUBZERO-MD</span>
-                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Bot Platform</span>
+                <span className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white tracking-wide">SUBZERO NODES</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">WhatsApp Bot Platform</span>
               </div>
             </Link>
             
@@ -258,8 +258,8 @@ export default function Signup() {
           {/* Signup Card */}
           <Card className="shadow-2xl border-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
             <CardHeader className="text-center pb-4 sm:pb-6 px-4 sm:px-6">
-              <CardTitle className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Join SUBZERO-MD</CardTitle>
-              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">Start deploying WhatsApp bots in minutes</p>
+              <CardTitle className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">Join SUBZERO NODES</CardTitle>
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">Deploy SUBZERO-MD WhatsApp bots in minutes</p>
               {referralCode && (
                 <div className="mt-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
                   <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">

@@ -433,7 +433,7 @@ export default function AnimatedLanding() {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-blue-200">
-            © 2025 SUBZERO NODES. Built with ❤️ for developers worldwide.
+            © 2025 SUBZERO NODES. Deploy SUBZERO-MD WhatsApp bots worldwide.
           </p>
         </div>
       </motion.footer>

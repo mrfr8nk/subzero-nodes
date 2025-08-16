@@ -48,7 +48,7 @@ export default function Navbar() {
               <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg flex items-center justify-center p-1">
                 <img 
                   src="/icon.svg" 
-                  alt="SUBZERO-MD Bot" 
+                  alt="SUBZERO NODES" 
                   className="w-full h-full rounded object-contain"
                   onError={(e) => {
                     // Fallback to Bot icon if image fails to load
@@ -59,7 +59,7 @@ export default function Navbar() {
                 />
                 <Bot className="w-5 h-5 text-white hidden" />
               </div>
-              <span className="text-xl font-bold text-gray-900 dark:text-white">SUBZERO-MD</span>
+              <span className="text-lg font-semibold text-gray-900 dark:text-white tracking-wide">SUBZERO NODES</span>
             </Link>
           </div>
           

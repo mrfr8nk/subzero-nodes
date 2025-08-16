@@ -189,7 +189,7 @@ export default function Login() {
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform p-1">
                 <img 
                   src="/icon.svg" 
-                  alt="SUBZERO-MD Bot" 
+                  alt="SUBZERO NODES" 
                   className="w-full h-full rounded object-contain"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
@@ -200,8 +200,8 @@ export default function Login() {
                 <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-white hidden" />
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
-                <span className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white tracking-wide">SUBZERO-MD</span>
-                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Bot Platform</span>
+                <span className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white tracking-wide">SUBZERO NODES</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">WhatsApp Bot Platform</span>
               </div>
             </Link>
             
@@ -412,7 +412,7 @@ export default function Login() {
             <div className="text-center pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-                  New to SUBZERO-NODES?
+                  New to SUBZERO NODES?
                 </p>
                 <Link href="/signup">
                   <Button variant="outline" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/30" data-testid="link-create-account">

@@ -550,5 +550,32 @@ export type InsertDeveloperInfo = z.infer<typeof insertDeveloperInfoSchema>;
 export type InsertUserMessageRead = z.infer<typeof insertUserMessageReadSchema>;
 export type InsertDeviceRestriction = z.infer<typeof insertDeviceRestrictionSchema>;
 
+export interface DatabaseStats {
+  totalUsers: number;
+  activeUsers: number;
+  totalDeployments: number;
+  activeDeployments: number;
+  totalTransactions: number;
+  totalVouchers: number;
+  totalChatMessages: number;
+  storageSize: {
+    users: number;
+    deployments: number;
+    transactions: number;
+    chatMessages: number;
+    vouchers: number;
+    total: number;
+  };
+  lastCleanup?: Date;
+}
+
+export interface DatabaseCleanupResult {
+  deletedUsers: number;
+  deletedMessages: number;
+  deletedDeployments: number;
+  totalSaved: number;
+  success: boolean;
+}
+
 // For backward compatibility
 export type UpsertUser = InsertUser;

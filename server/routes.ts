@@ -4989,6 +4989,27 @@ jobs:
     }
   });
 
+  // Database Usage Statistics
+  app.get('/api/admin/database/stats', requireAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getDatabaseStats();
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching database stats:', error);
+      res.status(500).json({ message: 'Failed to fetch database statistics' });
+    }
+  });
+
+  app.post('/api/admin/database/cleanup', requireAdmin, async (req, res) => {
+    try {
+      const result = await storage.performDatabaseCleanup();
+      res.json(result);
+    } catch (error) {
+      console.error('Error performing database cleanup:', error);
+      res.status(500).json({ message: 'Failed to perform database cleanup' });
+    }
+  });
+
   // Auto-check deployment status periodically - Fixed workflow rerun
   let deploymentCheckInterval: NodeJS.Timeout | null = null;
   
