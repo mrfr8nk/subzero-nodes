@@ -71,25 +71,25 @@ export default function AnimatedLanding() {
       icon: Zap,
       title: "Lightning Fast Deployment",
       description: "Deploy your applications in seconds with our advanced infrastructure and optimized deployment pipeline",
-      gradient: "from-blue-600/20 to-indigo-600/20",
-      border: "border-blue-400/30",
-      iconColor: "text-blue-300"
+      gradient: "from-blue-100/80 to-indigo-100/80 dark:from-blue-600/20 dark:to-indigo-600/20",
+      border: "border-blue-300/60 dark:border-blue-400/30",
+      iconColor: "text-blue-600 dark:text-blue-300"
     },
     {
       icon: Monitor,
       title: "Real-time Monitoring",
       description: "Comprehensive monitoring with live logs, performance metrics, and intelligent alerts",
-      gradient: "from-slate-600/20 to-slate-700/20",
-      border: "border-slate-400/30",
-      iconColor: "text-slate-300"
+      gradient: "from-slate-100/80 to-slate-200/80 dark:from-slate-600/20 dark:to-slate-700/20",
+      border: "border-slate-300/60 dark:border-slate-400/30",
+      iconColor: "text-slate-700 dark:text-slate-300"
     },
     {
       icon: Cpu,
       title: "Smart Resource Management",
       description: "Intelligent auto-scaling and resource allocation based on real-time usage patterns",
-      gradient: "from-indigo-600/20 to-blue-700/20",
-      border: "border-indigo-400/30",
-      iconColor: "text-indigo-300"
+      gradient: "from-indigo-100/80 to-blue-100/80 dark:from-indigo-600/20 dark:to-blue-700/20",
+      border: "border-indigo-300/60 dark:border-indigo-400/30",
+      iconColor: "text-indigo-600 dark:text-indigo-300"
     },
     {
       icon: Shield,

@@ -25,6 +25,7 @@ import AdminDashboard from "@/pages/admin-dashboard";
 import AdminGitHub from "@/pages/admin-github";
 import AdminApiTest from "@/pages/admin-api-test";
 import AdminVouchers from "@/pages/admin-vouchers";
+import AdminDatabaseStats from "@/pages/admin-database-stats";
 import AccountSettings from "@/pages/account-settings";
 import UserSettings from "@/pages/user-settings";
 import Maintenance from "@/pages/maintenance";
@@ -100,6 +101,7 @@ function Router() {
         {isAdmin && <Route path="/admin/github" component={AdminGitHub} />}
         {isAdmin && <Route path="/admin/api-test" component={AdminApiTest} />}
         {isAdmin && <Route path="/admin/vouchers" component={AdminVouchers} />}
+        {isAdmin && <Route path="/admin/database" component={AdminDatabaseStats} />}
         <Route component={NotFound} />
       </Switch>
     </>

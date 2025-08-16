@@ -35,7 +35,8 @@ export default function Navbar() {
     ...(isAdmin ? [
       { path: "/admin/dashboard", label: "Admin" },
       { path: "/admin/github", label: "GitHub" },
-      { path: "/admin/api-test", label: "API Test" }
+      { path: "/admin/api-test", label: "API Test" },
+      { path: "/admin/database", label: "Database" }
     ] : []),
   ];
 

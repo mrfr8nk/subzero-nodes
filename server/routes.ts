@@ -4910,22 +4910,39 @@ jobs:
   // Admin: Create voucher code
   app.post('/api/admin/vouchers', requireAdmin, async (req: any, res) => {
     try {
-      const data = insertVoucherCodeSchema.parse(req.body);
+      const { code, coinAmount, maxUsage, expiresAt } = req.body;
       
       // Check if voucher code already exists
-      const existingVoucher = await storage.getVoucherByCode(data.code);
+      const existingVoucher = await storage.getVoucherByCode(code);
       if (existingVoucher) {
         return res.status(400).json({ message: 'Voucher code already exists' });
       }
 
-      const voucher = await storage.createVoucherCode({
-        ...data,
-        createdBy: req.user.id
-      });
+      // Prepare voucher data with proper types
+      const voucherData = {
+        code: code?.toUpperCase() || '',
+        coinAmount: parseInt(coinAmount) || 0,
+        createdBy: req.user._id || req.user.id,
+        maxUsage: parseInt(maxUsage) || 1,
+        isActive: true,
+        ...(expiresAt && { expiresAt: new Date(expiresAt) })
+      };
+
+      // Validate the data
+      const validatedData = insertVoucherCodeSchema.parse(voucherData);
+      
+      const voucher = await storage.createVoucherCode(validatedData);
 
       res.json({ message: 'Voucher created successfully', voucher });
     } catch (error) {
       console.error('Error creating voucher:', error);
+      if (error && typeof error === 'object' && 'issues' in error) {
+        // Zod validation error
+        return res.status(400).json({ 
+          message: 'Validation failed',
+          errors: (error as any).issues.map((i: any) => `${i.path.join('.')}: ${i.message}`)
+        });
+      }
       res.status(500).json({ message: 'Failed to create voucher' });
     }
   });
