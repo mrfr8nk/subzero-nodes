@@ -29,7 +29,7 @@ export default function Navbar() {
     { path: "/deployments", label: "Deployments" },
     { path: "/wallet", label: "Wallet" },
     { path: "/referrals", label: "Referrals" },
-    { path: "/premium", label: "⭐ Premium", special: true },
+    { path: "/premium", label: "Premium", special: true },
     { path: "/chat", label: "Chat" },
     { path: "/user-settings", label: "Settings" },
     ...(isAdmin ? [
