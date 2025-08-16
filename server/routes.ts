@@ -4922,7 +4922,7 @@ jobs:
       const voucherData = {
         code: code?.toUpperCase() || '',
         coinAmount: parseInt(coinAmount) || 0,
-        createdBy: req.user._id || req.user.id,
+        createdBy: (req.user._id || req.user.id).toString(),
         maxUsage: parseInt(maxUsage) || 1,
         isActive: true,
         ...(expiresAt && { expiresAt: new Date(expiresAt) })
@@ -4993,7 +4993,7 @@ jobs:
         return res.status(400).json({ message: 'Voucher code is required' });
       }
 
-      const result = await storage.redeemVoucher(code.trim().toUpperCase(), req.user.id);
+      const result = await storage.redeemVoucher(code.trim().toUpperCase(), req.user._id.toString());
       
       if (result.success) {
         res.json(result);
