@@ -2707,75 +2707,70 @@ export class MongoStorage implements IStorage {
   }
 
   async redeemVoucher(code: string, userId: string): Promise<{ success: boolean; message: string; coinAmount?: number }> {
-    // For now, skip session handling as we need to fix client access
-    // const session = client.startSession();
-    
     try {
-      const result = await session.withTransaction(async () => {
-        // Find the voucher
-        const voucher = await this.voucherCodesCollection.findOne({ code }, { session });
-        
-        if (!voucher) {
-          return { success: false, message: "Voucher code not found" };
+      // Find the voucher
+      const voucher = await this.voucherCodesCollection.findOne({ code });
+      
+      if (!voucher) {
+        return { success: false, message: "Invalid voucher code. Please check and try again." };
+      }
+
+      if (!voucher.isActive) {
+        return { success: false, message: "This voucher code is no longer active and cannot be used." };
+      }
+
+      // Check if voucher has expired
+      if (voucher.expiresAt && voucher.expiresAt < new Date()) {
+        return { success: false, message: "This voucher code has expired and can no longer be used." };
+      }
+
+      // Check if user has already used this voucher
+      const userObjectId = new ObjectId(userId);
+      if (voucher.usedBy.some(id => id.equals(userObjectId))) {
+        return { success: false, message: "You have already used this voucher code. Each voucher can only be used once per user." };
+      }
+
+      // Check if voucher has reached its maximum usage limit
+      if (voucher.maxUsage && voucher.usageCount >= voucher.maxUsage) {
+        return { success: false, message: "Limit reached! This voucher code has been used by the maximum number of users allowed." };
+      }
+
+      // All validations passed, proceed with redemption
+      // Update user's coin balance
+      await this.usersCollection.updateOne(
+        { _id: userObjectId },
+        { $inc: { coinBalance: voucher.coinAmount } }
+      );
+
+      // Update voucher usage
+      await this.voucherCodesCollection.updateOne(
+        { _id: voucher._id },
+        {
+          $inc: { usageCount: 1 },
+          $push: { usedBy: userObjectId },
+          $set: { updatedAt: new Date() }
         }
+      );
 
-        if (!voucher.isActive) {
-          return { success: false, message: "Voucher code is no longer active" };
-        }
-
-        if (voucher.expiresAt && voucher.expiresAt < new Date()) {
-          return { success: false, message: "Voucher code has expired" };
-        }
-
-        // Check if user has already used this voucher
-        const userObjectId = new ObjectId(userId);
-        if (voucher.usedBy.some(id => id.equals(userObjectId))) {
-          return { success: false, message: "You have already used this voucher code" };
-        }
-
-        // Check usage limit
-        if (voucher.maxUsage && voucher.usageCount >= voucher.maxUsage) {
-          return { success: false, message: "Voucher code has reached its maximum usage limit" };
-        }
-
-        // Update user's coin balance
-        await this.usersCollection.updateOne(
-          { _id: userObjectId },
-          { $inc: { coinBalance: voucher.coinAmount } },
-          { session }
-        );
-
-        // Update voucher usage
-        await this.voucherCodesCollection.updateOne(
-          { _id: voucher._id },
-          {
-            $inc: { usageCount: 1 },
-            $push: { usedBy: userObjectId },
-            $set: { updatedAt: new Date() }
-          },
-          { session }
-        );
-
-        // Create transaction record
-        await this.transactionsCollection.insertOne({
-          _id: new ObjectId(),
-          userId: userObjectId,
-          type: "voucher_redemption",
-          amount: voucher.coinAmount,
-          description: `Redeemed voucher: ${code}`,
-          relatedId: voucher._id,
-          createdAt: new Date()
-        }, { session });
-
-        return { success: true, message: `Successfully redeemed voucher! You received ${voucher.coinAmount} coins.`, coinAmount: voucher.coinAmount };
+      // Create transaction record
+      await this.transactionsCollection.insertOne({
+        _id: new ObjectId(),
+        userId: userObjectId,
+        type: "voucher_redemption",
+        amount: voucher.coinAmount,
+        description: `Redeemed voucher code: ${code}`,
+        relatedId: voucher._id,
+        createdAt: new Date()
       });
 
-      return result;
+      return { 
+        success: true, 
+        message: `Success! You have received ${voucher.coinAmount} coins from voucher code "${code}".`, 
+        coinAmount: voucher.coinAmount 
+      };
     } catch (error) {
       console.error("Error redeeming voucher:", error);
-      return { success: false, message: "An error occurred while redeeming the voucher" };
-    } finally {
-      await session.endSession();
+      return { success: false, message: "An error occurred while processing your voucher. Please try again later." };
     }
   }
 
