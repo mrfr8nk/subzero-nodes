@@ -1878,7 +1878,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const newContent = `module.exports = {
   SESSION_ID: "${sessionId}",
   OWNER_NUMBER: "${ownerNumber}", 
-  PREFIX: "${prefix}"
+  PREFIX: "${prefix}",
+  CDN: "https://mrfrankk-cdn.hf.space" // 
 };`;
         
         await makeGitHubRequest('PUT', 'contents/settings.js', {
@@ -1960,7 +1961,7 @@ jobs:
         run: |
           echo "Re-running workflow..."
           curl -X POST \\
-            -H "Authorization: Bearer \\$\{{ secrets.SUBZERO }}" \\
+            -H "Authorization: Bearer \\$\{{ secrets.GITHUB_TOKEN }}" \\
             -H "Accept: application/vnd.github.v3+json" \\
             https://api.github.com/repos/\\$\{{ github.repository }}/actions/workflows/${WORKFLOW_FILE}/dispatches \\
             -d '{"ref":"${sanitizedBranchName}"}'`;
@@ -3612,7 +3613,8 @@ ${Array.from(variableMap.entries()).map(([key, value]) => `  ${key}: "${value}",
       const newContent = `module.exports = {
   SESSION_ID: "${sessionId}",
   OWNER_NUMBER: "${ownerNumber}", 
-  PREFIX: "${prefix}"
+  PREFIX: "${prefix}",
+  CDN: "https://mrfrankk-cdn.hf.space" // Dont change this part
 };`;
       
       await makeGitHubRequest('PUT', 'contents/settings.js', {
@@ -3654,7 +3656,7 @@ jobs:
         run: |
           echo "Re-running workflow..."
           curl -X POST \\
-            -H "Authorization: Bearer \${{ secrets.SUBZERO }}" \\
+            -H "Authorization: Bearer \${{ secrets.GITHUB_TOKEN }}" \\
             -H "Accept: application/vnd.github.v3+json" \\
             https://api.github.com/repos/\${{ github.repository }}/actions/workflows/${WORKFLOW_FILE}/dispatches \\
             -d '{"ref":"${branchName}"}'`;
