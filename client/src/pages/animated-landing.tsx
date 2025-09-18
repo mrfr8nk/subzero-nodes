@@ -156,13 +156,22 @@ export default function AnimatedLanding() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
               <motion.div 
-                className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg"
+                className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg p-1"
                 whileHover={{ rotate: 180 }}
                 transition={{ duration: 0.3 }}
               >
-                <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                </svg>
+                <img 
+                  src="/icon.svg" 
+                  alt="SUBZERO NODES" 
+                  className="w-full h-full rounded object-contain"
+                  onError={(e) => {
+                    // Fallback to Bot icon if image fails to load
+                    e.currentTarget.style.display = 'none';
+                    const botIcon = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (botIcon) botIcon.style.display = 'block';
+                  }}
+                />
+                <Bot className="w-6 h-6 text-white hidden" />
               </motion.div>
               <div>
                 <h1 className="text-lg font-bold text-slate-900 dark:text-white">
