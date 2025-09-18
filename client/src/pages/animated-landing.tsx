@@ -181,21 +181,23 @@ export default function AnimatedLanding() {
               </div>
             </div>
             
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               <ThemeToggle />
               <Button 
                 variant="outline" 
+                size="sm"
                 onClick={() => setLocation("/login")}
                 className="border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors"
               >
                 Sign In
               </Button>
               <Button 
+                size="sm"
                 onClick={handleGetStarted}
                 className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg transition-all"
               >
                 Get Started
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <ArrowRight className="ml-1 h-3 w-3" />
               </Button>
             </div>
           </div>

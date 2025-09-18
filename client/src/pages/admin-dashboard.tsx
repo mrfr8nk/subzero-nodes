@@ -1441,57 +1441,53 @@ export default function AdminDashboard() {
                                   </div>
 
                                   {/* Admin Management Controls */}
-                                  {(isSuperAdmin(currentUser) || (!user.isAdmin && !isSuperAdmin(currentUser))) && (
-                                    <div className="space-y-3 pt-4 border-t">
-                                      <Label>
-                                        {isSuperAdmin(currentUser) ? 'Admin Management (Super Admin Only)' : 'User Promotion'}
-                                      </Label>
+                                  <div className="space-y-3 pt-4 border-t">
+                                    <Label>Admin Management</Label>
+                                    
+                                    <div className="space-y-2">
+                                      {/* Promote to Admin - for non-admin users */}
+                                      {!user.isAdmin && (
+                                        <Button 
+                                          onClick={() => handlePromoteUser(user._id)}
+                                          variant="default"
+                                          size="sm"
+                                          className="w-full justify-start"
+                                          data-testid="button-promote-admin"
+                                        >
+                                          <Crown className="w-4 h-4 mr-2" />
+                                          Promote to Admin
+                                        </Button>
+                                      )}
                                       
-                                      <div className="space-y-2">
-                                        {/* Promote to Admin - for non-admin users */}
-                                        {!user.isAdmin && (
-                                          <Button 
-                                            onClick={() => handlePromoteUser(user._id)}
-                                            variant="default"
-                                            size="sm"
-                                            className="w-full justify-start"
-                                            data-testid="button-promote-admin"
-                                          >
-                                            <Crown className="w-4 h-4 mr-2" />
-                                            Promote to Admin
-                                          </Button>
-                                        )}
-                                        
-                                        {/* Demote to Normal User - for admin users (Super Admin only) */}
-                                        {user.isAdmin && user._id !== currentUser?._id && isSuperAdmin(currentUser) && (
-                                          <Button 
-                                            onClick={() => handleDemoteAdmin(user._id)}
-                                            variant="outline"
-                                            size="sm"
-                                            className="w-full justify-start"
-                                            data-testid="button-demote-admin"
-                                          >
-                                            <UserCheck className="w-4 h-4 mr-2" />
-                                            Demote to Normal User
-                                          </Button>
-                                        )}
-                                        
-                                        {/* Delete Admin - for admin users (Super Admin only) */}
-                                        {user.isAdmin && user._id !== currentUser?._id && isSuperAdmin(currentUser) && (
-                                          <Button 
-                                            onClick={() => handleDeleteAdmin(user._id)}
-                                            variant="destructive"
-                                            size="sm"
-                                            className="w-full justify-start"
-                                            data-testid="button-delete-admin"
-                                          >
-                                            <Trash2 className="w-4 h-4 mr-2" />
-                                            Delete Admin Account
-                                          </Button>
-                                        )}
-                                      </div>
+                                      {/* Demote to Normal User - for admin users */}
+                                      {user.isAdmin && user._id !== currentUser?._id && (
+                                        <Button 
+                                          onClick={() => handleDemoteAdmin(user._id)}
+                                          variant="outline"
+                                          size="sm"
+                                          className="w-full justify-start"
+                                          data-testid="button-demote-admin"
+                                        >
+                                          <UserCheck className="w-4 h-4 mr-2" />
+                                          Demote to Normal User
+                                        </Button>
+                                      )}
+                                      
+                                      {/* Delete Admin - for admin users */}
+                                      {user.isAdmin && user._id !== currentUser?._id && (
+                                        <Button 
+                                          onClick={() => handleDeleteAdmin(user._id)}
+                                          variant="destructive"
+                                          size="sm"
+                                          className="w-full justify-start"
+                                          data-testid="button-delete-admin"
+                                        >
+                                          <Trash2 className="w-4 h-4 mr-2" />
+                                          Delete Admin Account
+                                        </Button>
+                                      )}
                                     </div>
-                                  )}
+                                  </div>
 
                                   <div className="space-y-4 pt-4 border-t">
                                     <div className="space-y-2">
