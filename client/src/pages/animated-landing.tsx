@@ -246,7 +246,7 @@ export default function AnimatedLanding() {
               </span>
               <br />
               <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-700 dark:from-blue-300 dark:via-indigo-300 dark:to-slate-300 bg-clip-text text-transparent">
-                Anything
+                SUBZERO
               </span>
             </motion.h1>
             
