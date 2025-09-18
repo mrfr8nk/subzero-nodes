@@ -15,7 +15,7 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 36679
+localPort = 34569
 externalPort = 3000
 
 [env]
@@ -44,3 +44,4 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_mem_db==1.0.0", "javascript_stripe==1.0.0", "javascript_sendgrid==1.0.0", "javascript_websocket==1.0.0", "javascript_auth_all_persistance==1.0.0"]
+expertMode = true
