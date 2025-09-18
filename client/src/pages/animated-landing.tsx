@@ -119,14 +119,23 @@ export default function AnimatedLanding() {
           }}
         />
         
-        {/* Floating Orbs */}
+        {/* Optimized Floating Orbs - Reduced blur for performance */}
         <motion.div
-          className="absolute top-20 left-20 w-64 h-64 bg-blue-600/15 rounded-full blur-3xl"
+          className="absolute top-20 left-20 w-32 h-32 bg-blue-600/10 rounded-full blur-xl"
           animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.4, 0.7, 0.4],
-            x: [0, 50, 0],
-            y: [0, -30, 0]
+            opacity: [0.3, 0.5, 0.3],
+            scale: [1, 1.1, 1]
+          }}
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+        <motion.div
+          className="absolute bottom-40 right-20 w-48 h-48 bg-indigo-600/10 rounded-full blur-xl"
+          animate={{
+            opacity: [0.4, 0.6, 0.4]
           }}
           transition={{
             duration: 8,
@@ -134,53 +143,22 @@ export default function AnimatedLanding() {
             ease: "easeInOut"
           }}
         />
-        <motion.div
-          className="absolute bottom-40 right-20 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl"
-          animate={{
-            scale: [1.2, 1, 1.2],
-            opacity: [0.5, 0.8, 0.5],
-            x: [0, -70, 0],
-            y: [0, 40, 0]
-          }}
-          transition={{
-            duration: 12,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        <motion.div
-          className="absolute top-1/2 left-1/2 w-80 h-80 bg-slate-600/15 rounded-full blur-3xl"
-          animate={{
-            scale: [1, 1.3, 1],
-            opacity: [0.3, 0.6, 0.3],
-            rotate: [0, 180, 360]
-          }}
-          transition={{
-            duration: 15,
-            repeat: Infinity,
-            ease: "linear"
-          }}
-        />
       </div>
 
-      {/* Header */}
+      {/* Header - Optimized backdrop blur */}
       <motion.header 
-        className="relative z-50 border-b border-blue-500/20 backdrop-blur-xl bg-slate-900/60 dark:bg-slate-900/60 bg-white/80"
-        initial={{ y: -100 }}
+        className="relative z-50 border-b border-blue-500/20 backdrop-blur-sm bg-white/90 dark:bg-slate-900/90"
+        initial={{ y: -20 }}
         animate={{ y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <motion.div 
-              className="flex items-center space-x-3"
-              whileHover={{ scale: 1.05 }}
-              transition={{ duration: 0.2 }}
-            >
+            <div className="flex items-center space-x-3">
               <motion.div 
                 className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg"
-                whileHover={{ rotate: 360 }}
-                transition={{ duration: 0.5 }}
+                whileHover={{ rotate: 180 }}
+                transition={{ duration: 0.3 }}
               >
                 <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
@@ -192,28 +170,24 @@ export default function AnimatedLanding() {
                 </h1>
                 <div className="text-xs text-slate-600 dark:text-slate-300 font-medium">Bot Platform</div>
               </div>
-            </motion.div>
+            </div>
             
             <div className="flex items-center space-x-4">
               <ThemeToggle />
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setLocation("/login")}
-                  className="border-blue-400/30 text-blue-100 hover:bg-blue-500/10 backdrop-blur-sm dark:border-blue-400/30 dark:text-blue-100 dark:hover:bg-blue-500/10 border-slate-300 text-slate-700 hover:bg-slate-100"
-                >
-                  Sign In
-                </Button>
-              </motion.div>
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button 
-                  onClick={handleGetStarted}
-                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-xl border-0"
-                >
-                  Get Started
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </motion.div>
+              <Button 
+                variant="outline" 
+                onClick={() => setLocation("/login")}
+                className="border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors"
+              >
+                Sign In
+              </Button>
+              <Button 
+                onClick={handleGetStarted}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg transition-all"
+              >
+                Get Started
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
             </div>
           </div>
         </div>
@@ -262,30 +236,26 @@ export default function AnimatedLanding() {
             
             <motion.div 
               className="flex flex-col sm:flex-row gap-6 justify-center items-center"
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.8 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
             >
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button 
-                  onClick={handleGetStarted}
-                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-8 py-4 rounded-xl text-lg font-semibold h-auto shadow-2xl"
-                >
-                  <Play className="mr-2 h-5 w-5" />
-                  Start Building
-                </Button>
-              </motion.div>
+              <Button 
+                onClick={handleGetStarted}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-8 py-4 rounded-xl text-lg font-semibold h-auto shadow-lg transition-all hover:scale-105"
+              >
+                <Play className="mr-2 h-5 w-5" />
+                Start Building
+              </Button>
               
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button 
-                  onClick={handleGoogleLogin}
-                  variant="outline"
-                  className="border-blue-400/40 text-blue-100 hover:bg-blue-500/10 px-8 py-4 rounded-xl text-lg font-semibold h-auto backdrop-blur-sm"
-                >
-                  <SiGoogle className="mr-2 h-5 w-5" />
-                  Continue with Google
-                </Button>
-              </motion.div>
+              <Button 
+                onClick={handleGoogleLogin}
+                variant="outline"
+                className="border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 px-8 py-4 rounded-xl text-lg font-semibold h-auto transition-all hover:scale-105"
+              >
+                <SiGoogle className="mr-2 h-5 w-5" />
+                Continue with Google
+              </Button>
             </motion.div>
           </motion.div>
         </div>
