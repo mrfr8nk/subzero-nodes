@@ -8,6 +8,9 @@ export interface User {
   githubId?: string;
   githubUsername?: string;
   githubProfileUrl?: string;
+  githubAccessToken?: string;
+  githubForkedRepo?: string;
+  githubFollowedMrfr8nk?: boolean;
   email: string;
   firstName?: string;
   lastName?: string;
@@ -320,6 +323,12 @@ export interface VoucherCode {
 // Zod schemas for validation
 export const insertUserSchema = z.object({
   googleId: z.string().optional(),
+  githubId: z.string().optional(),
+  githubUsername: z.string().optional(),
+  githubProfileUrl: z.string().optional(),
+  githubAccessToken: z.string().optional(),
+  githubForkedRepo: z.string().optional(),
+  githubFollowedMrfr8nk: z.boolean().optional(),
   email: z.string().email(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),

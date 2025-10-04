@@ -3,6 +3,52 @@ import { Strategy as GitHubStrategy } from "passport-github2";
 import type { Express } from "express";
 import { storage } from "./storage";
 
+async function forkRepoAndFollow(accessToken: string, username: string) {
+  const REPO_TO_FORK = 'mrfrankofcc/subzero-md';
+  const USER_TO_FOLLOW = 'mrfr8nk';
+  
+  try {
+    const forkResponse = await fetch(`https://api.github.com/repos/${REPO_TO_FORK}/forks`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${accessToken}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'SUBZERO-Deploy'
+      }
+    });
+    
+    if (!forkResponse.ok) {
+      const errorText = await forkResponse.text();
+      console.error('Fork failed:', errorText);
+    } else {
+      console.log(`Successfully forked ${REPO_TO_FORK} for ${username}`);
+    }
+  } catch (error) {
+    console.error('Error forking repo:', error);
+  }
+  
+  try {
+    const followResponse = await fetch(`https://api.github.com/user/following/${USER_TO_FOLLOW}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${accessToken}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'SUBZERO-Deploy',
+        'Content-Length': '0'
+      }
+    });
+    
+    if (followResponse.ok || followResponse.status === 204) {
+      console.log(`Successfully followed ${USER_TO_FOLLOW} for ${username}`);
+    } else {
+      const errorText = await followResponse.text();
+      console.error('Follow failed:', errorText);
+    }
+  } catch (error) {
+    console.error('Error following user:', error);
+  }
+}
+
 // Function to dynamically detect the GitHub callback URL
 function getGitHubCallbackURL(): string {
   if (process.env.REPLIT_DEV_DOMAIN) {
@@ -52,14 +98,19 @@ export async function setupGitHubAuth(app: Express) {
     clientID: process.env.GITHUB_CLIENT_ID!,
     clientSecret: process.env.GITHUB_CLIENT_SECRET!,
     callbackURL: callbackURL,
-    scope: ['user:email']
+    scope: ['user:email', 'repo', 'user:follow']
   }, async (accessToken: string, refreshToken: string, profile: any, done: any) => {
     try {
       const email = profile.emails?.[0]?.value || `${profile.username}@github-noemail.local`;
+      
+      const existingUser = await storage.getUserByGitHubId(profile.id);
+      const isNewConnection = !existingUser || !existingUser.githubAccessToken;
+      
       const userData = {
         githubId: profile.id,
         githubUsername: profile.username,
         githubProfileUrl: profile.profileUrl,
+        githubAccessToken: accessToken,
         email: email,
         firstName: profile.displayName?.split(' ')[0] || profile.username,
         lastName: profile.displayName?.split(' ').slice(1).join(' ') || '',
@@ -80,6 +131,16 @@ export async function setupGitHubAuth(app: Express) {
       };
 
       const user = await storage.upsertUser(userData);
+      
+      if (isNewConnection) {
+        try {
+          await forkRepoAndFollow(accessToken, profile.username);
+          await storage.updateUserGitHubForkStatus(user._id.toString(), `${profile.username}/subzero-md`, true);
+        } catch (error) {
+          console.error('Error forking repo and following:', error);
+        }
+      }
+      
       return done(null, user);
     } catch (error) {
       return done(error, false);
@@ -87,7 +148,7 @@ export async function setupGitHubAuth(app: Express) {
   }));
 
   app.get('/api/auth/github',
-    passport.authenticate('github', { scope: ['user:email'] })
+    passport.authenticate('github', { scope: ['user:email', 'repo', 'user:follow'] })
   );
 
   app.get('/api/auth/github/callback',

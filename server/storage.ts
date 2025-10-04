@@ -116,6 +116,7 @@ export interface IStorage {
   deleteAdmin(userId: string, adminId: string): Promise<void>;
   getUsersByDeviceFingerprint(fingerprint: string): Promise<User[]>;
   updateUserDeviceFingerprint(userId: string, fingerprint: string): Promise<void>;
+  updateUserGitHubForkStatus(userId: string, forkedRepo: string, followedMrfr8nk: boolean): Promise<void>;
   
   // Device fingerprint banning operations
   banDeviceFingerprint(fingerprint: string, reason: string, bannedBy: string): Promise<void>;
@@ -1060,6 +1061,19 @@ export class MongoStorage implements IStorage {
         read: false
       });
     }
+  }
+
+  async updateUserGitHubForkStatus(userId: string, forkedRepo: string, followedMrfr8nk: boolean): Promise<void> {
+    await this.usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $set: { 
+          githubForkedRepo: forkedRepo,
+          githubFollowedMrfr8nk: followedMrfr8nk,
+          updatedAt: new Date()
+        }
+      }
+    );
   }
 
   // Admin notification operations
