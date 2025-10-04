@@ -2084,16 +2084,26 @@ jobs:
 
   // New user-based GitHub deployment - uses user's own GitHub account
   app.post('/api/deployments/user-github', checkDeviceBan, isAuthenticated, async (req: any, res) => {
+    console.log('=== USER GITHUB DEPLOYMENT STARTED ===');
     try {
       const userId = req.user._id.toString();
+      console.log('User ID:', userId);
       const user = await storage.getUser(userId);
       
       if (!user) {
+        console.error('User not found:', userId);
         return res.status(404).json({ message: "User not found" });
       }
 
+      console.log('User:', { 
+        username: user.username, 
+        githubUsername: user.githubUsername,
+        hasGithubToken: !!user.githubAccessToken 
+      });
+
       // Check if user has GitHub connected
       if (!user.githubAccessToken || !user.githubUsername) {
+        console.error('GitHub not connected for user:', user.username);
         return res.status(400).json({ 
           message: 'Please connect your GitHub account first',
           requiresGitHub: true
@@ -2101,8 +2111,10 @@ jobs:
       }
 
       const { branchName, sessionId, ownerNumber, prefix } = req.body;
+      console.log('Deployment request:', { branchName, sessionId, ownerNumber, prefix });
       
       if (!branchName || !sessionId || !ownerNumber || !prefix) {
+        console.error('Missing required fields');
         return res.status(400).json({ message: 'All fields are required' });
       }
 
@@ -2186,6 +2198,7 @@ jobs:
 
       try {
         // Check if fork exists, if not fork it
+        console.log('Checking if fork exists...');
         try {
           await fetch(`https://api.github.com/repos/${USER_GITHUB_USERNAME}/${FORKED_REPO_NAME}`, {
             headers: {
@@ -2195,9 +2208,9 @@ jobs:
           }).then(async (res) => {
             if (!res.ok) throw new Error('Repo not found');
           });
-          console.log(`Fork already exists for ${USER_GITHUB_USERNAME}/${FORKED_REPO_NAME}`);
+          console.log(`✓ Fork already exists for ${USER_GITHUB_USERNAME}/${FORKED_REPO_NAME}`);
         } catch {
-          console.log(`Forking repo for ${USER_GITHUB_USERNAME}...`);
+          console.log(`⚠ Forking repo for ${USER_GITHUB_USERNAME}...`);
           const forkResponse = await fetch('https://api.github.com/repos/mrfrankofcc/subzero-md/forks', {
             method: 'POST',
             headers: {
@@ -2208,9 +2221,12 @@ jobs:
           });
           
           if (!forkResponse.ok) {
+            const errorText = await forkResponse.text();
+            console.error('Fork failed:', errorText);
             throw new Error(`Failed to fork repository: ${forkResponse.statusText}`);
           }
           
+          console.log('✓ Fork created successfully');
           // Wait for fork to be ready
           await new Promise(resolve => setTimeout(resolve, 5000));
           
@@ -2219,26 +2235,33 @@ jobs:
         }
 
         // Check if branch already exists
+        console.log(`Checking if branch '${sanitizedBranchName}' exists...`);
         try {
           await makeUserGitHubRequest('GET', `git/refs/heads/${sanitizedBranchName}`);
+          console.error(`Branch '${sanitizedBranchName}' already exists`);
           return res.status(400).json({ 
             message: `Branch name '${sanitizedBranchName}' is already taken. Please choose a different name.` 
           });
         } catch (error) {
-          // Branch doesn't exist, continue
+          console.log('✓ Branch name available');
         }
         
         // Get main branch SHA
+        console.log('Getting main branch SHA...');
         const mainBranchData = await makeUserGitHubRequest('GET', `git/refs/heads/${MAIN_BRANCH}`);
         const mainSha = mainBranchData.object.sha;
+        console.log('✓ Main branch SHA:', mainSha);
         
         // Create new branch
+        console.log(`Creating branch '${sanitizedBranchName}'...`);
         await makeUserGitHubRequest('POST', 'git/refs', {
           ref: `refs/heads/${sanitizedBranchName}`,
           sha: mainSha
         });
+        console.log('✓ Branch created successfully');
 
         // Update settings.js
+        console.log('Updating settings.js...');
         const fileData = await makeUserGitHubRequest('GET', `contents/settings.js?ref=${sanitizedBranchName}`);
         const newContent = `module.exports = {
   SESSION_ID: "${sessionId}",
@@ -2253,8 +2276,10 @@ jobs:
           sha: fileData.sha,
           branch: sanitizedBranchName
         });
+        console.log('✓ settings.js updated');
 
         // Create/update workflow file with the new workflow content
+        console.log('Creating/updating workflow file...');
         const workflowContent = `name: SUBZERO-MD-DEPLOY
 on:
   workflow_dispatch:
@@ -2376,12 +2401,14 @@ jobs:
             sha: existingFile.sha,
             branch: sanitizedBranchName
           });
+          console.log('✓ Workflow file updated');
         } catch (error) {
           await makeUserGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
             message: `Create workflow for ${sanitizedBranchName}`,
             content: Buffer.from(workflowContent).toString('base64'),
             branch: sanitizedBranchName
           });
+          console.log('✓ Workflow file created');
         }
         
         // Trigger workflow
@@ -2389,6 +2416,7 @@ jobs:
         await makeUserGitHubRequest('POST', `actions/workflows/${WORKFLOW_FILE}/dispatches`, {
           ref: sanitizedBranchName
         });
+        console.log('✓ Workflow triggered successfully');
 
         // Create deployment record
         const now = new Date();
