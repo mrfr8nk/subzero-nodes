@@ -3,7 +3,28 @@
 ## Project Overview
 A comprehensive deployment platform that enables users to deploy and manage applications through GitHub Actions with real-time monitoring, advanced logging, and automated status tracking.
 
-## Recent Changes (August 15, 2025)
+## Recent Changes (October 4, 2025)
+
+### GitHub Authentication Integration Completed
+✅ **GitHub OAuth Login and Signup**
+- Added GitHub authentication option alongside Google OAuth on login and signup pages
+- Users can now sign in or create accounts using their GitHub credentials
+- Seamless integration with existing authentication system using Passport.js GitHub Strategy
+- Dynamic callback URL detection supporting multiple hosting platforms (Replit, Render, Koyeb, etc.)
+
+✅ **GitHub Account Linking**
+- Existing users can link their GitHub accounts from account settings
+- Account settings page shows GitHub connection status with username and profile link
+- One-click disconnect option for users who want to unlink their GitHub account
+- Profile data synced from GitHub including username and profile URL
+
+✅ **Backend Implementation**
+- Created dedicated GitHub authentication module (server/githubAuth.ts)
+- Added GitHub-specific database fields (githubId, githubUsername, githubProfileUrl)
+- Implemented secure OAuth flow with proper error handling
+- Storage layer updated with GitHub user operations (link, unlink, lookup by GitHub ID)
+
+### Previous Changes (August 15, 2025)
 
 ### Major UI Redesign Completed
 ✅ **Navy Blue Theme Implementation for SUBZERO NODES**
