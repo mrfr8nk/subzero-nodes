@@ -2082,6 +2082,358 @@ jobs:
     }
   });
 
+  // New user-based GitHub deployment - uses user's own GitHub account
+  app.post('/api/deployments/user-github', checkDeviceBan, isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check if user has GitHub connected
+      if (!user.githubAccessToken || !user.githubUsername) {
+        return res.status(400).json({ 
+          message: 'Please connect your GitHub account first',
+          requiresGitHub: true
+        });
+      }
+
+      const { branchName, sessionId, ownerNumber, prefix } = req.body;
+      
+      if (!branchName || !sessionId || !ownerNumber || !prefix) {
+        return res.status(400).json({ message: 'All fields are required' });
+      }
+
+      // Get deployment cost setting
+      const deploymentFeeSetting = await storage.getAppSetting('deployment_fee');
+      const deploymentFee = parseInt(deploymentFeeSetting?.value) || 10;
+
+      // Check user's wallet balance
+      const userBalance = user.coinBalance || 0;
+      
+      if (userBalance < deploymentFee) {
+        return res.status(400).json({ 
+          message: `Insufficient coins. You need ${deploymentFee} coins to deploy this bot. You currently have ${userBalance} coins.`,
+          required: deploymentFee,
+          current: userBalance,
+          shortfall: deploymentFee - userBalance
+        });
+      }
+
+      const deploymentNumber = await storage.getNextDeploymentNumber(userId);
+      
+      const USER_GITHUB_TOKEN = user.githubAccessToken;
+      const USER_GITHUB_USERNAME = user.githubUsername;
+      const FORKED_REPO_NAME = 'subzero-md';
+      const MAIN_BRANCH = 'main';
+      const WORKFLOW_FILE = 'deploy.yml';
+
+      // Sanitize branch name
+      const sanitizeBranchName = (name: string) => {
+        return name
+          .replace(/[^a-zA-Z0-9._-]/g, '-')
+          .replace(/^\.+|\.+$/g, '')
+          .replace(/\.\.+/g, '.')
+          .replace(/^-+|-+$/g, '')
+          .replace(/--+/g, '-')
+          .substring(0, 250);
+      };
+
+      let sanitizedBranchName = sanitizeBranchName(branchName.trim());
+      if (!sanitizedBranchName) {
+        return res.status(400).json({ message: 'Invalid branch name. Please provide a valid app name.' });
+      }
+
+      // Deduct coins first
+      await storage.updateUserBalance(userId, -deploymentFee);
+
+      // GitHub API helper for user's repo
+      const makeUserGitHubRequest = async (method: string, endpoint: string, data: any = null) => {
+        const url = `https://api.github.com/repos/${USER_GITHUB_USERNAME}/${FORKED_REPO_NAME}/${endpoint}`;
+        const config: any = {
+          method,
+          headers: {
+            'Authorization': `token ${USER_GITHUB_TOKEN}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': 'SUBZERO-Deploy'
+          }
+        };
+        if (data) {
+          config.body = JSON.stringify(data);
+          config.headers['Content-Type'] = 'application/json';
+        }
+        
+        const response = await fetch(url, config);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`GitHub API Error:`, {
+            url,
+            status: response.status,
+            statusText: response.statusText,
+            errorText
+          });
+          throw new Error(`GitHub API error: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+        
+        if (response.status === 204) {
+          return {};
+        }
+        
+        return await response.json();
+      };
+
+      try {
+        // Check if fork exists, if not fork it
+        try {
+          await fetch(`https://api.github.com/repos/${USER_GITHUB_USERNAME}/${FORKED_REPO_NAME}`, {
+            headers: {
+              'Authorization': `token ${USER_GITHUB_TOKEN}`,
+              'Accept': 'application/vnd.github.v3+json'
+            }
+          }).then(async (res) => {
+            if (!res.ok) throw new Error('Repo not found');
+          });
+          console.log(`Fork already exists for ${USER_GITHUB_USERNAME}/${FORKED_REPO_NAME}`);
+        } catch {
+          console.log(`Forking repo for ${USER_GITHUB_USERNAME}...`);
+          const forkResponse = await fetch('https://api.github.com/repos/mrfrankofcc/subzero-md/forks', {
+            method: 'POST',
+            headers: {
+              'Authorization': `token ${USER_GITHUB_TOKEN}`,
+              'Accept': 'application/vnd.github.v3+json',
+              'User-Agent': 'SUBZERO-Deploy'
+            }
+          });
+          
+          if (!forkResponse.ok) {
+            throw new Error(`Failed to fork repository: ${forkResponse.statusText}`);
+          }
+          
+          // Wait for fork to be ready
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          // Update user's fork status
+          await storage.updateUserGitHubForkStatus(userId, `${USER_GITHUB_USERNAME}/${FORKED_REPO_NAME}`, true);
+        }
+
+        // Check if branch already exists
+        try {
+          await makeUserGitHubRequest('GET', `git/refs/heads/${sanitizedBranchName}`);
+          return res.status(400).json({ 
+            message: `Branch name '${sanitizedBranchName}' is already taken. Please choose a different name.` 
+          });
+        } catch (error) {
+          // Branch doesn't exist, continue
+        }
+        
+        // Get main branch SHA
+        const mainBranchData = await makeUserGitHubRequest('GET', `git/refs/heads/${MAIN_BRANCH}`);
+        const mainSha = mainBranchData.object.sha;
+        
+        // Create new branch
+        await makeUserGitHubRequest('POST', 'git/refs', {
+          ref: `refs/heads/${sanitizedBranchName}`,
+          sha: mainSha
+        });
+
+        // Update settings.js
+        const fileData = await makeUserGitHubRequest('GET', `contents/settings.js?ref=${sanitizedBranchName}`);
+        const newContent = `module.exports = {
+  SESSION_ID: "${sessionId}",
+  OWNER_NUMBER: "${ownerNumber}", 
+  PREFIX: "${prefix}",
+  CDN: "https://mrfrankk-cdn.hf.space"
+};`;
+        
+        await makeUserGitHubRequest('PUT', 'contents/settings.js', {
+          message: `Update settings.js for ${sanitizedBranchName}`,
+          content: Buffer.from(newContent).toString('base64'),
+          sha: fileData.sha,
+          branch: sanitizedBranchName
+        });
+
+        // Create/update workflow file with the new workflow content
+        const workflowContent = `name: SUBZERO-MD-DEPLOY
+on:
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          
+      - name: Debug Environment
+        run: |
+          echo "=== ENVIRONMENT DEBUG ==="
+          echo "Node version: $(node --version)"
+          echo "NPM version: $(npm --version)"
+          echo "Working directory: $(pwd)"
+          echo "Files in current directory:"
+          ls -la
+          echo "=== SESSION ID CHECK ==="
+          if [ -f ".env" ]; then
+            echo ".env file found:"
+            cat .env
+          else
+            echo "No .env file found"
+          fi
+          echo "=== CONFIG FILE CHECK ==="
+          if [ -f "settings.js" ]; then
+            echo "settings.js content:"
+            cat settings.js
+          else
+            echo "No settings.js found"
+          fi
+          
+      - name: Install Dependencies
+        run: |
+          echo "=== INSTALLING DEPENDENCIES ==="
+          npm install --verbose
+          echo "=== DEPENDENCY TREE ==="
+          npm list --depth=0
+          
+      - name: Pre-run Checks
+        run: |
+          echo "=== PRE-RUN CHECKS ==="
+          echo "Checking package.json scripts:"
+          cat package.json | grep -A 10 '"scripts"'
+          echo "=== CHECKING FOR MAIN FILES ==="
+          if [ -f "index.js" ]; then echo "✓ index.js found"; else echo "✗ index.js missing"; fi
+          
+      - name: Run Bot with Detailed Logging
+        run: |
+          echo "=== STARTING SUBZERO-MD BOT ==="
+          echo "Timestamp: $(date)"
+          echo "Starting bot with detailed logging..."
+          
+          timeout 18000 bash -c '
+            attempt=1
+            while true; do
+              echo "=== ATTEMPT #$attempt ==="
+              echo ">>> Starting bot attempt #$attempt at $(date)"
+              npm start 2>&1 | while IFS= read -r line; do
+                echo "[$(date +"%H:%M:%S")] $line"
+              done
+              exit_code=$?
+              echo ">>> Bot stopped with exit code: $exit_code at $(date)"
+              
+              if [ $exit_code -eq 0 ]; then
+                echo "Bot exited normally, restarting in 5 seconds..."
+                sleep 5
+              else
+                echo "Bot crashed, analyzing error and restarting in 10 seconds..."
+                echo "=== ERROR ANALYSIS ==="
+                echo "Checking system resources:"
+                free -h
+                df -h
+                echo "Recent system messages:"
+                dmesg | tail -5 2>/dev/null || echo "No system messages available"
+                sleep 10
+              fi
+              
+              attempt=$((attempt + 1))
+            done
+          ' || echo "Timeout reached after 5 hours"
+          
+      - name: Post-Run Analysis
+        if: always()
+        run: |
+          echo "=== POST-RUN ANALYSIS ==="
+          echo "Final timestamp: $(date)"
+          echo "Checking for any log files:"
+          find . -name "*.log" -type f 2>/dev/null || echo "No log files found"
+          echo "=== FINAL SYSTEM STATE ==="
+          free -h
+          df -h
+          
+      - name: Re-Trigger Workflow
+        if: always()
+        run: |
+          echo "=== AUTO-RESTART ==="
+          echo "Preparing to restart workflow at $(date)"
+          sleep 30
+          curl -X POST \\
+            -H "Authorization: Bearer \\$\{{ secrets.GITHUB_TOKEN }}" \\
+            -H "Accept: application/vnd.github.v3+json" \\
+            https://api.github.com/repos/\\$\{{ github.repository }}/actions/workflows/${WORKFLOW_FILE}/dispatches \\
+            -d '{"ref":"${sanitizedBranchName}"}'
+          echo "Restart triggered successfully"`;
+
+        try {
+          const existingFile = await makeUserGitHubRequest('GET', `contents/.github/workflows/${WORKFLOW_FILE}?ref=${sanitizedBranchName}`);
+          
+          await makeUserGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
+            message: `Update workflow for ${sanitizedBranchName}`,
+            content: Buffer.from(workflowContent).toString('base64'),
+            sha: existingFile.sha,
+            branch: sanitizedBranchName
+          });
+        } catch (error) {
+          await makeUserGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
+            message: `Create workflow for ${sanitizedBranchName}`,
+            content: Buffer.from(workflowContent).toString('base64'),
+            branch: sanitizedBranchName
+          });
+        }
+        
+        // Trigger workflow
+        console.log(`Triggering workflow for branch: ${sanitizedBranchName}`);
+        await makeUserGitHubRequest('POST', `actions/workflows/${WORKFLOW_FILE}/dispatches`, {
+          ref: sanitizedBranchName
+        });
+
+        // Create deployment record
+        const now = new Date();
+        const nextChargeDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        
+        const deploymentData = insertDeploymentSchema.parse({
+          userId,
+          name: sanitizedBranchName,
+          branchName: sanitizedBranchName,
+          deploymentNumber,
+          status: "deploying",
+          configuration: `User GitHub: ${USER_GITHUB_USERNAME}/${FORKED_REPO_NAME}`,
+          cost: deploymentFee,
+          lastChargeDate: now,
+          nextChargeDate: nextChargeDate,
+          githubToken: USER_GITHUB_TOKEN,
+          githubOwner: USER_GITHUB_USERNAME,
+          githubRepo: FORKED_REPO_NAME
+        });
+
+        const deployment = await storage.createDeployment(deploymentData);
+
+        res.json({ 
+          success: true, 
+          message: 'Deployment started successfully using your GitHub account!', 
+          branch: sanitizedBranchName,
+          deployment,
+          repo: `${USER_GITHUB_USERNAME}/${FORKED_REPO_NAME}`
+        });
+
+      } catch (githubError) {
+        // Refund coins if deployment fails
+        await storage.updateUserBalance(userId, deploymentFee);
+        throw githubError;
+      }
+
+    } catch (error) {
+      console.error("Error creating user GitHub deployment:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  });
+
   app.patch('/api/deployments/:id/status', isAuthenticated, async (req: any, res) => {
     try {
       const deploymentId = req.params.id;
