@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { AlertTriangle, User, Trash2, Key, Eye, EyeOff } from "lucide-react";
+import { AlertTriangle, User, Trash2, Key, Eye, EyeOff, Github, CheckCircle, XCircle } from "lucide-react";
+import { SiGithub } from "react-icons/si";
 import { apiRequest } from "@/lib/queryClient";
 import {
   AlertDialog,
@@ -76,6 +77,27 @@ export default function AccountSettings() {
     onError: (error: any) => {
       toast({ 
         title: "Failed to change password", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    }
+  });
+
+  // Unlink GitHub account mutation
+  const unlinkGitHubMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('/api/user/unlink-github', 'POST');
+    },
+    onSuccess: () => {
+      toast({ 
+        title: "GitHub account disconnected",
+        description: "Your GitHub account has been successfully unlinked.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to unlink GitHub account", 
         description: error.message, 
         variant: "destructive" 
       });
@@ -304,6 +326,72 @@ export default function AccountSettings() {
           </CardContent>
         </Card>
       )}
+
+      {/* GitHub Connection */}
+      <Card data-testid="card-github-connection">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <SiGithub className="w-5 h-5" />
+            <span>GitHub Account</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {user?.githubId ? (
+            <div className="space-y-4">
+              <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-3">
+                    <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-medium text-green-800 dark:text-green-200">
+                        GitHub Connected
+                      </h4>
+                      <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                        Your GitHub account is linked: <strong>@{user.githubUsername}</strong>
+                      </p>
+                      {user.githubProfileUrl && (
+                        <a 
+                          href={user.githubProfileUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-sm text-green-600 dark:text-green-400 hover:underline mt-1 inline-block"
+                          data-testid="link-github-profile"
+                        >
+                          View GitHub Profile →
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <Button 
+                variant="outline"
+                onClick={() => unlinkGitHubMutation.mutate()}
+                disabled={unlinkGitHubMutation.isPending}
+                className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+                data-testid="button-disconnect-github"
+              >
+                <XCircle className="w-4 h-4 mr-2" />
+                {unlinkGitHubMutation.isPending ? "Disconnecting..." : "Disconnect GitHub"}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Link your GitHub account to enable additional features and streamline your authentication.
+              </p>
+              <Button 
+                onClick={() => window.location.href = '/api/auth/github'}
+                className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100"
+                data-testid="button-connect-github"
+              >
+                <SiGithub className="w-4 h-4 mr-2" />
+                Connect GitHub Account
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Danger Zone */}
       <Card className="border-red-200" data-testid="card-danger-zone">
