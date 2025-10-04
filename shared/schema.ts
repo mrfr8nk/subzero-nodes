@@ -5,6 +5,9 @@ import { ObjectId } from "mongodb";
 export interface User {
   _id: ObjectId;
   googleId?: string;
+  githubId?: string;
+  githubUsername?: string;
+  githubProfileUrl?: string;
   email: string;
   firstName?: string;
   lastName?: string;
