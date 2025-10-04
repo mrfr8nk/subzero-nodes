@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
-import { SiGoogle } from "react-icons/si";
+import { SiGoogle, SiGithub } from "react-icons/si";
 import { ArrowRight, CheckCircle, ArrowLeft, Mail, Eye, EyeOff, Lock, Bot } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
@@ -86,6 +86,10 @@ export default function Login() {
 
   const handleGoogleLogin = () => {
     window.location.href = "/api/auth/google";
+  };
+
+  const handleGitHubLogin = () => {
+    window.location.href = "/api/auth/github";
   };
 
   const onSubmit = async (data: LoginFormData) => {
@@ -382,6 +386,17 @@ export default function Login() {
             >
               <SiGoogle className="w-5 h-5 mr-3 text-red-500 group-hover:scale-110 transition-transform" />
               Continue with Google
+            </Button>
+
+            {/* GitHub Sign In */}
+            <Button
+              onClick={handleGitHubLogin}
+              size="lg"
+              className="w-full bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-2 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-slate-700 hover:border-gray-300 dark:hover:border-gray-500 h-12 rounded-xl font-semibold shadow-lg group"
+              data-testid="button-github-signin"
+            >
+              <SiGithub className="w-5 h-5 mr-3 text-gray-900 dark:text-white group-hover:scale-110 transition-transform" />
+              Continue with GitHub
             </Button>
 
             {/* Benefits */}

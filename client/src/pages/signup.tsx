@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
-import { SiGoogle } from "react-icons/si";
+import { SiGoogle, SiGithub } from "react-icons/si";
 import { Mail, Eye, EyeOff, UserPlus, ArrowLeft, Bot } from "lucide-react";
 import { getDeviceFingerprint } from "@/lib/deviceFingerprint";
 
@@ -62,6 +62,15 @@ export default function Signup() {
       window.location.href = `/api/auth/google?ref=${referralCode}`;
     } else {
       window.location.href = "/api/auth/google";
+    }
+  };
+
+  const handleGitHubLogin = () => {
+    // Include referral code in GitHub OAuth state if available
+    if (referralCode) {
+      window.location.href = `/api/auth/github?ref=${referralCode}`;
+    } else {
+      window.location.href = "/api/auth/github";
     }
   };
 
@@ -274,9 +283,21 @@ export default function Signup() {
                 onClick={handleGoogleLogin}
                 className="w-full bg-white dark:bg-slate-800 text-gray-900 dark:text-white border border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 h-12 text-base font-medium shadow-sm"
                 variant="outline"
+                data-testid="button-google-signup"
               >
                 <SiGoogle className="w-5 h-5 mr-3 text-red-500" />
                 Continue with Google
+              </Button>
+
+              {/* GitHub Sign Up Button */}
+              <Button
+                onClick={handleGitHubLogin}
+                className="w-full bg-white dark:bg-slate-800 text-gray-900 dark:text-white border border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 h-12 text-base font-medium shadow-sm"
+                variant="outline"
+                data-testid="button-github-signup"
+              >
+                <SiGithub className="w-5 h-5 mr-3 text-gray-900 dark:text-white" />
+                Continue with GitHub
               </Button>
 
               <div className="relative">
