@@ -1816,45 +1816,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use user's own GitHub credentials
       const GITHUB_TOKEN = user.githubAccessToken;
       const REPO_OWNER = user.githubUsername;
-      const REPO_NAME = 'subzero-md'; // User's forked repo
+      const REPO_NAME = 'subzero-md';
       const MAIN_BRANCH = 'main';
       const WORKFLOW_FILE = 'SUBZERO.yml';
 
-      // Validate GitHub repository access before proceeding
-      try {
-        const testUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
-        const testResponse = await fetch(testUrl, {
+      // Check if user has forked repository, if not create fork
+      const checkAndForkRepo = async () => {
+        const repoUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
+        const checkResponse = await fetch(repoUrl, {
           headers: {
             'Authorization': `token ${GITHUB_TOKEN}`,
             'Accept': 'application/vnd.github.v3+json'
           }
         });
-        
-        if (!testResponse.ok) {
-          console.error('GitHub repository validation failed:', {
-            url: testUrl,
-            status: testResponse.status,
-            statusText: testResponse.statusText
+
+        if (checkResponse.status === 404) {
+          // Repository doesn't exist, create fork
+          console.log(`Forking repository for user ${REPO_OWNER}...`);
+          const forkResponse = await fetch('https://api.github.com/repos/mrfrankofcc/subzero-md/forks', {
+            method: 'POST',
+            headers: {
+              'Authorization': `token ${GITHUB_TOKEN}`,
+              'Accept': 'application/vnd.github.v3+json',
+              'User-Agent': 'SUBZERO-Deploy'
+            }
           });
-          
-          if (testResponse.status === 404) {
-            return res.status(400).json({ 
-              message: 'GitHub repository not found. Please contact administrator to verify repository settings.' 
-            });
-          } else if (testResponse.status === 401) {
-            return res.status(400).json({ 
-              message: 'GitHub access denied. Please contact administrator to verify token permissions.' 
-            });
-          } else {
-            return res.status(400).json({ 
-              message: 'GitHub repository access failed. Please contact administrator.' 
-            });
+
+          if (!forkResponse.ok) {
+            const errorText = await forkResponse.text();
+            console.error('Fork creation failed:', errorText);
+            throw new Error('Failed to create fork. Please fork mrfrankofcc/subzero-md to your GitHub account manually.');
           }
+
+          // Update user's fork status
+          await storage.updateUserGitHubForkStatus(userId, `${REPO_OWNER}/subzero-md`, true);
+          
+          // Wait for fork to be ready
+          console.log('Fork created, waiting for GitHub to initialize...');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          return true;
+        } else if (checkResponse.ok) {
+          return false; // Already exists
+        } else if (checkResponse.status === 401) {
+          throw new Error('GitHub authentication failed. Please reconnect your GitHub account.');
+        } else {
+          throw new Error(`GitHub API error: ${checkResponse.statusText}`);
         }
+      };
+
+      try {
+        await checkAndForkRepo();
       } catch (error) {
-        console.error('GitHub repository validation error:', error);
-        return res.status(500).json({ 
-          message: 'Failed to validate GitHub repository access. Please try again later.' 
+        console.error('Repository check/fork error:', error);
+        return res.status(400).json({ 
+          message: error instanceof Error ? error.message : 'Failed to access GitHub repository. Please reconnect your GitHub account.'
         });
       }
 
