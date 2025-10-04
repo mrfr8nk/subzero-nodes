@@ -43,7 +43,10 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmailOrUsername(emailOrUsername: string): Promise<User | undefined>;
   getUserByGoogleId(googleId: string): Promise<User | undefined>;
+  getUserByGitHubId(githubId: string): Promise<User | undefined>;
   getUserByVerificationToken(token: string): Promise<User | undefined>;
+  linkGitHubAccount(userId: string, githubData: { githubId: string; githubUsername: string; githubProfileUrl: string }): Promise<void>;
+  unlinkGitHubAccount(userId: string): Promise<void>;
   getUserByResetToken(token: string): Promise<User | undefined>;
   createLocalUser(userData: any): Promise<any>;
   verifyUser(userId: string): Promise<void>;
@@ -365,6 +368,41 @@ export class MongoStorage implements IStorage {
     return user || undefined;
   }
 
+  async getUserByGitHubId(githubId: string): Promise<User | undefined> {
+    const user = await this.usersCollection.findOne({ githubId });
+    return user || undefined;
+  }
+
+  async linkGitHubAccount(userId: string, githubData: { githubId: string; githubUsername: string; githubProfileUrl: string }): Promise<void> {
+    await this.usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $set: { 
+          githubId: githubData.githubId,
+          githubUsername: githubData.githubUsername,
+          githubProfileUrl: githubData.githubProfileUrl,
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
+  async unlinkGitHubAccount(userId: string): Promise<void> {
+    await this.usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $unset: { 
+          githubId: "",
+          githubUsername: "",
+          githubProfileUrl: ""
+        },
+        $set: {
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
   async getUserByVerificationToken(token: string): Promise<User | undefined> {
     const user = await this.usersCollection.findOne({ verificationToken: token });
     return user || undefined;
@@ -492,10 +530,13 @@ export class MongoStorage implements IStorage {
   async upsertUser(userData: InsertUser, registrationIp?: string): Promise<User> {
     const now = new Date();
     
-    // Check if user exists by Google ID or email
+    // Check if user exists by Google ID, GitHub ID, or email
     let existingUser = null;
     if (userData.googleId) {
       existingUser = await this.getUserByGoogleId(userData.googleId);
+    }
+    if (!existingUser && userData.githubId) {
+      existingUser = await this.getUserByGitHubId(userData.githubId);
     }
     if (!existingUser && userData.email) {
       existingUser = await this.getUserByEmail(userData.email);
