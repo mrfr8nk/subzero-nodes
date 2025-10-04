@@ -5,7 +5,35 @@ A comprehensive deployment platform that enables users to deploy and manage appl
 
 ## Recent Changes (October 4, 2025)
 
-### GitHub Authentication Integration Completed
+### User-Based GitHub Deployment System Completed
+✅ **Personal GitHub Account Deployments**
+- Users can now deploy bots using their own GitHub accounts instead of admin-configured tokens
+- Automatic forking of mrfrankofcc/subzero-md repository to user's GitHub account
+- Auto-follow of mrfr8nk GitHub account when connecting
+- Deploys create branches in the user's forked repository with custom workflow files
+
+✅ **Enhanced GitHub OAuth Integration**
+- Updated GitHub OAuth to request `repo` and `user:follow` permissions
+- Access tokens securely stored for deployment operations
+- Automatic repository forking on first GitHub connection
+- Seamless fork detection to avoid duplicate forks
+
+✅ **New Deployment Endpoint**
+- Created `/api/deployments/user-github` endpoint for user-based deployments
+- Uses user's GitHub token instead of admin tokens
+- Automatically forks repository if not already forked
+- Creates deployment workflow with enhanced logging and auto-restart capabilities
+- Updates settings.js with user's bot configuration
+
+✅ **Improved Deployment UX**
+- Deployment modal now checks for GitHub connection status
+- Prominent alert with "Connect GitHub" button when not connected
+- Deploy button disabled until GitHub is connected
+- Clear error messages guiding users to connect GitHub first
+
+**Security Note**: GitHub access tokens are currently stored in the database. For production use, consider implementing token encryption at rest or using GitHub Apps with installation tokens for enhanced security.
+
+### Previous GitHub Authentication Integration Completed
 ✅ **GitHub OAuth Login and Signup**
 - Added GitHub authentication option alongside Google OAuth on login and signup pages
 - Users can now sign in or create accounts using their GitHub credentials
