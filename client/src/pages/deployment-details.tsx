@@ -7,7 +7,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, MessageSquare, CheckCircle, PauseCircle, Square, Play, Trash2, Settings, RefreshCw, AlertTriangle, Calendar, Coins } from "lucide-react";
+import { ArrowLeft, MessageSquare, CheckCircle, PauseCircle, Square, Play, Trash2, Settings, RefreshCw, AlertTriangle, Calendar, Coins, ExternalLink, Github } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import DeploymentVariablesModal from "@/components/deployment-variables-modal";
@@ -374,6 +374,7 @@ export default function DeploymentDetails() {
                 onClick={fetchLogs}
                 disabled={isLoadingLogs}
                 className="w-full"
+                data-testid="button-refresh-logs"
               >
                 {isLoadingLogs ? (
                   <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -383,11 +384,28 @@ export default function DeploymentDetails() {
                 Refresh Logs
               </Button>
               
+              {deployment.githubOwner && deployment.githubRepo && deployment.branchName && (
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    const workflowUrl = `https://github.com/${deployment.githubOwner}/${deployment.githubRepo}/actions?query=branch%3A${deployment.branchName}`;
+                    window.open(workflowUrl, '_blank');
+                  }}
+                  className="w-full"
+                  data-testid="button-view-workflow"
+                >
+                  <Github className="w-4 h-4 mr-2" />
+                  View Workflow Runs
+                  <ExternalLink className="w-3 h-3 ml-2" />
+                </Button>
+              )}
+              
               <Button 
                 variant="destructive"
                 onClick={handleDeleteDeployment}
                 disabled={deleteDeploymentMutation.isPending}
                 className="w-full"
+                data-testid="button-delete-deployment"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete Deployment
