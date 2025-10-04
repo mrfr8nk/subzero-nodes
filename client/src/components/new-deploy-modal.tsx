@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Rocket, RefreshCw, CheckCircle, AlertTriangle, Coins, Plus, GitBranch } from "lucide-react";
+import { Rocket, RefreshCw, CheckCircle, AlertTriangle, Coins, Plus, GitBranch, Github } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import CreateRepoModal from "./create-repo-modal";
@@ -84,12 +84,12 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
   // Deploy bot mutation
   const deployBotMutation = useMutation({
     mutationFn: async (data: { repositoryId: string; branchName: string; sessionId: string; ownerNumber: string; prefix: string }) => {
-      await apiRequest("/api/deployments/github", "POST", data);
+      await apiRequest("/api/deployments/user-github", "POST", data);
     },
     onSuccess: () => {
       toast({
         title: "Deployment Started!",
-        description: `Bot ${deploymentForm.branchName} is being deployed successfully.`,
+        description: `Bot ${deploymentForm.branchName} is being deployed successfully using your GitHub account.`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/deployments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
@@ -101,11 +101,17 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
       setSelectedRepository("");
       setBranchCheckResult(null);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
           description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+      } else if (error?.requiresGitHub) {
+        toast({
+          title: "GitHub Connection Required",
+          description: error.message || "Please connect your GitHub account first",
           variant: "destructive",
         });
       } else {
@@ -144,6 +150,28 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
           </DialogHeader>
           
           <div className="space-y-6">
+            {/* GitHub Connection Check */}
+            {(!user?.githubUsername || !user?.githubAccessToken) && (
+              <Alert className="bg-blue-50 border-blue-200">
+                <Github className="h-4 w-4 text-blue-600" />
+                <AlertDescription>
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-800">Connect your GitHub account to deploy bots using your own repository.</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.location.href = '/api/auth/github'}
+                      className="ml-4 border-blue-300 text-blue-700 hover:bg-blue-100"
+                      data-testid="button-connect-github"
+                    >
+                      <Github className="w-4 h-4 mr-2" />
+                      Connect GitHub
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Repository Selection */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -338,7 +366,9 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
                   !deploymentForm.ownerNumber?.trim() ||
                   !deploymentForm.prefix?.trim() ||
                   (user?.coinBalance || 0) < deploymentFee ||
-                  (branchCheckResult ? !branchCheckResult.available : false)
+                  (branchCheckResult ? !branchCheckResult.available : false) ||
+                  !user?.githubUsername ||
+                  !user?.githubAccessToken
                 }
                 className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700"
                 data-testid="button-deploy"
