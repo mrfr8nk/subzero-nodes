@@ -95,6 +95,15 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
           description: detailMessage,
           variant: "destructive",
         });
+      } else if (error.message.includes("GitHub account not connected")) {
+        toast({
+          title: "GitHub Connection Required",
+          description: "Please log in with your GitHub account to deploy. Redirecting...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/auth/github";
+        }, 2000);
       } else if (error.message.includes("GitHub settings not configured")) {
         toast({
           title: "Deployment Unavailable",

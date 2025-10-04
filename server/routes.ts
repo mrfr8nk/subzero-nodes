@@ -1574,36 +1574,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User deployment branch checking - MUST come before /api/deployments/:id
-  app.get('/api/deployments/check-branch', isAuthenticated, async (req, res) => {
+  app.get('/api/deployments/check-branch', isAuthenticated, async (req: any, res) => {
     try {
       const { branchName } = req.query;
-      const [githubToken, repoOwner, repoName] = await Promise.all([
-        storage.getAppSetting('github_token'),
-        storage.getAppSetting('github_repo_owner'),
-        storage.getAppSetting('github_repo_name')
-      ]);
+      const userId = req.user._id.toString();
+      const user = await storage.getUser(userId);
 
-      // Debug logging to see what we're getting
-      console.log('GitHub settings check:', {
-        token: githubToken ? 'EXISTS' : 'MISSING',
-        owner: repoOwner ? 'EXISTS' : 'MISSING',
-        repo: repoName ? 'EXISTS' : 'MISSING',
-        tokenValue: githubToken?.value ? 'SET' : 'NOT SET',
-        ownerValue: repoOwner?.value ? 'SET' : 'NOT SET',
-        repoValue: repoName?.value ? 'SET' : 'NOT SET'
-      });
-
-      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
+      // Check if user has connected their GitHub account
+      if (!user?.githubAccessToken || !user?.githubUsername) {
         return res.status(400).json({ 
-          message: 'GitHub integration not configured. Administrator needs to set up GitHub token and repository settings.',
-          details: 'Contact support to configure GitHub integration for deployment management.',
-          missingSettings: {
-            token: !githubToken?.value,
-            owner: !repoOwner?.value,  
-            repo: !repoName?.value
-          }
+          message: 'GitHub account not connected. Please log in with GitHub to check branch availability.',
+          requiresGitHubConnection: true
         });
       }
+
+      const githubToken = user.githubAccessToken;
+      const repoOwner = user.githubUsername;
+      const repoName = 'subzero-md';
 
       const generateBranchName = () => {
         const prefix = 'user-';
@@ -1648,11 +1635,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const nameToCheck = sanitizedName;
 
       // Check if branch exists using sanitized name
-      const url = `https://api.github.com/repos/${repoOwner.value}/${repoName.value}/git/ref/heads/${nameToCheck}`;
+      const url = `https://api.github.com/repos/${repoOwner}/${repoName}/git/ref/heads/${nameToCheck}`;
       try {
         const response = await fetch(url, {
           headers: {
-            'Authorization': `token ${githubToken.value}`,
+            'Authorization': `token ${githubToken}`,
             'Accept': 'application/vnd.github.v3+json'
           }
         });
@@ -1679,10 +1666,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Check which suggestions are available
             for (const suggestion of suggestions) {
               try {
-                const checkUrl = `https://api.github.com/repos/${repoOwner.value}/${repoName.value}/git/ref/heads/${suggestion}`;
+                const checkUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/git/ref/heads/${suggestion}`;
                 const checkResponse = await fetch(checkUrl, {
                   headers: {
-                    'Authorization': `token ${githubToken.value}`,
+                    'Authorization': `token ${githubToken}`,
                     'Accept': 'application/vnd.github.v3+json'
                   }
                 });
@@ -1781,7 +1768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // User GitHub deployment - uses admin GitHub settings
+  // User GitHub deployment - uses user's connected GitHub account
   app.post('/api/deployments/github', checkDeviceBan, isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user._id.toString();
@@ -1789,6 +1776,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!user) {
         return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check if user has connected their GitHub account
+      if (!user.githubAccessToken || !user.githubUsername) {
+        return res.status(400).json({ 
+          message: 'GitHub account not connected. Please log in with GitHub to deploy.',
+          requiresGitHubConnection: true
+        });
       }
 
       const { branchName, sessionId, ownerNumber, prefix } = req.body;
@@ -1818,18 +1813,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get deployment number for user
       const deploymentNumber = await storage.getNextDeploymentNumber(userId);
 
-      // Get the best available GitHub account
-      const githubAccount = await storage.getBestGitHubAccount();
-      
-      if (!githubAccount) {
-        return res.status(400).json({ message: 'No GitHub accounts configured by admin. Please contact administrator.' });
-      }
-
-      const GITHUB_TOKEN = githubAccount.token;
-      const REPO_OWNER = githubAccount.owner;
-      const REPO_NAME = githubAccount.repo;
+      // Use user's own GitHub credentials
+      const GITHUB_TOKEN = user.githubAccessToken;
+      const REPO_OWNER = user.githubUsername;
+      const REPO_NAME = 'subzero-md'; // User's forked repo
       const MAIN_BRANCH = 'main';
-      const WORKFLOW_FILE = githubAccount.workflowFile;
+      const WORKFLOW_FILE = 'SUBZERO.yml';
 
       // Validate GitHub repository access before proceeding
       try {
