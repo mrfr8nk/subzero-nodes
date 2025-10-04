@@ -4,6 +4,7 @@ import passport from "passport";
 import cors from "cors";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./googleAuth";
+import { setupGitHubAuth } from "./githubAuth";
 import { adminLogin, requireAdmin, requireSuperAdmin } from "./adminAuth";
 import { insertDeploymentSchema, insertTransactionSchema, insertAppSettingsSchema, insertCoinTransferSchema, insertBannedUserSchema, insertVoucherCodeSchema } from "@shared/schema";
 import { sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail } from "./emailService";
@@ -331,6 +332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Auth middleware
   await setupAuth(app);
+  await setupGitHubAuth(app);
 
   // Maintenance mode middleware - check before all routes except maintenance and admin
   const maintenanceMiddleware = async (req: any, res: any, next: any) => {
@@ -822,6 +824,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Current password is incorrect' });
       }
       res.status(500).json({ message: 'Failed to change password' });
+    }
+  });
+
+  // Link GitHub account
+  app.post('/api/user/link-github', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const { githubId, githubUsername, githubProfileUrl } = req.body;
+
+      if (!githubId || !githubUsername) {
+        return res.status(400).json({ message: 'GitHub ID and username are required' });
+      }
+
+      // Check if GitHub account is already linked to another user
+      const existingUser = await storage.getUserByGitHubId(githubId);
+      if (existingUser && existingUser._id.toString() !== userId) {
+        return res.status(400).json({ message: 'This GitHub account is already linked to another user' });
+      }
+
+      await storage.linkGitHubAccount(userId, { githubId, githubUsername, githubProfileUrl });
+      res.json({ message: 'GitHub account linked successfully' });
+    } catch (error) {
+      console.error('Error linking GitHub account:', error);
+      res.status(500).json({ message: 'Failed to link GitHub account' });
+    }
+  });
+
+  // Unlink GitHub account
+  app.post('/api/user/unlink-github', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      await storage.unlinkGitHubAccount(userId);
+      res.json({ message: 'GitHub account unlinked successfully' });
+    } catch (error) {
+      console.error('Error unlinking GitHub account:', error);
+      res.status(500).json({ message: 'Failed to unlink GitHub account' });
     }
   });
 
