@@ -863,6 +863,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get user's repositories
+  app.get('/api/github/repositories', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const repositories = await storage.getUserRepositories(userId);
+      
+      // Remove sensitive token field before sending to client
+      const sanitizedRepositories = repositories.map(repo => ({
+        _id: repo._id,
+        userId: repo.userId,
+        name: repo.name,
+        githubUsername: repo.githubUsername,
+        repositoryName: repo.repositoryName,
+        workflowName: repo.workflowName,
+        branches: repo.branches,
+        createdAt: repo.createdAt,
+        updatedAt: repo.updatedAt
+      }));
+      
+      res.json(sanitizedRepositories);
+    } catch (error) {
+      console.error('Error fetching repositories:', error);
+      res.status(500).json({ message: 'Failed to fetch repositories' });
+    }
+  });
+
+  // Create a new repository
+  app.post('/api/github/repositories', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const { name, githubUsername, repositoryName, token, workflowName } = req.body;
+
+      if (!name || !githubUsername || !repositoryName || !token || !workflowName) {
+        return res.status(400).json({ message: 'All fields are required' });
+      }
+
+      const repository = await storage.createRepository({
+        userId,
+        name,
+        githubUsername,
+        repositoryName,
+        token,
+        workflowName,
+        branches: []
+      });
+
+      // Remove sensitive token field before sending to client
+      const sanitizedRepository = {
+        _id: repository._id,
+        userId: repository.userId,
+        name: repository.name,
+        githubUsername: repository.githubUsername,
+        repositoryName: repository.repositoryName,
+        workflowName: repository.workflowName,
+        branches: repository.branches,
+        createdAt: repository.createdAt,
+        updatedAt: repository.updatedAt
+      };
+
+      res.json(sanitizedRepository);
+    } catch (error) {
+      console.error('Error creating repository:', error);
+      res.status(500).json({ message: 'Failed to create repository' });
+    }
+  });
+
   // Check username availability route
   app.post('/api/auth/check-username', async (req, res) => {
     try {
@@ -2110,12 +2176,25 @@ jobs:
         });
       }
 
-      const { branchName, sessionId, ownerNumber, prefix } = req.body;
-      console.log('Deployment request:', { branchName, sessionId, ownerNumber, prefix });
+      const { repositoryId, branchName, sessionId, ownerNumber, prefix } = req.body;
+      console.log('Deployment request:', { repositoryId, branchName, sessionId, ownerNumber, prefix });
       
-      if (!branchName || !sessionId || !ownerNumber || !prefix) {
+      if (!repositoryId || !branchName || !sessionId || !ownerNumber || !prefix) {
         console.error('Missing required fields');
         return res.status(400).json({ message: 'All fields are required' });
+      }
+
+      // Get repository from database
+      const repository = await storage.getRepository(repositoryId);
+      if (!repository) {
+        console.error('Repository not found:', repositoryId);
+        return res.status(404).json({ message: 'Repository not found' });
+      }
+
+      // Verify repository belongs to user
+      if (repository.userId.toString() !== userId) {
+        console.error('Repository does not belong to user');
+        return res.status(403).json({ message: 'Access denied to this repository' });
       }
 
       // Get deployment cost setting
@@ -2136,11 +2215,11 @@ jobs:
 
       const deploymentNumber = await storage.getNextDeploymentNumber(userId);
       
-      const USER_GITHUB_TOKEN = user.githubAccessToken;
-      const USER_GITHUB_USERNAME = user.githubUsername;
-      const FORKED_REPO_NAME = 'subzero-md';
+      const USER_GITHUB_TOKEN = repository.token;
+      const USER_GITHUB_USERNAME = repository.githubUsername;
+      const FORKED_REPO_NAME = repository.repositoryName;
       const MAIN_BRANCH = 'main';
-      const WORKFLOW_FILE = 'deploy.yml';
+      const WORKFLOW_FILE = repository.workflowName;
 
       // Sanitize branch name
       const sanitizeBranchName = (name: string) => {
@@ -2438,6 +2517,12 @@ jobs:
         });
 
         const deployment = await storage.createDeployment(deploymentData);
+
+        // Update repository's branches array
+        const currentBranches = repository.branches || [];
+        if (!currentBranches.includes(sanitizedBranchName)) {
+          await storage.updateRepositoryBranches(repositoryId, [...currentBranches, sanitizedBranchName]);
+        }
 
         res.json({ 
           success: true, 

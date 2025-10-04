@@ -17,6 +17,7 @@ import {
   UserMessageRead,
   DeviceRestriction,
   VoucherCode,
+  Repository,
   InsertUser,
   InsertDeployment,
   InsertTransaction,
@@ -31,6 +32,7 @@ import {
   InsertLoginHistory,
   InsertDeveloperInfo,
   InsertVoucherCode,
+  InsertRepository,
 } from "@shared/schema";
 import { getDb } from "./db";
 import { ObjectId } from "mongodb";
@@ -199,6 +201,13 @@ export interface IStorage {
   setGitHubAccountActive(id: string, active: boolean): Promise<void>;
   testGitHubAccountToken(id: string): Promise<{ isValid: boolean; error?: string; rateLimitRemaining?: number }>;
   
+  // Repository operations
+  createRepository(repository: InsertRepository): Promise<Repository>;
+  getUserRepositories(userId: string): Promise<Repository[]>;
+  getRepository(id: string): Promise<Repository | undefined>;
+  updateRepositoryBranches(id: string, branches: string[]): Promise<void>;
+  deleteRepository(id: string): Promise<void>;
+  
   // User password change operations
   changeUserPassword(userId: string, currentPassword: string, newPassword: string): Promise<void>;
   
@@ -327,6 +336,10 @@ export class MongoStorage implements IStorage {
 
   private get voucherCodesCollection() {
     return getDb().collection<VoucherCode>("voucherCodes");
+  }
+
+  private get repositoriesCollection() {
+    return getDb().collection<Repository>("repositories");
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -1692,6 +1705,59 @@ export class MongoStorage implements IStorage {
         error: `Network error: ${error instanceof Error ? error.message : 'Unknown error'}` 
       };
     }
+  }
+
+  async createRepository(repository: InsertRepository): Promise<Repository> {
+    const newRepository = {
+      _id: new ObjectId(),
+      userId: new ObjectId(repository.userId),
+      name: repository.name,
+      githubUsername: repository.githubUsername,
+      repositoryName: repository.repositoryName,
+      token: repository.token,
+      workflowName: repository.workflowName,
+      branches: repository.branches || [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await this.repositoriesCollection.insertOne(newRepository);
+    return newRepository;
+  }
+
+  async getUserRepositories(userId: string): Promise<Repository[]> {
+    const repositories = await this.repositoriesCollection
+      .find({ userId: new ObjectId(userId) })
+      .sort({ createdAt: -1 })
+      .toArray();
+    return repositories;
+  }
+
+  async getRepository(id: string): Promise<Repository | undefined> {
+    try {
+      if (!id || typeof id !== 'string' || id.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(id)) {
+        return undefined;
+      }
+      const repository = await this.repositoriesCollection.findOne({ _id: new ObjectId(id) });
+      return repository || undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  async updateRepositoryBranches(id: string, branches: string[]): Promise<void> {
+    await this.repositoriesCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { 
+        $set: { 
+          branches,
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
+  async deleteRepository(id: string): Promise<void> {
+    await this.repositoriesCollection.deleteOne({ _id: new ObjectId(id) });
   }
 
   async changeUserPassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {

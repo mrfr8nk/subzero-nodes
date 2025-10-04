@@ -6,10 +6,11 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Plus, CheckCircle, PauseCircle, Calendar, AlertTriangle, ArrowRight, Square } from "lucide-react";
+import { MessageSquare, Plus, CheckCircle, PauseCircle, Calendar, AlertTriangle, ArrowRight, Square, Eye } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import DeployModal from "@/components/deploy-modal";
+import DeploymentLogsModal from "@/components/deployment-logs-modal";
 import CountdownTimer from "@/components/countdown-timer";
 
 export default function Deployments() {
@@ -17,6 +18,7 @@ export default function Deployments() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [showDeployModal, setShowDeployModal] = useState(false);
+  const [selectedDeploymentId, setSelectedDeploymentId] = useState<string | null>(null);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -239,10 +241,20 @@ export default function Deployments() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex justify-end">
+                  <div className="flex gap-2 justify-end">
+                    <Button 
+                      onClick={() => setSelectedDeploymentId(deployment._id)}
+                      variant="outline"
+                      className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                      data-testid={`button-view-workflow-${deployment._id}`}
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      View Workflow
+                    </Button>
                     <Button 
                       onClick={() => setLocation(`/deployments/${deployment._id}`)}
                       className="bg-blue-600 hover:bg-blue-700"
+                      data-testid={`button-manage-${deployment._id}`}
                     >
                       Manage Bot
                       <ArrowRight className="w-4 h-4 ml-2" />
@@ -262,6 +274,13 @@ export default function Deployments() {
       <DeployModal 
         isOpen={showDeployModal}
         onClose={() => setShowDeployModal(false)}
+      />
+      
+      <DeploymentLogsModal
+        isOpen={!!selectedDeploymentId}
+        onClose={() => setSelectedDeploymentId(null)}
+        deploymentId={selectedDeploymentId || ""}
+        deploymentName={deployments?.find(d => d._id === selectedDeploymentId)?.name || ""}
       />
     </div>
   );

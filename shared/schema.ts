@@ -277,6 +277,19 @@ export interface GitHubAccount {
   updatedAt: Date;
 }
 
+export interface Repository {
+  _id: ObjectId;
+  userId: ObjectId;
+  name: string; // Friendly name for the repository
+  githubUsername: string; // GitHub username/organization
+  repositoryName: string; // Repository name on GitHub
+  token: string; // GitHub personal access token
+  workflowName: string; // Workflow file name (e.g., 'deploy.yml')
+  branches?: string[]; // Array of deployed branch names
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface CoinTransfer {
   _id: ObjectId;
   fromUserId: ObjectId;
@@ -470,6 +483,16 @@ export const insertVoucherCodeSchema = z.object({
   maxUsage: z.number().positive().optional().default(1),
 });
 
+export const insertRepositorySchema = z.object({
+  userId: z.string(),
+  name: z.string().min(1),
+  githubUsername: z.string().min(1),
+  repositoryName: z.string().min(1),
+  token: z.string().min(1),
+  workflowName: z.string().min(1),
+  branches: z.string().array().optional().default([]),
+});
+
 export const insertReferralSchema = z.object({
   referrerId: z.string(),
   referredId: z.string(),
@@ -557,6 +580,7 @@ export type InsertBannedDeviceFingerprint = z.infer<typeof insertBannedDeviceFin
 export type InsertCoinTransfer = z.infer<typeof insertCoinTransferSchema>;
 export type InsertBannedUser = z.infer<typeof insertBannedUserSchema>;
 export type InsertVoucherCode = z.infer<typeof insertVoucherCodeSchema>;
+export type InsertRepository = z.infer<typeof insertRepositorySchema>;
 export type InsertLoginHistory = z.infer<typeof insertLoginHistorySchema>;
 export type InsertDeveloperInfo = z.infer<typeof insertDeveloperInfoSchema>;
 export type InsertUserMessageRead = z.infer<typeof insertUserMessageReadSchema>;
