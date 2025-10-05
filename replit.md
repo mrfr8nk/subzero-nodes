@@ -5,6 +5,15 @@ A comprehensive deployment platform that enables users to deploy and manage appl
 
 ## Recent Changes (October 5, 2025)
 
+### GitHub Workflow Permission Fix
+✅ **Added 'workflow' Scope to GitHub OAuth**
+- Fixed 403 Forbidden error when creating/updating workflow files in user repositories
+- Added 'workflow' scope to GitHub OAuth permissions (user:email, repo, user:follow, workflow)
+- Updated both passport strategy configuration and authentication route
+- Changed default workflow file from 'SUBZERO.yml' to 'deploy.yml' throughout the codebase
+- Users who already connected GitHub need to disconnect and reconnect to get new permissions
+- New users will automatically receive all required permissions
+
 ### Critical Workflow File Fix
 ✅ **Fixed 404 Error on Workflow File Update**
 - Fixed deployment failing with 404 error when updating workflow file
