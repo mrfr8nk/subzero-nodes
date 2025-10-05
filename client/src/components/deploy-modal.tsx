@@ -7,15 +7,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Rocket, RefreshCw, CheckCircle, AlertTriangle, Bot, Settings, Coins, ExternalLink } from "lucide-react";
+import { Rocket, RefreshCw, CheckCircle, AlertTriangle, Bot, Settings, Coins, ExternalLink, Github, XCircle, GitFork } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface DeployModalProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+interface GitHubStatus {
+  connected: boolean;
+  username: string | null;
+  hasValidToken: boolean;
+  hasFork: boolean;
+  forkUrl: string | null;
+  error: string | null;
 }
 
 export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
@@ -34,6 +43,13 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
     sanitized?: string;
   } | null>(null);
   const [isCheckingBranch, setIsCheckingBranch] = useState(false);
+
+  // Fetch GitHub connection status
+  const { data: githubStatus, isLoading: isLoadingGitHubStatus, refetch: refetchGitHubStatus } = useQuery<GitHubStatus>({
+    queryKey: ["/api/github/connection-status"],
+    enabled: isOpen,
+    retry: false,
+  });
 
   // Fetch deployment costs from database
   const { data: deploymentFeeConfig } = useQuery<{deploymentFee: number}>({
@@ -197,19 +213,170 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
     }
   };
 
+  const isDeploymentDisabled = () => {
+    if (!githubStatus) return true;
+    if (!githubStatus.connected) return true;
+    if (!githubStatus.hasValidToken) return true;
+    if (githubDeployMutation.isPending) return true;
+    if (!githubForm.branchName.trim() || !githubForm.sessionId.trim() || !githubForm.ownerNumber.trim()) return true;
+    if (branchCheckResult !== null && !branchCheckResult.available) return true;
+    if ((user?.coinBalance || 0) < deploymentFee) return true;
+    return false;
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader className="text-center">
-          <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Rocket className="w-8 h-8 text-blue-600" />
+          <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Rocket className="w-8 h-8 text-blue-600 dark:text-blue-400" />
           </div>
           <DialogTitle className="text-2xl font-bold">Deploy New Bot</DialogTitle>
-          <p className="text-gray-600">Deploy a new SUBZERO-MD WhatsApp bot</p>
+          <p className="text-gray-600 dark:text-gray-400">Deploy a new SUBZERO-MD WhatsApp bot</p>
         </DialogHeader>
 
-        <div className="mt-6 max-h-[60vh] overflow-y-auto pr-2">
-          <form onSubmit={handleGithubSubmit} className="space-y-8">
+        <div className="mt-6 space-y-6">
+          {/* GitHub Connection Status Card */}
+          <Card className="border-2" data-testid="card-github-status">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center">
+                  <Github className="w-6 h-6 mr-3 text-gray-700 dark:text-gray-300" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">GitHub Connection Status</h3>
+                </div>
+                <Button
+                  onClick={() => refetchGitHubStatus()}
+                  variant="outline"
+                  size="sm"
+                  disabled={isLoadingGitHubStatus}
+                  data-testid="button-refresh-github-status"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingGitHubStatus ? 'animate-spin' : ''}`} />
+                  Check Status
+                </Button>
+              </div>
+
+              {isLoadingGitHubStatus ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+                  <span className="ml-2 text-gray-600 dark:text-gray-400">Checking GitHub status...</span>
+                </div>
+              ) : githubStatus ? (
+                <div className="space-y-3">
+                  {/* Connection Status */}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg" data-testid="status-github-connection">
+                    <div className="flex items-center">
+                      <div className={`w-2 h-2 rounded-full mr-3 ${githubStatus.connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">GitHub Account</span>
+                    </div>
+                    <div className="flex items-center">
+                      {githubStatus.connected ? (
+                        <>
+                          <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
+                          <span className="text-green-700 dark:text-green-300">Connected as {githubStatus.username}</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 mr-2" />
+                          <Button
+                            variant="link"
+                            size="sm"
+                            onClick={() => window.location.href = "/api/auth/github"}
+                            className="text-blue-600 dark:text-blue-400"
+                            data-testid="button-connect-github"
+                          >
+                            Connect GitHub
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Token Status */}
+                  {githubStatus.connected && (
+                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg" data-testid="status-github-token">
+                      <div className="flex items-center">
+                        <div className={`w-2 h-2 rounded-full mr-3 ${githubStatus.hasValidToken ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">API Token</span>
+                      </div>
+                      <div className="flex items-center">
+                        {githubStatus.hasValidToken ? (
+                          <>
+                            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
+                            <span className="text-green-700 dark:text-green-300">Valid & Active</span>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 mr-2" />
+                            <Button
+                              variant="link"
+                              size="sm"
+                              onClick={() => window.location.href = "/api/auth/github"}
+                              className="text-blue-600 dark:text-blue-400"
+                              data-testid="button-reconnect-github"
+                            >
+                              Reconnect
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fork Status */}
+                  {githubStatus.connected && githubStatus.hasValidToken && (
+                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg" data-testid="status-github-fork">
+                      <div className="flex items-center">
+                        <div className={`w-2 h-2 rounded-full mr-3 ${githubStatus.hasFork ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">Repository Fork</span>
+                      </div>
+                      <div className="flex items-center">
+                        {githubStatus.hasFork ? (
+                          <>
+                            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
+                            <a 
+                              href={githubStatus.forkUrl || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 dark:text-blue-400 hover:underline flex items-center"
+                              data-testid="link-view-fork"
+                            >
+                              View Fork <ExternalLink className="w-3 h-3 ml-1" />
+                            </a>
+                          </>
+                        ) : (
+                          <>
+                            <GitFork className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-2" />
+                            <span className="text-yellow-700 dark:text-yellow-300">Will be created on first deploy</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error Message */}
+                  {githubStatus.error && (
+                    <Alert variant="destructive" data-testid="alert-github-error">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>{githubStatus.error}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Success Message */}
+                  {githubStatus.connected && githubStatus.hasValidToken && (
+                    <Alert className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800" data-testid="alert-github-ready">
+                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      <AlertDescription className="text-green-700 dark:text-green-300">
+                        GitHub is connected and ready for deployment!
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <form onSubmit={handleGithubSubmit} className="space-y-6">
           {/* Template Selection */}
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 p-6 rounded-xl border border-blue-200 dark:border-blue-800">
             <div className="flex items-center mb-4">
@@ -264,6 +431,7 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
                   setTimeout(() => checkBranchAvailability(e.target.value), 500);
                 }}
                 disabled={githubDeployMutation.isPending}
+                data-testid="input-bot-name"
               />
               <Button
                 type="button"
@@ -271,12 +439,13 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
                 onClick={() => checkBranchAvailability(githubForm.branchName)}
                 disabled={isCheckingBranch || !githubForm.branchName.trim() || githubDeployMutation.isPending}
                 className="px-3"
+                data-testid="button-check-availability"
               >
                 {isCheckingBranch ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Check"}
               </Button>
             </div>
             {branchCheckResult && (
-              <Alert variant={branchCheckResult.available ? "default" : "destructive"} className="mt-2">
+              <Alert variant={branchCheckResult.available ? "default" : "destructive"} className="mt-2" data-testid="alert-branch-check">
                 <div className="flex items-center">
                   {branchCheckResult.available ? (
                     <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
@@ -295,6 +464,7 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
                             setGithubForm(prev => ({ ...prev, branchName: branchCheckResult.suggested || '' }));
                             setBranchCheckResult({ ...branchCheckResult, available: true, message: 'Name available!' });
                           }}
+                          data-testid="button-use-suggested"
                         >
                           Use "{branchCheckResult.suggested}"
                         </Button>
@@ -311,7 +481,7 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
                   <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900 rounded-full flex items-center justify-center mr-3 mt-0.5">
                     <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <Label htmlFor="session-id" className="text-base font-medium text-gray-900 dark:text-gray-100">WhatsApp Session ID</Label>
                     <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">Required for bot authentication with WhatsApp</p>
                     <Input
@@ -322,6 +492,7 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
                       onChange={(e) => setGithubForm(prev => ({ ...prev, sessionId: e.target.value }))}
                       className="mb-2"
                       disabled={githubDeployMutation.isPending}
+                      data-testid="input-session-id"
                     />
                     <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                       <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
@@ -335,6 +506,7 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="inline-flex items-center text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline text-sm font-medium"
+                        data-testid="link-session-pairing"
                       >
                         subzero-auth.koyeb.app
                         <ExternalLink className="w-3 h-3 ml-1" />
@@ -355,6 +527,7 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
                     value={githubForm.ownerNumber}
                     onChange={(e) => setGithubForm(prev => ({ ...prev, ownerNumber: e.target.value }))}
                     disabled={githubDeployMutation.isPending}
+                    data-testid="input-owner-number"
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Include country code (e.g., +1 for US)</p>
                 </div>
@@ -369,6 +542,7 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
                     value={githubForm.prefix}
                     onChange={(e) => setGithubForm(prev => ({ ...prev, prefix: e.target.value }))}
                     disabled={githubDeployMutation.isPending}
+                    data-testid="input-prefix"
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Default: "." (dot)</p>
                 </div>
@@ -376,7 +550,7 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
             </div>
           </div>
 
-          {/* Pricing Information - Enhanced Design */}
+          {/* Pricing Information */}
           <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950 dark:via-indigo-950 dark:to-purple-950 p-6 rounded-2xl border border-blue-200 dark:border-blue-800 shadow-sm">
             <div className="flex items-center mb-6">
               <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center mr-4 shadow-md">
@@ -402,7 +576,7 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">{deploymentFee}</p>
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-deployment-fee">{deploymentFee}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">coins</p>
                   </div>
                 </div>
@@ -421,7 +595,7 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{dailyCharge}</p>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400" data-testid="text-daily-charge">{dailyCharge}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">coins/day</p>
                   </div>
                 </div>
@@ -456,7 +630,7 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
                       (user?.coinBalance || 0) >= deploymentFee 
                         ? 'text-green-600 dark:text-green-400' 
                         : 'text-red-600 dark:text-red-400'
-                    }`}>
+                    }`} data-testid="text-coin-balance">
                       {user?.coinBalance || 0}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">coins</p>
@@ -495,25 +669,30 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
               variant="outline"
               className="flex-1"
               disabled={githubDeployMutation.isPending}
+              data-testid="button-cancel"
             >
               Cancel
             </Button>
             <Button 
               type="submit"
               className="flex-1 bg-blue-600 hover:bg-blue-700"
-              disabled={
-                githubDeployMutation.isPending || 
-                !githubForm.branchName.trim() || 
-                !githubForm.sessionId.trim() || 
-                !githubForm.ownerNumber.trim() ||
-                (branchCheckResult !== null && !branchCheckResult.available) ||
-                (user?.coinBalance || 0) < deploymentFee
-              }
+              disabled={isDeploymentDisabled()}
+              data-testid="button-deploy"
             >
-              {githubDeployMutation.isPending ? "Deploying..." : "Deploy Bot"}
+              {githubDeployMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Deploying...
+                </>
+              ) : (
+                <>
+                  <Rocket className="w-4 h-4 mr-2" />
+                  Deploy Bot
+                </>
+              )}
             </Button>
           </div>
-        </form>
+          </form>
         </div>
       </DialogContent>
     </Dialog>
