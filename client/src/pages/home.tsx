@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,9 +10,9 @@ export default function Home() {
   useEffect(() => {
     // Redirect authenticated users to dashboard immediately
     if (user && !isLoading) {
-      window.location.href = "/dashboard";
+      setLocation("/dashboard");
     }
-  }, [user, isLoading]);
+  }, [user, isLoading, setLocation]);
 
   // Show loading while checking authentication
   if (isLoading) {
@@ -22,7 +23,7 @@ export default function Home() {
     );
   }
 
-  // Show loading during redirect
+  // If authenticated, show loading during redirect
   if (user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -34,5 +35,7 @@ export default function Home() {
     );
   }
 
+  // If not authenticated, redirect to landing page
+  setLocation("/landing");
   return null;
 }
