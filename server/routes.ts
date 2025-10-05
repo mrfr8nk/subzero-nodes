@@ -1561,6 +1561,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check GitHub connection and fork status
+  app.get('/api/github/connection-status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const status = {
+        connected: false,
+        username: null as string | null,
+        hasValidToken: false,
+        hasFork: false,
+        forkUrl: null as string | null,
+        error: null as string | null
+      };
+
+      // Check if GitHub is connected
+      if (!user.githubAccessToken || !user.githubUsername) {
+        return res.json(status);
+      }
+
+      status.connected = true;
+      status.username = user.githubUsername;
+
+      // Test token validity by making a simple API call
+      try {
+        const userResponse = await fetch('https://api.github.com/user', {
+          headers: {
+            'Authorization': `token ${user.githubAccessToken}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        });
+
+        if (userResponse.ok) {
+          status.hasValidToken = true;
+
+          // Check if user has forked the repo
+          const repoResponse = await fetch(`https://api.github.com/repos/${user.githubUsername}/subzero-md`, {
+            headers: {
+              'Authorization': `token ${user.githubAccessToken}`,
+              'Accept': 'application/vnd.github.v3+json'
+            }
+          });
+
+          if (repoResponse.ok) {
+            status.hasFork = true;
+            status.forkUrl = `https://github.com/${user.githubUsername}/subzero-md`;
+          }
+        } else if (userResponse.status === 401) {
+          status.error = 'GitHub token is invalid or expired. Please reconnect your GitHub account.';
+        } else {
+          status.error = `GitHub API error: ${userResponse.statusText}`;
+        }
+      } catch (error) {
+        status.error = error instanceof Error ? error.message : 'Failed to verify GitHub connection';
+      }
+
+      res.json(status);
+    } catch (error) {
+      console.error("Error checking GitHub status:", error);
+      res.status(500).json({ message: "Failed to check GitHub status" });
+    }
+  });
+
   // Deployments
   app.get('/api/deployments', isAuthenticated, async (req: any, res) => {
     try {
