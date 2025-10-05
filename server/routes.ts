@@ -2019,7 +2019,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Create/update workflow file with the new workflow content
         console.log('Creating/updating workflow file...');
-        const workflowContent = `name: SUBZERO-MD-DEPLOY
+    
+
+   /* const workflowContent = `name: SUBZERO-MD-DEPLOY
 on:
   workflow_dispatch:
 jobs:
@@ -2130,6 +2132,44 @@ jobs:
             https://api.github.com/repos/\\$\{{ github.repository }}/actions/workflows/${WORKFLOW_FILE}/dispatches \\\\
             -d '{"ref":"${sanitizedBranchName}"}'
           echo "Restart triggered successfully"`;
+          
+          */
+          
+    const workflowContent = `name: SUBZERO-MD-DEPLOY
+
+on:
+  workflow_dispatch:
+
+jobs:
+  loop-task:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Bot (loop & auto-restart if crash)
+        run: |
+          echo "Running SUBZERO-MD in auto-restart mode..."
+          timeout 18000 bash -c 'while true; do npm start || echo "Bot crashed, restarting..."; sleep 2; done'
+
+      - name: Re-Trigger Workflow
+        if: always()
+        run: |
+          echo "Re-running workflow..."
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/deploy.yml/dispatches \
+          -d '{"ref":"${sanitizedBranchName}"}'`;
 
         try {
           // First check if file exists on the deployment branch
@@ -2893,7 +2933,7 @@ jobs:
         repoOwner: repoOwner?.value || '',
         repoName: repoName?.value || '',
         mainBranch: mainBranch?.value || 'main',
-        workflowFile: workflowFile?.value || 'SUBZERO.yml'
+        workflowFile: workflowFile?.value || 'deploy.yml'
       });
     } catch (error) {
       console.error('Error fetching GitHub settings:', error);
@@ -2912,7 +2952,7 @@ jobs:
         { key: 'github_repo_owner', value: repoOwner, description: 'GitHub repository owner/organization' },
         { key: 'github_repo_name', value: repoName, description: 'GitHub repository name' },
         { key: 'github_main_branch', value: mainBranch || 'main', description: 'Main branch name' },
-        { key: 'github_workflow_file', value: workflowFile || 'SUBZERO.yml', description: 'GitHub Actions workflow file name' }
+        { key: 'github_workflow_file', value: workflowFile || 'deploy.yml', description: 'GitHub Actions workflow file name' }
       ];
 
       for (const setting of settings) {
@@ -2972,7 +3012,7 @@ jobs:
         token,
         owner,
         repo,
-        workflowFile: workflowFile || 'SUBZERO.yml'
+        workflowFile: workflowFile || 'deploy.yml'
       });
 
       res.json(account);
@@ -3049,7 +3089,7 @@ jobs:
       const GITHUB_TOKEN = githubToken.value;
       const REPO_OWNER = repoOwner.value;
       const REPO_NAME = repoName.value;
-      const WORKFLOW_FILE = workflowFile?.value || 'SUBZERO.yml';
+      const WORKFLOW_FILE = workflowFile?.value || 'deploy.yml';
 
       // Get workflow runs for the specific branch
       const runsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/runs?branch=${deployment.branchName}&per_page=10`;
@@ -3294,7 +3334,7 @@ jobs:
       const GITHUB_TOKEN = githubToken.value;
       const REPO_OWNER = repoOwner.value;
       const REPO_NAME = repoName.value;
-      const WORKFLOW_FILE = workflowFile?.value || 'SUBZERO.yml';
+      const WORKFLOW_FILE = workflowFile?.value || 'deploy.yml';
 
       // Get workflow runs for the specific branch
       const runsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/runs?branch=${deployment.branchName}&per_page=10`;
@@ -3414,7 +3454,7 @@ jobs:
         return res.status(400).json({ message: 'GitHub settings not configured' });
       }
 
-      const WORKFLOW_FILE = workflowFile?.value || 'main.yml';
+      const WORKFLOW_FILE = workflowFile?.value || 'deploy.yml';
       const response = await fetch(`https://api.github.com/repos/${repoOwner.value}/${repoName.value}/actions/workflows/${WORKFLOW_FILE}/runs?per_page=20`, {
         headers: {
           'Authorization': `token ${githubToken.value}`,
