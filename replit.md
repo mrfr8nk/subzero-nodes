@@ -5,6 +5,13 @@ A comprehensive deployment platform that enables users to deploy and manage appl
 
 ## Recent Changes (October 5, 2025)
 
+### Critical Workflow File Fix
+✅ **Fixed 404 Error on Workflow File Update**
+- Fixed deployment failing with 404 error when updating workflow file
+- Changed WORKFLOW_FILE constant from 'SUBZERO.yml' to 'deploy.yml' to match actual repository workflow filename
+- Deployment now correctly updates `.github/workflows/deploy.yml` on deployment branch
+- Workflow automatically triggers after successful file update
+
 ### Enhanced Deployment Form with GitHub Status Checker
 ✅ **GitHub Connection Status Verification**
 - Added `/api/github/connection-status` endpoint that verifies GitHub connection, token validity, and fork status
