@@ -119,17 +119,17 @@ export default function Landing() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-600 text-white overflow-hidden">
-        <div className="absolute inset-0 bg-black opacity-10"></div>
+      <section className="relative bg-gradient-to-br from-purple-700 via-blue-700 to-cyan-700 text-white overflow-hidden">
+        <div className="absolute inset-0 bg-black opacity-20"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 lg:py-32">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             <div>
-              <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold mb-6 leading-tight">
+              <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold mb-6 leading-tight drop-shadow-lg">
                 Deploy
-                <span className="text-cyan-200 block bg-gradient-to-r from-cyan-200 to-purple-200 bg-clip-text text-transparent">SUBZERO-MD</span>
+                <span className="text-white block drop-shadow-lg">SUBZERO-MD</span>
                 Instantly
               </h1>
-              <p className="text-lg sm:text-xl text-white/90 mb-8 leading-relaxed">
+              <p className="text-lg sm:text-xl text-white mb-8 leading-relaxed drop-shadow-md">
                 The ultimate SUBZERO-MD deployment platform. Built exclusively for SUBZERO-MD bots with 
                 specialized infrastructure, instant deployment, and dedicated support.
               </p>
@@ -168,8 +168,8 @@ export default function Landing() {
       <section className="py-16 bg-white dark:bg-slate-900 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mb-4">TRUSTED BY ENGINEERING TEAMS</p>
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-8">Powering SUBZERO-MD deployments for technical teams worldwide</h3>
+            <p className="text-sm text-gray-700 dark:text-gray-300 font-semibold mb-4 tracking-wide">TRUSTED BY ENGINEERING TEAMS</p>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-8">Powering SUBZERO-MD deployments for technical teams worldwide</h3>
           </div>
           
           {/* Floating Machine-Related Logos */}
@@ -239,15 +239,21 @@ export default function Landing() {
       <section className="py-20 bg-gradient-to-br from-white via-blue-50 to-purple-50 dark:bg-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <Badge className="mb-6 bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300 border-0">
-              <Award className="w-3 h-3 mr-1" />
-              Industry Leading Features
-            </Badge>
+            <div className="flex justify-center gap-3 mb-6">
+                <Badge className="bg-emerald-600 text-white border-0 px-4 py-2 text-sm">
+                  <Award className="w-4 h-4 mr-2" />
+                  Industry Leading Features
+                </Badge>
+                <Badge className="bg-blue-600 text-white border-0 px-4 py-2 text-sm">
+                  <Zap className="w-4 h-4 mr-2" />
+                  Deploy in seconds, not minutes
+                </Badge>
+              </div>
             <h2 className="text-3xl lg:text-5xl font-bold mb-6 text-gray-900 dark:text-white">
               Everything You Need for
-              <span className="block bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">SUBZERO-MD Deployment</span>
+              <span className="block text-blue-600 dark:text-blue-400 mt-2">SUBZERO-MD Deployment</span>
             </h2>
-            <p className="text-xl max-w-3xl mx-auto text-gray-600 dark:text-gray-300">
+            <p className="text-xl max-w-3xl mx-auto text-gray-700 dark:text-gray-200 font-medium">
               Built specifically for SUBZERO-MD. Our platform provides specialized infrastructure 
               and tools designed exclusively for SUBZERO-MD bot deployment and management.
             </p>
@@ -309,8 +315,8 @@ export default function Landing() {
               <ArrowRight className="w-5 h-5 ml-3 group-hover:translate-x-1 transition-transform" />
             </Button>
             <div className="text-center">
-              <div className="text-white/80 text-sm">
-                <CheckCircle className="w-4 h-4 inline mr-2" />
+              <div className="text-white text-base font-medium drop-shadow-md">
+                <CheckCircle className="w-5 h-5 inline mr-2" />
                 SUBZERO-MD optimized • Instant deployment • 24/7 support
               </div>
             </div>
@@ -321,8 +327,8 @@ export default function Landing() {
       {/* Support Section */}
       <section className="py-16 bg-gradient-to-r from-slate-900 via-blue-900 to-purple-900 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h3 className="text-2xl font-bold mb-4">Need Support? We're Here to Help!</h3>
-          <p className="text-white/80 mb-8 max-w-2xl mx-auto">
+          <h3 className="text-3xl font-bold mb-4 drop-shadow-lg">Need Support? We're Here to Help!</h3>
+          <p className="text-white text-lg mb-8 max-w-2xl mx-auto drop-shadow-md">
             Join our community channels for instant support, updates, and connect with other SUBZERO-MD users.
           </p>
           
@@ -386,8 +392,8 @@ export default function Landing() {
             </a>
           </div>
           
-          <div className="text-white/60 text-sm">
-            <MessageCircle className="w-4 h-4 inline mr-2" />
+          <div className="text-white text-base font-medium drop-shadow-md">
+            <MessageCircle className="w-5 h-5 inline mr-2" />
             Get help within minutes • Active community • Expert support team
           </div>
         </div>
