@@ -1885,7 +1885,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const REPO_OWNER = user.githubUsername;
       const REPO_NAME = 'subzero-md';
       const MAIN_BRANCH = 'main';
-      const WORKFLOW_FILE = 'SUBZERO.yml';
+      const WORKFLOW_FILE = 'deploy.yml';
 
       // Check if user has forked repository, if not create fork
       const checkAndForkRepo = async () => {
