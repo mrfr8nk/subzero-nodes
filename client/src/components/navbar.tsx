@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Menu, X, Shield, Bot, Github, Activity, User, Settings } from "lucide-react";
+import { Menu, X, Shield, Bot, Github, Activity, User, Settings, Home, LayoutDashboard, Rocket, Wallet, Users, Crown, MessageCircle, Database } from "lucide-react";
 
 export default function Navbar() {
   const [location] = useLocation();
@@ -24,19 +24,19 @@ export default function Navbar() {
   };
 
   const navItems = [
-    { path: "/", label: "Home" },
-    { path: "/dashboard", label: "Dashboard" },
-    { path: "/deployments", label: "Deployments" },
-    { path: "/wallet", label: "Wallet" },
-    { path: "/referrals", label: "Referrals" },
-    { path: "/premium", label: "Premium", special: true },
-    { path: "/chat", label: "Chat" },
-    { path: "/user-settings", label: "Settings" },
+    { path: "/", label: "Home", icon: Home },
+    { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { path: "/deployments", label: "Deployments", icon: Rocket },
+    { path: "/wallet", label: "Wallet", icon: Wallet },
+    { path: "/referrals", label: "Referrals", icon: Users },
+    { path: "/premium", label: "Premium", icon: Crown, special: true },
+    { path: "/chat", label: "Chat", icon: MessageCircle },
+    { path: "/user-settings", label: "Settings", icon: Settings },
     ...(isAdmin ? [
-      { path: "/admin/dashboard", label: "Admin" },
-      { path: "/admin/github", label: "GitHub" },
-      { path: "/admin/api-test", label: "API Test" },
-      { path: "/admin/database", label: "Database" }
+      { path: "/admin/dashboard", label: "Admin", icon: Shield },
+      { path: "/admin/github", label: "GitHub", icon: Github },
+      { path: "/admin/api-test", label: "API Test", icon: Activity },
+      { path: "/admin/database", label: "Database", icon: Database }
     ] : []),
   ];
 
@@ -66,21 +66,25 @@ export default function Navbar() {
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            {navItems.map((item) => (
-              <Link 
-                key={item.path}
-                href={item.path}
-                className={`font-medium transition-colors ${
-                  item.special
-                    ? "text-purple-600 dark:text-purple-400 font-semibold hover:text-purple-700 dark:hover:text-purple-300"
-                    : isActive(item.path)
-                    ? "text-blue-600 dark:text-blue-400 font-semibold"
-                    : "text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link 
+                  key={item.path}
+                  href={item.path}
+                  className={`flex items-center gap-2 font-medium transition-colors ${
+                    item.special
+                      ? "text-purple-600 dark:text-purple-400 font-semibold hover:text-purple-700 dark:hover:text-purple-300"
+                      : isActive(item.path)
+                      ? "text-blue-600 dark:text-blue-400 font-semibold"
+                      : "text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+                  }`}
+                >
+                  {Icon && <Icon className="w-4 h-4" />}
+                  {item.label}
+                </Link>
+              );
+            })}
           </div>
 
           <div className="hidden md:flex items-center space-x-4">
@@ -136,22 +140,26 @@ export default function Navbar() {
       {isMobileMenuOpen && (
         <div className="md:hidden bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700">
           <div className="px-4 py-2 space-y-2">
-            {navItems.map((item) => (
-              <Link 
-                key={item.path}
-                href={item.path}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={`block py-2 transition-colors ${
-                  item.special
-                    ? "text-purple-600 dark:text-purple-400 font-semibold hover:text-purple-700 dark:hover:text-purple-300"
-                    : isActive(item.path)
-                    ? "text-blue-600 dark:text-blue-400 font-semibold"
-                    : "text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link 
+                  key={item.path}
+                  href={item.path}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center gap-2 py-2 transition-colors ${
+                    item.special
+                      ? "text-purple-600 dark:text-purple-400 font-semibold hover:text-purple-700 dark:hover:text-purple-300"
+                      : isActive(item.path)
+                      ? "text-blue-600 dark:text-blue-400 font-semibold"
+                      : "text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+                  }`}
+                >
+                  {Icon && <Icon className="w-4 h-4" />}
+                  {item.label}
+                </Link>
+              );
+            })}
             <hr className="my-2 border-gray-200 dark:border-slate-700" />
             {user && (
               <div className="py-2">

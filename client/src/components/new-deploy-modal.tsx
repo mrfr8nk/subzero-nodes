@@ -141,7 +141,7 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[95vw] md:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Rocket className="h-5 w-5" />
@@ -149,19 +149,19 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
             </DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             {/* GitHub Connection Check */}
             {(!user?.githubUsername || !user?.githubAccessToken) && (
-              <Alert className="bg-blue-50 border-blue-200">
-                <Github className="h-4 w-4 text-blue-600" />
+              <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                <Github className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 <AlertDescription>
-                  <div className="flex items-center justify-between">
-                    <span className="text-blue-800">Connect your GitHub account to deploy bots using your own repository.</span>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <span className="text-blue-800 dark:text-blue-200 text-sm">You must connect your GitHub account to deploy bots. This is required for all users.</span>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => window.location.href = '/api/auth/github'}
-                      className="ml-4 border-blue-300 text-blue-700 hover:bg-blue-100"
+                      className="border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900 whitespace-nowrap"
                       data-testid="button-connect-github"
                     >
                       <Github className="w-4 h-4 mr-2" />
@@ -174,14 +174,15 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
 
             {/* Repository Selection */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium">Select Repository</h3>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <h3 className="text-base md:text-lg font-medium">Select Repository</h3>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => setShowCreateRepoModal(true)}
                   data-testid="button-create-repo"
+                  disabled={!user?.githubUsername || !user?.githubAccessToken}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Create Repository
@@ -232,11 +233,11 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
             <Alert>
               <Coins className="h-4 w-4" />
               <AlertDescription>
-                <div className="flex justify-between items-center">
-                  <span>Deployment Fee: <strong>{deploymentFee} coins</strong></span>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                  <span className="text-sm">Deployment Fee: <strong>{deploymentFee} coins</strong></span>
                   <span className="text-sm text-muted-foreground">Daily Charge: <strong>{dailyCharge} coins</strong></span>
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">
+                <div className="text-xs text-muted-foreground mt-2">
                   Your current balance: <strong>{user?.coinBalance || 0} coins</strong>
                 </div>
               </AlertDescription>
@@ -253,17 +254,17 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
             )}
 
             {selectedRepository && (
-              <div className="grid gap-4">
+              <div className="grid gap-3 md:gap-4">
                 {/* Bot Name Field */}
                 <div className="grid gap-2">
-                  <Label htmlFor="branchName" data-testid="label-branch-name">Bot Name (Branch Name)</Label>
-                  <div className="flex gap-2">
+                  <Label htmlFor="branchName" data-testid="label-branch-name" className="text-sm">Bot Name (Branch Name)</Label>
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Input
                       id="branchName"
                       placeholder="my-discord-bot"
                       value={deploymentForm.branchName}
                       onChange={(e) => setDeploymentForm({ ...deploymentForm, branchName: e.target.value })}
-                      className="flex-1"
+                      className="flex-1 text-sm"
                       data-testid="input-branch-name"
                     />
                     <Button
@@ -273,6 +274,7 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
                       onClick={checkBranchAvailability}
                       disabled={isCheckingBranch || !deploymentForm.branchName.trim()}
                       data-testid="button-check-branch"
+                      className="whitespace-nowrap sm:w-auto w-full"
                     >
                       {isCheckingBranch ? (
                         <RefreshCw className="h-4 w-4 animate-spin" />
@@ -315,45 +317,48 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
 
                 {/* Session ID Field */}
                 <div className="grid gap-2">
-                  <Label htmlFor="sessionId" data-testid="label-session-id">Session ID</Label>
+                  <Label htmlFor="sessionId" data-testid="label-session-id" className="text-sm">Session ID</Label>
                   <Input
                     id="sessionId"
                     placeholder="Enter your session ID"
                     value={deploymentForm.sessionId}
                     onChange={(e) => setDeploymentForm({ ...deploymentForm, sessionId: e.target.value })}
                     data-testid="input-session-id"
+                    className="text-sm"
                   />
                 </div>
 
                 {/* Owner Number Field */}
                 <div className="grid gap-2">
-                  <Label htmlFor="ownerNumber" data-testid="label-owner-number">Owner Number</Label>
+                  <Label htmlFor="ownerNumber" data-testid="label-owner-number" className="text-sm">Owner Number</Label>
                   <Input
                     id="ownerNumber"
                     placeholder="Enter owner number"
                     value={deploymentForm.ownerNumber}
                     onChange={(e) => setDeploymentForm({ ...deploymentForm, ownerNumber: e.target.value })}
                     data-testid="input-owner-number"
+                    className="text-sm"
                   />
                 </div>
 
                 {/* Prefix Field */}
                 <div className="grid gap-2">
-                  <Label htmlFor="prefix" data-testid="label-prefix">Bot Prefix</Label>
+                  <Label htmlFor="prefix" data-testid="label-prefix" className="text-sm">Bot Prefix</Label>
                   <Input
                     id="prefix"
                     placeholder="."
                     value={deploymentForm.prefix}
                     onChange={(e) => setDeploymentForm({ ...deploymentForm, prefix: e.target.value })}
                     data-testid="input-prefix"
+                    className="text-sm"
                   />
                 </div>
               </div>
             )}
 
             {/* Deploy Button */}
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={onClose} data-testid="button-cancel">
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={onClose} data-testid="button-cancel" className="w-full sm:w-auto">
                 Cancel
               </Button>
               <Button
@@ -370,7 +375,7 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
                   !user?.githubUsername ||
                   !user?.githubAccessToken
                 }
-                className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700"
+                className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 w-full sm:w-auto"
                 data-testid="button-deploy"
               >
                 {deployBotMutation.isPending ? (

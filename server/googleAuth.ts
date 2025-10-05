@@ -123,6 +123,8 @@ export async function setupAuth(app: Express) {
     callbackURL: callbackURL
   }, async (accessToken, refreshToken, profile, done) => {
     try {
+      const existingUser = await storage.getUserByGoogleId(profile.id);
+      
       // Extract user information from Google profile
       const userData = {
         googleId: profile.id,
@@ -132,7 +134,7 @@ export async function setupAuth(app: Express) {
         profileImageUrl: profile.photos?.[0]?.value || '',
         authProvider: 'google' as const,
         emailVerified: true,
-        coinBalance: 100,
+        coinBalance: existingUser?.coinBalance ?? 100,
         // Required fields for InsertUser type
         status: 'active' as const,
         role: 'user' as const,
@@ -147,8 +149,6 @@ export async function setupAuth(app: Express) {
         currentBotCount: 0,
       };
 
-      // Note: We can't access req object here in the strategy callback
-      // IP tracking will be handled in the callback route
       const user = await storage.upsertUser(userData);
       return done(null, user);
     } catch (error) {
@@ -178,53 +178,14 @@ export async function setupAuth(app: Express) {
     passport.authenticate('google', { failureRedirect: '/login' }),
     async (req, res) => {
       try {
-        // Handle enhanced device tracking for new users
         const user = req.user as any;
         if (user) {
-          // Get device fingerprint and cookie from session (set by frontend)
-          const deviceFingerprint = (req.session as any)?.deviceFingerprint;
-          const deviceCookie = (req.session as any)?.deviceCookie;
-          
-          if (deviceFingerprint && deviceCookie) {
-            // Check device restrictions using the new system
-            const deviceCheck = await storage.checkDeviceAccountCreationLimit(deviceFingerprint, deviceCookie);
-            
-            if (!deviceCheck.allowed) {
-              // Delete the newly created user account if device is blocked
-              await storage.deleteUser(user._id.toString(), 'system');
-              
-              // Log out and redirect with specific error
-              req.logout((err) => {
-                if (err) console.error('Logout error:', err);
-                res.redirect(`/login?error=multiple_accounts&reason=${encodeURIComponent(deviceCheck.reason || 'Device blocked')}`);
-              });
-              return;
-            }
-            
-            // Register this account with the device
-            await storage.addAccountToDevice(deviceFingerprint, user._id.toString());
-            
-            // Update user device fingerprint for valid users
-            await storage.updateUserDeviceFingerprint(user._id.toString(), deviceFingerprint);
-            
-            // Update user activity
-            await storage.updateUserActivity(user._id.toString());
-          }
+          await storage.updateUserActivity(user._id.toString());
         }
       } catch (error) {
         console.error('Error in Google OAuth callback:', error);
-        
-        // If device check failed due to multiple accounts, redirect with error
-        if (error instanceof Error && error.message.includes('Multiple accounts detected')) {
-          req.logout((err) => {
-            if (err) console.error('Logout error:', err);
-            res.redirect('/login?error=multiple_accounts');
-          });
-          return;
-        }
       }
       
-      // Successful authentication, redirect to dashboard
       res.redirect('/');
     }
   );

@@ -117,7 +117,7 @@ export async function setupGitHubAuth(app: Express) {
         profileImageUrl: profile.photos?.[0]?.value || '',
         authProvider: 'github' as const,
         emailVerified: true,
-        coinBalance: 100,
+        coinBalance: existingUser?.coinBalance ?? 100,
         status: 'active' as const,
         role: 'user' as const,
         isAdmin: false,
@@ -157,37 +157,10 @@ export async function setupGitHubAuth(app: Express) {
       try {
         const user = req.user as any;
         if (user) {
-          const deviceFingerprint = (req.session as any)?.deviceFingerprint;
-          const deviceCookie = (req.session as any)?.deviceCookie;
-          
-          if (deviceFingerprint && deviceCookie) {
-            const deviceCheck = await storage.checkDeviceAccountCreationLimit(deviceFingerprint, deviceCookie);
-            
-            if (!deviceCheck.allowed) {
-              await storage.deleteUser(user._id.toString(), 'system');
-              
-              req.logout((err) => {
-                if (err) console.error('Logout error:', err);
-                res.redirect(`/login?error=multiple_accounts&reason=${encodeURIComponent(deviceCheck.reason || 'Device blocked')}`);
-              });
-              return;
-            }
-            
-            await storage.addAccountToDevice(deviceFingerprint, user._id.toString());
-            await storage.updateUserDeviceFingerprint(user._id.toString(), deviceFingerprint);
-            await storage.updateUserActivity(user._id.toString());
-          }
+          await storage.updateUserActivity(user._id.toString());
         }
       } catch (error) {
         console.error('Error in GitHub OAuth callback:', error);
-        
-        if (error instanceof Error && error.message.includes('Multiple accounts detected')) {
-          req.logout((err) => {
-            if (err) console.error('Logout error:', err);
-            res.redirect('/login?error=multiple_accounts');
-          });
-          return;
-        }
       }
       
       res.redirect('/');

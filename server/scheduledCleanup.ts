@@ -105,11 +105,14 @@ async function updateCleanupStatistics(usersDeleted: number, messagesDeleted: nu
       lastCleanup: new Date().toISOString(),
       usersDeleted,
       messagesDeleted,
-      totalCleanups: 1 // This would be incremented
+      totalCleanups: 1
     };
     
-    // Store cleanup stats as app setting for admin monitoring
-    await storage.setAppSetting('last_cleanup_stats', JSON.stringify(stats));
+    await storage.setAppSetting({
+      key: 'last_cleanup_stats',
+      value: JSON.stringify(stats),
+      description: 'Last automated cleanup statistics'
+    });
     
   } catch (error) {
     console.error('Error updating cleanup statistics:', error);

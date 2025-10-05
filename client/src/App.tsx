@@ -85,7 +85,7 @@ function Router() {
     <>
       <Navbar />
       <Switch>
-        <Route path="/" component={Home} />
+        <Route path="/" component={Landing} />
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/wallet" component={Wallet} />
         <Route path="/referrals" component={Referrals} />
