@@ -1,0 +1,539 @@
+require('dotenv').config();
+const express = require('express');
+const axios = require('axios');
+const cors = require('cors');
+const path = require('path');
+const session = require('express-session');
+
+const app = express();
+
+// Trust proxy - CRITICAL for Render/Heroku to detect HTTPS correctly
+app.set('trust proxy', 1);
+
+app.use(cors());
+app.use(express.json());
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'subzero-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Serve static files from frontend
+app.use(express.static(path.join(__dirname, '../frontend')));
+
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || "Ov23lidLCpPC9Mf8gj2V";
+const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || "3029f46d23bc4df32921a5ac210dfab862c1d9a5";
+const BASE_REPO_OWNER = "mrfrankofcc";
+const BASE_REPO_NAME = "SUBZERO";
+const WORKFLOW_FILE = "SUBZERO-MD-DEPLOY.yml";
+
+// Redirect old routes to new /api routes for backward compatibility
+app.get('/auth/github', (req, res) => {
+  res.redirect('/api/auth/github');
+});
+
+app.get('/auth/github/callback', (req, res) => {
+  res.redirect(`/api/auth/github/callback${req.url.replace('/auth/github/callback', '')}`);
+});
+
+// GitHub OAuth routes
+app.get('/api/auth/github', (req, res) => {
+  const state = Math.random().toString(36).substring(2);
+  req.session.state = state;
+  
+  const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/github/callback`;
+  const scope = 'repo,workflow,user:email';
+  
+  const authUrl = `https://github.com/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&state=${state}`;
+  
+  console.log('OAuth redirect URI:', redirectUri); // Debug log
+  res.redirect(authUrl);
+});
+
+app.get('/api/auth/github/callback', async (req, res) => {
+  const { code, state } = req.query;
+  
+  if (state !== req.session.state) {
+    return res.status(400).json({ error: 'Invalid state parameter' });
+  }
+  
+  try {
+    const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/github/callback`;
+    console.log('Token exchange redirect URI:', redirectUri); // Debug log
+    
+    // Exchange code for access token
+    const tokenResponse = await axios.post('https://github.com/oauth/access_token', {
+      client_id: GITHUB_CLIENT_ID,
+      client_secret: GITHUB_CLIENT_SECRET,
+      code,
+      redirect_uri: redirectUri
+    }, {
+      headers: { Accept: 'application/json' }
+    });
+    
+    const { access_token, scope } = tokenResponse.data;
+    
+    if (!access_token) {
+      throw new Error('No access token received');
+    }
+    
+    // Get user info
+    const userResponse = await axios.get('https://api.github.com/user', {
+      headers: { Authorization: `Bearer ${access_token}` }
+    });
+    
+    // Store user session
+    req.session.githubToken = access_token;
+    req.session.githubUser = userResponse.data;
+    req.session.authenticated = true;
+    
+    res.redirect('/?auth=success');
+  } catch (error) {
+    console.error('OAuth error:', error.response?.data || error.message);
+    res.redirect('/?auth=error');
+  }
+});
+
+app.get('/api/auth/logout', (req, res) => {
+  req.session.destroy();
+  res.redirect('/');
+});
+
+app.get('/api/user', (req, res) => {
+  if (req.session.authenticated) {
+    res.json({
+      authenticated: true,
+      user: req.session.githubUser,
+      token: req.session.githubToken
+    });
+  } else {
+    res.json({ authenticated: false });
+  }
+});
+
+async function checkForkStatus(token, username) {
+  try {
+    const response = await axios.get(`https://api.github.com/repos/${BASE_REPO_OWNER}/${BASE_REPO_NAME}/forks`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    const userFork = response.data.find(fork => fork.owner.login === username);
+    return userFork || null;
+  } catch (error) {
+    console.error('Fork check error:', error.response?.data || error.message);
+    return null;
+  }
+}
+
+async function forkRepository(token) {
+  try {
+    const response = await axios.post(`https://api.github.com/repos/${BASE_REPO_OWNER}/${BASE_REPO_NAME}/forks`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    return response.data;
+  } catch (error) {
+    console.error('Fork error:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+async function makeGitHubRequest(token, method, endpoint, data = null) {
+  const url = `https://api.github.com/${endpoint}`;
+  const config = {
+    method,
+    url,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json'
+    }
+  };
+  
+  if (data) config.data = data;
+  
+  try {
+    const response = await axios(config);
+    return response.data;
+  } catch (error) {
+    if (error.response && error.response.status === 404) {
+      return null;
+    }
+    console.error('GitHub API Error:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+function generateBranchName() {
+  const prefix = 'subzero-';
+  const randomChars = Math.random().toString(36).substring(2, 8);
+  return prefix + randomChars;
+}
+
+app.get('/api/check-fork', async (req, res) => {
+  try {
+    if (!req.session.authenticated) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    const fork = await checkForkStatus(req.session.githubToken, req.session.githubUser.login);
+    
+    if (fork) {
+      res.json({ 
+        forked: true, 
+        forkUrl: fork.html_url,
+        repoName: fork.name,
+        owner: fork.owner.login
+      });
+    } else {
+      res.json({ forked: false });
+    }
+  } catch (error) {
+    console.error('Fork check error:', error);
+    res.status(500).json({ 
+      error: error.response?.data?.message || error.message 
+    });
+  }
+});
+
+app.post('/api/fork-repo', async (req, res) => {
+  try {
+    if (!req.session.authenticated) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    const fork = await forkRepository(req.session.githubToken);
+    
+    res.json({ 
+      success: true, 
+      message: 'Repository forked successfully',
+      forkUrl: fork.html_url,
+      repoName: fork.name,
+      owner: fork.owner.login
+    });
+  } catch (error) {
+    console.error('Fork error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.response?.data?.message || error.message 
+    });
+  }
+});
+
+app.get('/api/check-branch', async (req, res) => {
+  try {
+    if (!req.session.authenticated) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    const { branchName } = req.query;
+    
+    if (!branchName || branchName.trim() === '') {
+      const generatedName = generateBranchName();
+      return res.json({ 
+        available: true, 
+        suggested: generatedName,
+        message: `Try this available name: ${generatedName}`
+      });
+    }
+
+    // Check branch in user's forked repo
+    const branchExists = await makeGitHubRequest(
+      req.session.githubToken, 
+      'GET', 
+      `repos/${req.session.githubUser.login}/${BASE_REPO_NAME}/git/ref/heads/${branchName}`
+    );
+    
+    if (branchExists) {
+      const suggestedName = `${branchName}-${Math.floor(Math.random() * 1000)}`;
+      return res.json({ 
+        available: false, 
+        suggested: suggestedName,
+        message: `Name taken. Try: ${suggestedName}`
+      });
+    } else {
+      return res.json({ 
+        available: true,
+        message: 'Name available!'
+      });
+    }
+  } catch (error) {
+    console.error('Branch check error:', error);
+    res.status(500).json({ 
+      error: error.response?.data?.message || error.message 
+    });
+  }
+});
+
+function createWorkflowContent(branchName) {
+  // Create workflow content without template literals to avoid parsing issues
+  const githubToken = '$' + '{{ secrets.GITHUB_TOKEN }}';
+  const githubRepo = '$' + '{{ github.repository }}';
+  
+  return `name: SUBZERO-MD-DEPLOY
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          
+      - name: Debug Environment
+        run: |
+          echo "=== ENVIRONMENT DEBUG ==="
+          echo "Node version: $(node --version)"
+          echo "NPM version: $(npm --version)"
+          echo "Working directory: $(pwd)"
+          echo "Files in current directory:"
+          ls -la
+          echo "=== SESSION ID CHECK ==="
+          if [ -f ".env" ]; then
+            echo ".env file found:"
+            cat .env
+          else
+            echo "No .env file found"
+          fi
+          echo "=== CONFIG FILE CHECK ==="
+          if [ -f "settings.js" ]; then
+            echo "settings.js content:"
+            cat settings.js
+          else
+            echo "No settings.js found"
+          fi
+          
+      - name: Install Dependencies
+        run: |
+          echo "=== INSTALLING DEPENDENCIES ==="
+          npm install --verbose
+          echo "=== DEPENDENCY TREE ==="
+          npm list --depth=0
+          
+      - name: Pre-run Checks
+        run: |
+          echo "=== PRE-RUN CHECKS ==="
+          echo "Checking package.json scripts:"
+          cat package.json | grep -A 10 '"scripts"'
+          echo "=== CHECKING FOR MAIN FILES ==="
+          if [ -f "index.js" ]; then echo "✓ index.js found"; else echo "✗ index.js missing"; fi
+          
+      - name: Run Bot with Detailed Logging
+        run: |
+          echo "=== STARTING SUBZERO-MD BOT ==="
+          echo "Timestamp: $(date)"
+          echo "Starting bot with detailed logging..."
+          
+          timeout 18000 bash -c '
+            attempt=1
+            while true; do
+              echo "=== ATTEMPT #$attempt ==="
+              echo ">>> Starting bot attempt #$attempt at $(date)"
+              npm start 2>&1 | while IFS= read -r line; do
+                echo "[$(date +"%H:%M:%S")] $line"
+              done
+              exit_code=$?
+              echo ">>> Bot stopped with exit code: $exit_code at $(date)"
+              
+              if [ $exit_code -eq 0 ]; then
+                echo "Bot exited normally, restarting in 5 seconds..."
+              else
+                echo "Bot crashed, analyzing error and restarting in 10 seconds..."
+                echo "=== ERROR ANALYSIS ==="
+                echo "Checking system resources:"
+                free -h
+                df -h
+              fi
+              
+              attempt=$((attempt + 1))
+              sleep 10
+            done
+          ' || echo "Timeout reached after 5 hours"
+          
+      - name: Post-Run Analysis
+        if: always()
+        run: |
+          echo "=== POST-RUN ANALYSIS ==="
+          echo "Final timestamp: $(date)"
+          echo "Checking for any log files:"
+          find . -name "*.log" -type f 2>/dev/null || echo "No log files found"
+          echo "=== FINAL SYSTEM STATE ==="
+          free -h
+          df -h
+          
+      - name: Re-Trigger Workflow
+        if: always()
+        run: |
+          echo "=== AUTO-RESTART ==="
+          echo "Preparing to restart workflow at $(date)"
+          sleep 30
+          curl -X POST \\
+            -H "Authorization: Bearer ${githubToken}" \\
+            -H "Accept: application/vnd.github.v3+json" \\
+            https://api.github.com/repos/${githubRepo}/actions/workflows/SUBZERO-MD-DEPLOY.yml/dispatches \\
+            -d '{"ref":"${branchName}"}'
+          echo "Restart triggered successfully"`;
+}
+
+async function updateWorkflowFile(token, username, branchName) {
+  try {
+    const workflowContent = createWorkflowContent(branchName);
+
+    // Check if file exists in the new branch
+    try {
+      const existingFile = await makeGitHubRequest(
+        token, 
+        'GET', 
+        `repos/${username}/${BASE_REPO_NAME}/contents/.github/workflows/${WORKFLOW_FILE}?ref=${branchName}`
+      );
+      
+      // Update existing file
+      await makeGitHubRequest(
+        token, 
+        'PUT', 
+        `repos/${username}/${BASE_REPO_NAME}/contents/.github/workflows/${WORKFLOW_FILE}`,
+        {
+          message: `Update workflow to use ${branchName} branch`,
+          content: Buffer.from(workflowContent).toString('base64'),
+          sha: existingFile.sha,
+          branch: branchName
+        }
+      );
+    } catch (error) {
+      // Create new file if it doesn't exist
+      await makeGitHubRequest(
+        token, 
+        'PUT', 
+        `repos/${username}/${BASE_REPO_NAME}/contents/.github/workflows/${WORKFLOW_FILE}`,
+        {
+          message: `Create workflow for ${branchName} branch`,
+          content: Buffer.from(workflowContent).toString('base64'),
+          branch: branchName
+        }
+      );
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating workflow file:', error);
+    throw error;
+  }
+}
+
+app.post('/api/deploy', async (req, res) => {
+  try {
+    if (!req.session.authenticated) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    let { branchName, sessionId, ownerNumber, prefix } = req.body;
+    
+    if (!branchName || branchName.trim() === '') {
+      branchName = generateBranchName();
+    }
+
+    if (!sessionId || !ownerNumber || !prefix) {
+      throw new Error('All fields are required');
+    }
+
+    const username = req.session.githubUser.login;
+    const token = req.session.githubToken;
+
+    // 1. Check if repo is forked, if not fork it
+    let fork = await checkForkStatus(token, username);
+    if (!fork) {
+      fork = await forkRepository(token);
+      // Wait a moment for fork to be ready
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+
+    // 2. Create branch in user's forked repo
+    const mainRef = await makeGitHubRequest(
+      token, 
+      'GET', 
+      `repos/${username}/${BASE_REPO_NAME}/git/ref/heads/main`
+    );
+    
+    await makeGitHubRequest(
+      token, 
+      'POST', 
+      `repos/${username}/${BASE_REPO_NAME}/git/refs`,
+      {
+        ref: `refs/heads/${branchName}`,
+        sha: mainRef.object.sha
+      }
+    );
+    
+    // 3. Update settings.js in user's forked repo
+    const fileData = await makeGitHubRequest(
+      token, 
+      'GET', 
+      `repos/${username}/${BASE_REPO_NAME}/contents/settings.js?ref=${branchName}`
+    );
+    
+    const newContent = `module.exports = {
+  SESSION_ID: "${sessionId}",
+  OWNER_NUMBER: "${ownerNumber}", 
+  PREFIX: "${prefix}",
+  CDN: "https://mrfrankk-cdn.hf.space"
+};`;
+    
+    await makeGitHubRequest(
+      token, 
+      'PUT', 
+      `repos/${username}/${BASE_REPO_NAME}/contents/settings.js`,
+      {
+        message: `Update settings.js for ${branchName}`,
+        content: Buffer.from(newContent).toString('base64'),
+        sha: fileData.sha,
+        branch: branchName
+      }
+    );
+    
+    // 4. Update workflow file in user's forked repo
+    await updateWorkflowFile(token, username, branchName);
+    
+    // 5. Trigger workflow in user's forked repo
+    await makeGitHubRequest(
+      token, 
+      'POST', 
+      `repos/${username}/${BASE_REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
+      {
+        ref: branchName
+      }
+    );
+    
+    res.json({ 
+      success: true, 
+      message: 'Deployment successful!',
+      branch: branchName,
+      workflowUpdated: true,
+      repoUrl: `https://github.com/${username}/${BASE_REPO_NAME}`,
+      workflowUrl: `https://github.com/${username}/${BASE_REPO_NAME}/actions`
+    });
+  } catch (error) {
+    console.error('Deployment error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.response?.data?.message || error.message,
+      details: error.response?.data?.errors || null
+    });
+  }
+});
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/index.html'));
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
