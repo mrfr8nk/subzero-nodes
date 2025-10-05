@@ -224,6 +224,17 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
     return false;
   };
 
+  const handleForkRepository = () => {
+    window.open('https://github.com/mrfrankofcc/subzero-md/fork', '_blank');
+    setTimeout(() => {
+      refetchGitHubStatus();
+      toast({
+        title: "Fork Created?",
+        description: "Click 'Check Status' to verify your fork was created successfully.",
+      });
+    }, 3000);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -325,32 +336,47 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
 
                   {/* Fork Status */}
                   {githubStatus.connected && githubStatus.hasValidToken && (
-                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg" data-testid="status-github-fork">
-                      <div className="flex items-center">
-                        <div className={`w-2 h-2 rounded-full mr-3 ${githubStatus.hasFork ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                        <span className="font-medium text-gray-900 dark:text-gray-100">Repository Fork</span>
-                      </div>
-                      <div className="flex items-center">
-                        {githubStatus.hasFork ? (
-                          <>
-                            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
-                            <a 
-                              href={githubStatus.forkUrl || '#'}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 dark:text-blue-400 hover:underline flex items-center"
-                              data-testid="link-view-fork"
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg" data-testid="status-github-fork">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center">
+                          <div className={`w-2 h-2 rounded-full mr-3 ${githubStatus.hasFork ? 'bg-green-500' : 'bg-blue-500'}`}></div>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">Repository Fork</span>
+                        </div>
+                        <div className="flex items-center">
+                          {githubStatus.hasFork ? (
+                            <>
+                              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
+                              <a 
+                                href={githubStatus.forkUrl || '#'}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 dark:text-blue-400 hover:underline flex items-center"
+                                data-testid="link-view-fork"
+                              >
+                                View Fork <ExternalLink className="w-3 h-3 ml-1" />
+                              </a>
+                            </>
+                          ) : (
+                            <Button
+                              variant="link"
+                              size="sm"
+                              onClick={handleForkRepository}
+                              className="text-blue-600 dark:text-blue-400 p-0 h-auto"
+                              data-testid="button-fork-repo"
                             >
-                              View Fork <ExternalLink className="w-3 h-3 ml-1" />
-                            </a>
-                          </>
-                        ) : (
-                          <>
-                            <GitFork className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-2" />
-                            <span className="text-yellow-700 dark:text-yellow-300">Will be created on first deploy</span>
-                          </>
-                        )}
+                              <GitFork className="w-4 h-4 mr-1" />
+                              Fork Now
+                            </Button>
+                          )}
+                        </div>
                       </div>
+                      {!githubStatus.hasFork && (
+                        <div className="ml-5 text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-950/50 p-2 rounded border border-blue-200 dark:border-blue-800">
+                          <p className="mb-1">
+                            <strong>Optional:</strong> You can manually fork the repository now, or let the deployment create it automatically for you.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
 
