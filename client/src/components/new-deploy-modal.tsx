@@ -126,7 +126,7 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
 
   const handleDeploy = () => {
     if (!selectedRepository) return;
-    
+
     deployBotMutation.mutate({
       repositoryId: selectedRepository,
       branchName: deploymentForm.branchName,
@@ -148,7 +148,7 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
               Deploy New Bot
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 md:space-y-6">
             {/* GitHub Connection Check */}
             {(!user?.githubUsername || !user?.githubAccessToken) && (
@@ -214,7 +214,7 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
                       ))}
                     </SelectContent>
                   </Select>
-                  
+
                   {selectedRepo && (
                     <div className="text-sm text-muted-foreground mt-2 p-3 bg-muted rounded">
                       <div className="flex items-center gap-2 mb-1">
@@ -330,10 +330,10 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
 
                 {/* Owner Number Field */}
                 <div className="grid gap-2">
-                  <Label htmlFor="ownerNumber" data-testid="label-owner-number" className="text-sm">Owner Number</Label>
+                  <Label htmlFor="ownerNumber" data-testid="label-owner-number" className="text-sm">Owner Phone Number</Label>
                   <Input
                     id="ownerNumber"
-                    placeholder="Enter owner number"
+                    placeholder="+263719647303"
                     value={deploymentForm.ownerNumber}
                     onChange={(e) => setDeploymentForm({ ...deploymentForm, ownerNumber: e.target.value })}
                     data-testid="input-owner-number"

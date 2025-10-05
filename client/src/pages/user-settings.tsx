@@ -132,12 +132,12 @@ export default function UserSettings() {
       setProfileData({
         firstName: fullProfile.firstName || "",
         lastName: fullProfile.lastName || "",
-        username: fullProfile.username || "",
+        username: fullProfile.username || fullProfile.githubUsername || "",
         bio: fullProfile.bio || "",
         profilePicture: fullProfile.profilePicture || "",
         country: fullProfile.country || "",
         socialProfiles: {
-          github: fullProfile.socialProfiles?.github || "",
+          github: fullProfile.socialProfiles?.github || fullProfile.githubUsername || "",
           facebook: fullProfile.socialProfiles?.facebook || "",
           instagram: fullProfile.socialProfiles?.instagram || "",
           tiktok: fullProfile.socialProfiles?.tiktok || "",
@@ -863,6 +863,82 @@ export default function UserSettings() {
               <Save className="w-4 h-4 mr-2" />
               {isUploadingPicture ? "Uploading..." : updateProfileMutation.isPending ? "Updating..." : "Update Profile"}
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* GitHub Connection */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Github className="w-5 h-5 mr-2" />
+              GitHub Connection
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {fullProfile?.githubUsername ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+                      <Github className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-gray-100">Connected</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">@{fullProfile.githubUsername}</p>
+                    </div>
+                  </div>
+                  <Badge variant="default" className="bg-green-600">
+                    Active
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  <Label>GitHub Username</Label>
+                  <Input
+                    value={fullProfile.githubUsername}
+                    disabled
+                    className="bg-gray-50 dark:bg-gray-800"
+                  />
+                </div>
+                {fullProfile.githubProfileUrl && (
+                  <div className="space-y-2">
+                    <Label>Profile URL</Label>
+                    <div className="flex space-x-2">
+                      <Input
+                        value={fullProfile.githubProfileUrl}
+                        disabled
+                        className="bg-gray-50 dark:bg-gray-800"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(fullProfile.githubProfileUrl, '_blank')}
+                      >
+                        Visit
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Github className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                  Connect GitHub Account
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Link your GitHub account to deploy bots from your own repositories
+                </p>
+                <Button
+                  onClick={() => window.location.href = "/api/auth/github"}
+                  className="flex items-center"
+                >
+                  <Github className="w-4 h-4 mr-2" />
+                  Connect GitHub
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 

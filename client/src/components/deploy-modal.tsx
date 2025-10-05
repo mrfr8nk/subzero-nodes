@@ -435,13 +435,13 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
           </div>
 
           {/* Bot Configuration */}
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             <div className="flex items-center mb-4">
               <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Bot Configuration</h3>
             </div>
 
-            <div className="grid gap-6">
+            <div className="grid gap-4 md:gap-6">
               <div>
                 <Label htmlFor="bot-name" className="text-base font-medium">Bot Name</Label>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Choose a unique identifier for your bot</p>
@@ -471,15 +471,17 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
               </Button>
             </div>
             {branchCheckResult && (
-              <Alert variant={branchCheckResult.available ? "default" : "destructive"} className="mt-2" data-testid="alert-branch-check">
-                <div className="flex items-center">
+              <Alert variant={branchCheckResult.available ? "default" : "destructive"} className="mt-2 border-2" data-testid="alert-branch-check">
+                <div className="flex items-start">
                   {branchCheckResult.available ? (
-                    <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
+                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mr-2 mt-0.5 flex-shrink-0" />
                   ) : (
-                    <AlertTriangle className="h-4 w-4 text-red-600 mr-2" />
+                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2 mt-0.5 flex-shrink-0" />
                   )}
                   <AlertDescription className="flex-1">
-                    {branchCheckResult.message}
+                    <p className={`font-semibold ${branchCheckResult.available ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
+                      {branchCheckResult.message}
+                    </p>
                     {branchCheckResult.suggested && (
                       <div className="mt-2">
                         <Button
@@ -542,20 +544,20 @@ export default function DeployModal({ isOpen, onClose }: DeployModalProps) {
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid md:grid-cols-2 gap-4 md:gap-6">
                 <div>
                   <Label htmlFor="owner-number" className="text-base font-medium">Owner Number</Label>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Your WhatsApp number (with country code)</p>
                   <Input
                     id="owner-number"
                     type="text"
-                    placeholder="+1234567890"
+                    placeholder="+263719647303"
                     value={githubForm.ownerNumber}
                     onChange={(e) => setGithubForm(prev => ({ ...prev, ownerNumber: e.target.value }))}
                     disabled={githubDeployMutation.isPending}
                     data-testid="input-owner-number"
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Include country code (e.g., +1 for US)</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Include country code (e.g., +263 for Zimbabwe)</p>
                 </div>
 
                 <div>
