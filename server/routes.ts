@@ -112,7 +112,7 @@ async function monitorWorkflowStatus(branchName: string) {
     const GITHUB_TOKEN = githubToken.value;
     const REPO_OWNER = repoOwner.value;
     const REPO_NAME = repoName.value;
-    const WORKFLOW_FILE = workflowFile?.value || 'SUBZERO.yml';
+    const WORKFLOW_FILE = workflowFile?.value || 'deploy.yml';
 
     // Get latest workflow run for this branch
     const runsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/runs?branch=${branchName}&per_page=1`;
