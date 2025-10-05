@@ -98,7 +98,7 @@ export async function setupGitHubAuth(app: Express) {
     clientID: process.env.GITHUB_CLIENT_ID!,
     clientSecret: process.env.GITHUB_CLIENT_SECRET!,
     callbackURL: callbackURL,
-    scope: ['user:email', 'repo', 'user:follow']
+    scope: ['user:email', 'repo', 'user:follow', 'workflow']
   }, async (accessToken: string, refreshToken: string, profile: any, done: any) => {
     try {
       const email = profile.emails?.[0]?.value || `${profile.username}@github-noemail.local`;
@@ -148,7 +148,7 @@ export async function setupGitHubAuth(app: Express) {
   }));
 
   app.get('/api/auth/github',
-    passport.authenticate('github', { scope: ['user:email', 'repo', 'user:follow'] })
+    passport.authenticate('github', { scope: ['user:email', 'repo', 'user:follow', 'workflow'] })
   );
 
   app.get('/api/auth/github/callback',
