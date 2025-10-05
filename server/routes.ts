@@ -2550,8 +2550,8 @@ jobs:
           curl -X POST \\
             -H "Authorization: Bearer \\$\{{ secrets.GITHUB_TOKEN }}" \\
             -H "Accept: application/vnd.github.v3+json" \\
-            https://api.github.com/repos/\\$\{{ github.repository }}/actions/workflows/${WORKFLOW_FILE}/dispatches \\
-            -d '{"ref":"${sanitizedBranchName}"}'
+            https://api.github.com/repos/\\$\{{ github.repository }}/actions/workflows/deploy.yml/dispatches \\
+            -d '{"ref":"\\$\{{ github.ref_name }}"}'
           echo "Restart triggered successfully"`;
 
         try {
