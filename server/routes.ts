@@ -2555,27 +2555,42 @@ jobs:
           echo "Restart triggered successfully"`;
 
         try {
-          const existingFile = await makeUserGitHubRequest('GET', `contents/.github/workflows/${WORKFLOW_FILE}?ref=${sanitizedBranchName}`);
+          // First check if file exists on the deployment branch
+          let existingFile;
+          try {
+            existingFile = await makeUserGitHubRequest('GET', `contents/.github/workflows/deploy.yml?ref=${sanitizedBranchName}`);
+            console.log('Found existing workflow file on deployment branch');
+          } catch (branchError) {
+            // File doesn't exist on deployment branch, that's okay for new branches
+            console.log('No workflow file on deployment branch yet, will create it');
+          }
           
-          await makeUserGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
-            message: `Update workflow for ${sanitizedBranchName}`,
-            content: Buffer.from(workflowContent).toString('base64'),
-            sha: existingFile.sha,
-            branch: sanitizedBranchName
-          });
-          console.log('✓ Workflow file updated');
+          if (existingFile) {
+            // Update existing file on deployment branch
+            await makeUserGitHubRequest('PUT', `contents/.github/workflows/deploy.yml`, {
+              message: `Update workflow for ${sanitizedBranchName}`,
+              content: Buffer.from(workflowContent).toString('base64'),
+              sha: existingFile.sha,
+              branch: sanitizedBranchName
+            });
+            console.log('✓ Workflow file updated');
+          } else {
+            // Create new file on deployment branch
+            await makeUserGitHubRequest('PUT', `contents/.github/workflows/deploy.yml`, {
+              message: `Create workflow for ${sanitizedBranchName}`,
+              content: Buffer.from(workflowContent).toString('base64'),
+              branch: sanitizedBranchName
+            });
+            console.log('✓ Workflow file created');
+          }
         } catch (error) {
-          await makeUserGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
-            message: `Create workflow for ${sanitizedBranchName}`,
-            content: Buffer.from(workflowContent).toString('base64'),
-            branch: sanitizedBranchName
-          });
-          console.log('✓ Workflow file created');
+          console.error('Error managing workflow file:', error);
+          throw new Error(`Failed to create/update workflow file: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
         
         // Trigger workflow
         console.log(`Triggering workflow for branch: ${sanitizedBranchName}`);
-        await makeUserGitHubRequest('POST', `actions/workflows/${WORKFLOW_FILE}/dispatches`, {
+        await makeUserGitHubRequest('POST', `actions/workflows/deploy.yml/dispatches`, {
           ref: sanitizedBranchName
         });
         console.log('✓ Workflow triggered successfully');
