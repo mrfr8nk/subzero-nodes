@@ -2105,7 +2105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         
-        // 3. Update workflow file (exact same as admin deployment)
+        // 3. Update workflow file - Get from main branch, update it, commit to deployment branch
         const workflowContent = `name: SUBZERO-MD-X-MR-FRANK
 
 on:
@@ -2142,23 +2142,34 @@ jobs:
             https://api.github.com/repos/\\$\{{ github.repository }}/actions/workflows/${WORKFLOW_FILE}/dispatches \\
             -d '{"ref":"${sanitizedBranchName}"}'`;
 
+        // Get the workflow file from main branch (where user manually created it)
         try {
-          const existingFile = await makeGitHubRequest('GET', `contents/.github/workflows/${WORKFLOW_FILE}?ref=${sanitizedBranchName}`);
+          await makeGitHubRequest('GET', `contents/.github/workflows/${WORKFLOW_FILE}?ref=${MAIN_BRANCH}`);
+          console.log(`Found existing ${WORKFLOW_FILE} on main branch, will update it on ${sanitizedBranchName}`);
+        } catch (mainError) {
+          console.log(`${WORKFLOW_FILE} not found on main branch, will check deployment branch`);
+        }
+
+        // Now check if it exists on deployment branch
+        try {
+          const branchWorkflowFile = await makeGitHubRequest('GET', `contents/.github/workflows/${WORKFLOW_FILE}?ref=${sanitizedBranchName}`);
           
-          // Update existing file
+          // File exists on deployment branch, update it
           await makeGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
             message: `Update workflow to use ${sanitizedBranchName} branch`,
             content: Buffer.from(workflowContent).toString('base64'),
-            sha: existingFile.sha,
+            sha: branchWorkflowFile.sha,
             branch: sanitizedBranchName
           });
-        } catch (error) {
-          // Create new file if it doesn't exist
+          console.log(`Updated existing ${WORKFLOW_FILE} on branch ${sanitizedBranchName}`);
+        } catch (branchError) {
+          // File doesn't exist on deployment branch, create it
           await makeGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
-            message: `Create workflow for ${sanitizedBranchName} branch`,
+            message: `Add workflow for ${sanitizedBranchName} branch`,
             content: Buffer.from(workflowContent).toString('base64'),
             branch: sanitizedBranchName
           });
+          console.log(`Created new ${WORKFLOW_FILE} on branch ${sanitizedBranchName}`);
         }
         
         // 4. Trigger workflow with advanced waiting logic
