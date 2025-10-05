@@ -7,11 +7,11 @@ export default function Home() {
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    // Redirect authenticated users to dashboard
-    if (user) {
-      setLocation("/dashboard");
+    // Redirect authenticated users to dashboard immediately
+    if (user && !isLoading) {
+      window.location.href = "/dashboard";
     }
-  }, [user, setLocation]);
+  }, [user, isLoading]);
 
   // Show loading while checking authentication
   if (isLoading) {

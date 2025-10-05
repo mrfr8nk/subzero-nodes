@@ -152,7 +152,7 @@ export async function setupGitHubAuth(app: Express) {
   );
 
   app.get('/api/auth/github/callback',
-    passport.authenticate('github', { failureRedirect: '/login' }),
+    passport.authenticate('github', { failureRedirect: '/login?error=auth_failed' }),
     async (req, res) => {
       try {
         const user = req.user as any;
@@ -163,6 +163,7 @@ export async function setupGitHubAuth(app: Express) {
         console.error('Error in GitHub OAuth callback:', error);
       }
       
+      // Always redirect to dashboard after successful login
       res.redirect('/dashboard');
     }
   );

@@ -113,8 +113,10 @@ export default function Login() {
           title: "Login Successful",
           description: "Welcome back! Redirecting to your dashboard.",
         });
-        // Reload to trigger auth state update
-        window.location.href = "/dashboard";
+        // Force redirect to dashboard
+        setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 100);
       } else {
         // Check if it's an email verification error
         if (result.message === "Please verify your email before signing in") {

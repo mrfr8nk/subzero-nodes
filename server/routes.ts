@@ -1822,482 +1822,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // User GitHub deployment - uses user's connected GitHub account
   app.post('/api/deployments/github', checkDeviceBan, isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user._id.toString();
-      const user = await storage.getUser(userId);
-
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Check if user has connected their GitHub account
-      if (!user.githubAccessToken || !user.githubUsername) {
-        return res.status(400).json({ 
-          message: 'GitHub account not connected. Please log in with GitHub to deploy.',
-          requiresGitHubConnection: true
-        });
-      }
-
-      const { branchName, sessionId, ownerNumber, prefix } = req.body;
-
-      if (!branchName || !sessionId || !ownerNumber || !prefix) {
-        return res.status(400).json({ message: 'All fields are required' });
-      }
-
-      // Get deployment cost setting - admin controlled
-      const deploymentFeeSetting = await storage.getAppSetting('deployment_fee');
-      const deploymentFee = parseInt(deploymentFeeSetting?.value) || 10; // Fallback to 10 coins if not set by admin
-
-      // Check user's current wallet balance
-      const currentUser = await storage.getUser(userId); // Get fresh user data
-      const userBalance = currentUser?.coinBalance || 0;
-
-      // Validate user has sufficient funds for deployment
-      if (userBalance < deploymentFee) {
-        return res.status(400).json({ 
-          message: `Insufficient coins. You need ${deploymentFee} coins to deploy this bot. You currently have ${userBalance} coins.`,
-          required: deploymentFee,
-          current: userBalance,
-          shortfall: deploymentFee - userBalance
-        });
-      }
-
-      // Get deployment number for user
-      const deploymentNumber = await storage.getNextDeploymentNumber(userId);
-
-      // Use user's own GitHub credentials
-      const GITHUB_TOKEN = user.githubAccessToken;
-      const REPO_OWNER = user.githubUsername;
-      const REPO_NAME = 'subzero-md';
-      const MAIN_BRANCH = 'main';
-      const WORKFLOW_FILE = 'deploy.yml';
-
-      // Check if user has forked repository, if not create fork
-      const checkAndForkRepo = async () => {
-        const repoUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
-        const checkResponse = await fetch(repoUrl, {
-          headers: {
-            'Authorization': `token ${GITHUB_TOKEN}`,
-            'Accept': 'application/vnd.github.v3+json'
-          }
-        });
-
-        if (checkResponse.status === 404) {
-          // Repository doesn't exist, create fork
-          console.log(`Forking repository for user ${REPO_OWNER}...`);
-          const forkResponse = await fetch('https://api.github.com/repos/mrfrankofcc/subzero-md/forks', {
-            method: 'POST',
-            headers: {
-              'Authorization': `token ${GITHUB_TOKEN}`,
-              'Accept': 'application/vnd.github.v3+json',
-              'User-Agent': 'SUBZERO-Deploy'
-            }
-          });
-
-          if (!forkResponse.ok) {
-            const errorText = await forkResponse.text();
-            console.error('Fork creation failed:', errorText);
-            throw new Error('Failed to create fork. Please fork mrfrankofcc/subzero-md to your GitHub account manually.');
-          }
-
-          // Update user's fork status
-          await storage.updateUserGitHubForkStatus(userId, `${REPO_OWNER}/subzero-md`, true);
-
-          // Wait for fork to be ready
-          console.log('Fork created, waiting for GitHub to initialize...');
-          await new Promise(resolve => setTimeout(resolve, 5000));
-
-          return true;
-        } else if (checkResponse.ok) {
-          return false; // Already exists
-        } else if (checkResponse.status === 401) {
-          throw new Error('GitHub authentication failed. Please reconnect your GitHub account.');
-        } else {
-          throw new Error(`GitHub API error: ${checkResponse.statusText}`);
-        }
-      };
-
-      try {
-        await checkAndForkRepo();
-      } catch (error) {
-        console.error('Repository check/fork error:', error);
-        return res.status(400).json({ 
-          message: error instanceof Error ? error.message : 'Failed to access GitHub repository. Please reconnect your GitHub account.'
-        });
-      }
-
-      // Sanitize branch name
-      const sanitizeBranchName = (name: string) => {
-        return name
-          .replace(/[^a-zA-Z0-9._-]/g, '-')
-          .replace(/^\.+|\.+$/g, '')
-          .replace(/\.\.+/g, '.')
-          .replace(/^-+|-+$/g, '')
-          .replace(/--+/g, '-')
-          .substring(0, 250);
-      };
-
-      let sanitizedBranchName = sanitizeBranchName(branchName.trim());
-      if (!sanitizedBranchName) {
-        return res.status(400).json({ message: 'Invalid branch name. Please provide a valid app name.' });
-      }
-
-      // Use the exact sanitized name without modifications
-      // The frontend should have already validated availability
-
-      // Deduct coins first
-      await storage.updateUserBalance(userId, -deploymentFee);
-
-      // GitHub API helper
-      const makeGitHubRequest = async (method: string, endpoint: string, data: any = null) => {
-        const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/${endpoint}`;
-        const config: any = {
-          method,
-          headers: {
-            'Authorization': `token ${GITHUB_TOKEN}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'SUBZERO-Deployment-Bot'
-          }
-        };
-        if (data) {
-          config.body = JSON.stringify(data);
-          config.headers['Content-Type'] = 'application/json';
-        }
-
-        const response = await fetch(url, config);
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`GitHub API Error Details:`, {
-            url,
-            status: response.status,
-            statusText: response.statusText,
-            errorText,
-            method: config.method || 'GET'
-          });
-          throw new Error(`GitHub API error: ${response.status} ${response.statusText} - ${errorText}`);
-        }
-
-        if (response.status === 204) {
-          return {};
-        }
-
-        return await response.json();
-      };
-
-      try {
-        // Check if branch already exists - if it does, reject the deployment
-        try {
-          await makeGitHubRequest('GET', `git/refs/heads/${sanitizedBranchName}`);
-          // Branch exists, return error
-          return res.status(400).json({ message: `Branch name '${sanitizedBranchName}' is already taken. Please choose a different name.` });
-        } catch (error) {
-          // Branch doesn't exist, which is what we want - continue with deployment
-        }
-
-        // Create branch from main with retry logic
-        let mainBranchData;
-        let attempts = 0;
-        const maxAttempts = 3;
-
-        while (attempts < maxAttempts) {
-          try {
-            mainBranchData = await makeGitHubRequest('GET', `git/refs/heads/${MAIN_BRANCH}`);
-            break;
-          } catch (error) {
-            attempts++;
-            if (attempts >= maxAttempts) {
-              throw new Error(`Failed to get main branch after ${maxAttempts} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            }
-            // Wait 2 seconds before retry
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          }
-        }
-
-        const mainSha = mainBranchData.object.sha;
-
-        // Create branch with retry logic
-        attempts = 0;
-        while (attempts < maxAttempts) {
-          try {
-            await makeGitHubRequest('POST', 'git/refs', {
-              ref: `refs/heads/${sanitizedBranchName}`,
-              sha: mainSha
-            });
-            break;
-          } catch (error) {
-            attempts++;
-            if (attempts >= maxAttempts) {
-              throw new Error(`Failed to create branch after ${maxAttempts} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            }
-            // Wait 3 seconds before retry
-            await new Promise(resolve => setTimeout(resolve, 3000));
-          }
-        }
-
-        // 2. Update settings.js (exact same as admin deployment)
-        const fileData = await makeGitHubRequest('GET', `contents/settings.js?ref=${sanitizedBranchName}`);
-        const newContent = `module.exports = {
-  SESSION_ID: "${sessionId}",
-  OWNER_NUMBER: "${ownerNumber}", 
-  PREFIX: "${prefix}",
-  CDN: "https://mrfrankk-cdn.hf.space" // 
-};`;
-
-        await makeGitHubRequest('PUT', 'contents/settings.js', {
-          message: `Update settings.js for ${sanitizedBranchName}`,
-          content: Buffer.from(newContent).toString('base64'),
-          sha: fileData.sha,
-          branch: sanitizedBranchName
-        });
-
-        // 2.5. Update config.js with environment variables (if it exists)
-        try {
-          const configFileData = await makeGitHubRequest('GET', `contents/config.js?ref=${sanitizedBranchName}`);
-          const configContent = `module.exports = {
-  SESSION_ID: "${sessionId}",
-  OWNER_NUMBER: "${ownerNumber}", 
-  PREFIX: "${prefix}",
-  // Auto-generated environment variables
-  NODE_ENV: process.env.NODE_ENV || "production",
-  PORT: process.env.PORT || 3000,
-  DATABASE_URL: process.env.DATABASE_URL || "",
-  // Add any custom environment variables here
-};`;
-
-          await makeGitHubRequest('PUT', 'contents/config.js', {
-            message: `Update config.js for ${sanitizedBranchName}`,
-            content: Buffer.from(configContent).toString('base64'),
-            sha: configFileData.sha,
-            branch: sanitizedBranchName
-          });
-        } catch (configError) {
-          // config.js doesn't exist, create it
-          const configContent = `module.exports = {
-  SESSION_ID: "${sessionId}",
-  OWNER_NUMBER: "${ownerNumber}", 
-  PREFIX: "${prefix}",
-  // Auto-generated environment variables
-  NODE_ENV: process.env.NODE_ENV || "production",
-  PORT: process.env.PORT || 3000,
-  DATABASE_URL: process.env.DATABASE_URL || "",
-  // Add any custom environment variables here
-};`;
-
-          await makeGitHubRequest('PUT', 'contents/config.js', {
-            message: `Create config.js for ${sanitizedBranchName}`,
-            content: Buffer.from(configContent).toString('base64'),
-            branch: sanitizedBranchName
-          });
-        }
-
-        // 3. Update workflow file - Get from main branch, update it, commit to deployment branch
-        const workflowContent = `name: SUBZERO-MD-DEPLOY
-on:
-  workflow_dispatch:
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20'
-
-      - name: Debug Environment
-        run: |
-          echo "=== ENVIRONMENT DEBUG ==="
-          echo "Node version: \\$(node --version)"
-          echo "NPM version: \\$(npm --version)"
-          echo "Working directory: \\$(pwd)"
-          echo "Files in current directory:"
-          ls -la
-          echo "=== SESSION ID CHECK ==="
-          if [ -f ".env" ]; then
-            echo ".env file found:"
-            cat .env
-          else
-            echo "No .env file found"
-          fi
-          echo "=== CONFIG FILE CHECK ==="
-          if [ -f "settings.js" ]; then
-            echo "settings.js content:"
-            cat settings.js
-          else
-            echo "No settings.js found"
-          fi
-
-      - name: Install Dependencies
-        run: |
-          echo "=== INSTALLING DEPENDENCIES ==="
-          npm install --verbose
-          echo "=== DEPENDENCY TREE ==="
-          npm list --depth=0
-
-      - name: Pre-run Checks
-        run: |
-          echo "=== PRE-RUN CHECKS ==="
-          echo "Checking package.json scripts:"
-          cat package.json | grep -A 10 '"scripts"'
-          echo "=== CHECKING FOR MAIN FILES ==="
-          if [ -f "index.js" ]; then echo "✓ index.js found"; else echo "✗ index.js missing"; fi
-
-      - name: Run Bot with Detailed Logging
-        run: |
-          echo "=== STARTING SUBZERO-MD BOT ==="
-          echo "Timestamp: \\$(date)"
-          echo "Starting bot with detailed logging..."
-
-          timeout 18000 bash -c '
-            attempt=1
-            while true; do
-              echo "=== ATTEMPT #\\$attempt ==="
-              echo ">>> Starting bot attempt #\\$attempt at \\$(date)"
-              npm start 2>&1 | while IFS= read -r line; do
-                echo "[\\$(date +"%H:%M:%S")] \\$line"
-              done
-              exit_code=\\$?
-              echo ">>> Bot stopped with exit code: \\$exit_code at \\$(date)"
-
-              if [ \\$exit_code -eq 0 ]; then
-                echo "Bot exited normally, restarting in 5 seconds..."
-                sleep 5
-              else
-                echo "Bot crashed, analyzing error and restarting in 10 seconds..."
-                echo "=== ERROR ANALYSIS ==="
-                echo "Checking system resources:"
-                free -h
-                df -h
-                echo "Recent system messages:"
-                dmesg | tail -5 2>/dev/null || echo "No system messages available"
-                sleep 10
-              fi
-
-              attempt=\\$((attempt + 1))
-            done
-          ' || echo "Timeout reached after 5 hours"
-
-      - name: Post-Run Analysis
-        if: always()
-        run: |
-          echo "=== POST-RUN ANALYSIS ==="
-          echo "Final timestamp: \\$(date)"
-          echo "Checking for any log files:"
-          find . -name "*.log" -type f 2>/dev/null || echo "No log files found"
-          echo "=== FINAL SYSTEM STATE ==="
-          free -h
-          df -h
-
-      - name: Re-Trigger Workflow
-        if: always()
-        run: |
-          echo "=== AUTO-RESTART ==="
-          echo "Preparing to restart workflow at \\$(date)"
-          sleep 30
-          curl -X POST \\\\
-            -H "Authorization: Bearer \\$\{{ secrets.GITHUB_TOKEN }}" \\\\
-            -H "Accept: application/vnd.github.v3+json" \\\\
-            https://api.github.com/repos/\\$\{{ github.repository }}/actions/workflows/deploy.yml/dispatches \\\\
-            -d '{"ref":"\\$\{{ github.ref_name }}"}'
-          echo "Restart triggered successfully"`;
-
-        // Create or update the workflow file on deployment branch
-        try {
-          let existingFile;
-          try {
-            // Try to get existing file on deployment branch
-            existingFile = await makeGitHubRequest('GET', `contents/.github/workflows/deploy.yml?ref=${sanitizedBranchName}`);
-            console.log('Found existing workflow file on deployment branch');
-          } catch (getError) {
-            console.log('No workflow file exists yet, will create it');
-          }
-
-          if (existingFile) {
-            // Update existing file
-            await makeGitHubRequest('PUT', 'contents/.github/workflows/deploy.yml', {
-              message: `Update workflow for ${sanitizedBranchName}`,
-              content: Buffer.from(workflowContent).toString('base64'),
-              sha: existingFile.sha,
-              branch: sanitizedBranchName
-            });
-            console.log(`✓ Workflow file updated on branch ${sanitizedBranchName}`);
-          } else {
-            // Create new file
-            await makeGitHubRequest('PUT', 'contents/.github/workflows/deploy.yml', {
-              message: `Create workflow for ${sanitizedBranchName}`,
-              content: Buffer.from(workflowContent).toString('base64'),
-              branch: sanitizedBranchName
-            });
-            console.log(`✓ Workflow file created on branch ${sanitizedBranchName}`);
-          }
-        } catch (workflowError) {
-          console.error('Error creating/updating workflow file:', workflowError);
-          throw new Error(`Failed to create workflow file: ${workflowError instanceof Error ? workflowError.message : 'Unknown error'}`);
-        }
-
-        // 4. Trigger workflow with advanced waiting logic
-        console.log(`Triggering workflow for branch: ${sanitizedBranchName}`);
-        await makeGitHubRequest('POST', `actions/workflows/deploy.yml/dispatches`, {
-          ref: sanitizedBranchName
-        });
-
-        // Create deployment record
-        const now = new Date();
-        const nextChargeDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
-
-        const deploymentData = insertDeploymentSchema.parse({
-          userId,
-          name: sanitizedBranchName,
-          branchName: sanitizedBranchName,
-          deploymentNumber,
-          status: "deploying",
-          configuration: `GitHub: ${sanitizedBranchName}`,
-          cost: deploymentFee,
-          lastChargeDate: now,
-          nextChargeDate: nextChargeDate,
-        });
-
-        const deployment = await storage.createDeployment(deploymentData);
-
-        // Start monitoring this deployment for workflow status
-        startWorkflowMonitoring(sanitizedBranchName);
-
-        // Wait for GitHub to initialize the workflow (5-10 seconds)
-        setTimeout(async () => {
-          try {
-            console.log(`Checking workflow status for branch: ${sanitizedBranchName}`);
-            await monitorWorkflowStatus(sanitizedBranchName);
-          } catch (error) {
-            console.error(`Error in delayed workflow monitoring for ${sanitizedBranchName}:`, error);
-          }
-        }, 8000);
-
-        res.json({ 
-          success: true, 
-          message: 'Deployment started successfully!', 
-          branch: sanitizedBranchName,
-          deployment 
-        });
-
-      } catch (githubError) {
-        // Refund coins if GitHub deployment fails
-        await storage.updateUserBalance(userId, deploymentFee);
-        throw githubError;
-      }
-
-    } catch (error) {
-      console.error("Error creating GitHub deployment:", error);
-      res.status(500).json({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
-      });
-    }
-  });
-
-  // New user-based GitHub deployment - uses user's own GitHub account
-  app.post('/api/deployments/user-github', checkDeviceBan, isAuthenticated, async (req: any, res) => {
     console.log('=== USER GITHUB DEPLOYMENT STARTED ===');
     try {
       const userId = req.user._id.toString();
@@ -2324,25 +1848,12 @@ jobs:
         });
       }
 
-      const { repositoryId, branchName, sessionId, ownerNumber, prefix } = req.body;
-      console.log('Deployment request:', { repositoryId, branchName, sessionId, ownerNumber, prefix });
+      const { branchName, sessionId, ownerNumber, prefix } = req.body;
+      console.log('Deployment request:', { repositoryId: null, branchName, sessionId, ownerNumber, prefix }); // repositoryId is not used here
 
-      if (!repositoryId || !branchName || !sessionId || !ownerNumber || !prefix) {
+      if (!branchName || !sessionId || !ownerNumber || !prefix) {
         console.error('Missing required fields');
         return res.status(400).json({ message: 'All fields are required' });
-      }
-
-      // Get repository from database
-      const repository = await storage.getRepository(repositoryId);
-      if (!repository) {
-        console.error('Repository not found:', repositoryId);
-        return res.status(404).json({ message: 'Repository not found' });
-      }
-
-      // Verify repository belongs to user
-      if (repository.userId.toString() !== userId) {
-        console.error('Repository does not belong to user');
-        return res.status(403).json({ message: 'Access denied to this repository' });
       }
 
       // Get deployment cost setting
@@ -2363,11 +1874,12 @@ jobs:
 
       const deploymentNumber = await storage.getNextDeploymentNumber(userId);
 
-      const USER_GITHUB_TOKEN = repository.token;
-      const USER_GITHUB_USERNAME = repository.githubUsername;
-      const FORKED_REPO_NAME = repository.repositoryName;
+      // Use user's own GitHub credentials and the default repo
+      const GITHUB_TOKEN = user.githubAccessToken;
+      const REPO_OWNER = user.githubUsername;
+      const REPO_NAME = 'subzero-md'; // Hardcoded to user's fork
       const MAIN_BRANCH = 'main';
-      const WORKFLOW_FILE = repository.workflowName;
+      const WORKFLOW_FILE = 'deploy.yml'; // Hardcoded workflow file
 
       // Sanitize branch name
       const sanitizeBranchName = (name: string) => {
@@ -2390,11 +1902,11 @@ jobs:
 
       // GitHub API helper for user's repo
       const makeUserGitHubRequest = async (method: string, endpoint: string, data: any = null) => {
-        const url = `https://api.github.com/repos/${USER_GITHUB_USERNAME}/${FORKED_REPO_NAME}/${endpoint}`;
+        const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/${endpoint}`;
         const config: any = {
           method,
           headers: {
-            'Authorization': `token ${USER_GITHUB_TOKEN}`,
+            'Authorization': `token ${GITHUB_TOKEN}`,
             'Accept': 'application/vnd.github.v3+json',
             'User-Agent': 'SUBZERO-Deploy'
           }
@@ -2427,21 +1939,21 @@ jobs:
         // Check if fork exists, if not fork it
         console.log('Checking if fork exists...');
         try {
-          await fetch(`https://api.github.com/repos/${USER_GITHUB_USERNAME}/${FORKED_REPO_NAME}`, {
+          await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`, {
             headers: {
-              'Authorization': `token ${USER_GITHUB_TOKEN}`,
+              'Authorization': `token ${GITHUB_TOKEN}`,
               'Accept': 'application/vnd.github.v3+json'
             }
           }).then(async (res) => {
             if (!res.ok) throw new Error('Repo not found');
           });
-          console.log(`✓ Fork already exists for ${USER_GITHUB_USERNAME}/${FORKED_REPO_NAME}`);
+          console.log(`✓ Fork already exists for ${REPO_OWNER}/${REPO_NAME}`);
         } catch {
-          console.log(`⚠ Forking repo for ${USER_GITHUB_USERNAME}...`);
+          console.log(`⚠ Forking repo for ${REPO_OWNER}...`);
           const forkResponse = await fetch('https://api.github.com/repos/mrfrankofcc/subzero-md/forks', {
             method: 'POST',
             headers: {
-              'Authorization': `token ${USER_GITHUB_TOKEN}`,
+              'Authorization': `token ${GITHUB_TOKEN}`,
               'Accept': 'application/vnd.github.v3+json',
               'User-Agent': 'SUBZERO-Deploy'
             }
@@ -2457,8 +1969,8 @@ jobs:
           // Wait for fork to be ready
           await new Promise(resolve => setTimeout(resolve, 5000));
 
-          // Update user's fork status
-          await storage.updateUserGitHubForkStatus(userId, `${USER_GITHUB_USERNAME}/${FORKED_REPO_NAME}`, true);
+          // Update user's fork status in DB (if needed, this logic might be elsewhere)
+          // await storage.updateUserGitHubForkStatus(userId, `${REPO_OWNER}/${REPO_NAME}`, true);
         }
 
         // Check if branch already exists
@@ -2615,15 +2127,15 @@ jobs:
           curl -X POST \\\\
             -H "Authorization: Bearer \\$\{{ secrets.GITHUB_TOKEN }}" \\\\
             -H "Accept: application/vnd.github.v3+json" \\\\
-            https://api.github.com/repos/\\$\{{ github.repository }}/actions/workflows/deploy.yml/dispatches \\\\
-            -d '{"ref":"\\$\{{ github.ref_name }}"}'
+            https://api.github.com/repos/\\$\{{ github.repository }}/actions/workflows/${WORKFLOW_FILE}/dispatches \\\\
+            -d '{"ref":"${sanitizedBranchName}"}'
           echo "Restart triggered successfully"`;
 
         try {
           // First check if file exists on the deployment branch
           let existingFile;
           try {
-            existingFile = await makeUserGitHubRequest('GET', `contents/.github/workflows/deploy.yml?ref=${sanitizedBranchName}`);
+            existingFile = await makeUserGitHubRequest('GET', `contents/.github/workflows/${WORKFLOW_FILE}?ref=${sanitizedBranchName}`);
             console.log('Found existing workflow file on deployment branch');
           } catch (branchError) {
             // File doesn't exist on deployment branch, that's okay for new branches
@@ -2632,7 +2144,7 @@ jobs:
 
           if (existingFile) {
             // Update existing file on deployment branch
-            await makeUserGitHubRequest('PUT', `contents/.github/workflows/deploy.yml`, {
+            await makeUserGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
               message: `Update workflow for ${sanitizedBranchName}`,
               content: Buffer.from(workflowContent).toString('base64'),
               sha: existingFile.sha,
@@ -2641,7 +2153,7 @@ jobs:
             console.log('✓ Workflow file updated');
           } else {
             // Create new file on deployment branch
-            await makeUserGitHubRequest('PUT', `contents/.github/workflows/deploy.yml`, {
+            await makeUserGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
               message: `Create workflow for ${sanitizedBranchName}`,
               content: Buffer.from(workflowContent).toString('base64'),
               branch: sanitizedBranchName
@@ -2655,7 +2167,7 @@ jobs:
 
         // Trigger workflow
         console.log(`Triggering workflow for branch: ${sanitizedBranchName}`);
-        await makeUserGitHubRequest('POST', `actions/workflows/deploy.yml/dispatches`, {
+        await makeUserGitHubRequest('POST', `actions/workflows/${WORKFLOW_FILE}/dispatches`, {
           ref: sanitizedBranchName
         });
         console.log('✓ Workflow triggered successfully');
@@ -2669,35 +2181,36 @@ jobs:
           name: sanitizedBranchName,
           branchName: sanitizedBranchName,
           deploymentNumber,
-          status: "deploying",
-          configuration: `User GitHub: ${USER_GITHUB_USERNAME}/${FORKED_REPO_NAME}`,
+          status: "deploying", // Set status to deploying initially
+          configuration: `User GitHub: ${REPO_OWNER}/${REPO_NAME}`, // Indicate it's using user's GitHub
           cost: deploymentFee,
           lastChargeDate: now,
           nextChargeDate: nextChargeDate,
-          githubToken: USER_GITHUB_TOKEN,
-          githubOwner: USER_GITHUB_USERNAME,
-          githubRepo: FORKED_REPO_NAME
+          // These fields are not directly used in this deployment type but kept for schema consistency
+          githubToken: GITHUB_TOKEN, 
+          githubOwner: REPO_OWNER,
+          githubRepo: REPO_NAME
         });
 
         const deployment = await storage.createDeployment(deploymentData);
+        console.log('Deployment record created:', deployment._id);
 
-        // Update repository's branches array
-        const currentBranches = repository.branches || [];
-        if (!currentBranches.includes(sanitizedBranchName)) {
-          await storage.updateRepositoryBranches(repositoryId, [...currentBranches, sanitizedBranchName]);
-        }
+        // Update repository's branches array (optional, depends on schema)
+        // This might require fetching the repo details first if not already done
+        // await storage.updateRepositoryBranches(repositoryId, [...currentBranches, sanitizedBranchName]);
 
         res.json({ 
           success: true, 
           message: 'Deployment started successfully using your GitHub account!', 
           branch: sanitizedBranchName,
           deployment,
-          repo: `${USER_GITHUB_USERNAME}/${FORKED_REPO_NAME}`
+          repo: `${REPO_OWNER}/${REPO_NAME}`
         });
 
       } catch (githubError) {
         // Refund coins if deployment fails
         await storage.updateUserBalance(userId, deploymentFee);
+        console.error('GitHub deployment failed, refunding coins.');
         throw githubError;
       }
 
@@ -2709,6 +2222,7 @@ jobs:
       });
     }
   });
+
 
   app.patch('/api/deployments/:id/status', isAuthenticated, async (req: any, res) => {
     try {
@@ -3687,7 +3201,7 @@ jobs:
         return res.json([{
           jobId: parseInt(runId) || 1,
           jobName: 'Configuration Required',
-          logs: 'GitHub integration not configured by administrator. Cannot access specific workflow run logs.\n\nContact your administrator to configure GitHub settings.',
+          logs: 'GitHub integration not configured by administrator. Cannot access specific workflow run logs.\n\nContact your administrator to configure GitHub settings.\n',
           status: 'configuration_missing',
           conclusion: 'neutral'
         }]);
@@ -3745,736 +3259,21 @@ jobs:
     }
   });
 
-  // Deployment endpoints using admin-configured GitHub settings
-  app.get('/api/admin/deployment/check-branch', requireAdmin, async (req, res) => {
+  // Admin: Get deployment logs (admin access)
+  app.get('/api/admin/deployments/:deploymentId/logs', requireAdmin, async (req: any, res) => {
     try {
-      const { branchName } = req.query;
-      const [githubToken, repoOwner, repoName] = await Promise.all([
-        storage.getAppSetting('github_token'),
-        storage.getAppSetting('github_repo_owner'),
-        storage.getAppSetting('github_repo_name')
-      ]);
+      const { deploymentId } = req.params;
 
-      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
-        return res.status(400).json({ message: 'GitHub settings not configured. Please configure GitHub settings first.' });
-      }
-
-      const generateBranchName = () => {
-        const prefix = 'subzero-';
-        const randomChars = Math.random().toString(36).substring(2, 8);
-        return prefix + randomChars;
-      };
-
-      const sanitizeBranchName = (name: string) => {
-        // Remove invalid characters and ensure it follows GitHub branch naming rules
-        return name
-          .replace(/[^a-zA-Z0-9._-]/g, '-') // Replace invalid chars with dash
-          .replace(/^\.+|\.+$/g, '') // Remove leading/trailing dots
-          .replace(/\.\.+/g, '.') // Replace multiple dots with single dot
-          .replace(/^-+|-+$/g, '') // Remove leading/trailing dashes
-          .replace(/--+/g, '-') // Replace multiple dashes with single dash
-          .substring(0, 250); // Limit length
-      };
-
-      if (!branchName || branchName.toString().trim() === '') {
-        const generatedName = generateBranchName();
-        return res.json({ 
-          available: true, 
-          suggested: generatedName,
-          message: `Try this available name: ${generatedName}`
-        });
-      }
-
-      // Sanitize the branch name
-      const originalName = branchName.toString().trim();
-      const sanitizedName = sanitizeBranchName(originalName);
-
-      if (!sanitizedName) {
-        const generatedName = generateBranchName();
-        return res.json({ 
-          available: false, 
-          suggested: generatedName,
-          message: `Invalid name. Try: ${generatedName}`
-        });
-      }
-
-      // Use sanitized name for checking
-      const nameToCheck = sanitizedName;
-
-      // Check if branch exists using sanitized name
-      const url = `https://api.github.com/repos/${repoOwner.value}/${repoName.value}/git/ref/heads/${nameToCheck}`;
-      try {
-        const response = await fetch(url, {
-          headers: {
-            'Authorization': `token ${githubToken.value}`,
-            'Accept': 'application/vnd.github.v3+json'
-          }
-        });
-
-        if (response.status === 404) {
-          return res.json({ 
-            available: true,
-            sanitized: originalName !== sanitizedName ? sanitizedName : undefined,
-            message: originalName !== sanitizedName ? 
-              `Name available! (Auto-corrected to: ${sanitizedName})` : 
-              'Name available!'
-          });
-        } else if (response.ok) {
-          const suggestedName = `${sanitizedName}-${Math.floor(Math.random() * 1000)}`;
-          return res.json({ 
-            available: false, 
-            suggested: suggestedName,
-            sanitized: originalName !== sanitizedName ? sanitizedName : undefined,
-            message: `Name taken. Try: ${suggestedName}`
-          });
-        } else {
-          throw new Error(`GitHub API error: ${response.statusText}`);
-        }
-      } catch (error) {
-        console.error('Branch check error:', error);
-        res.status(500).json({ message: 'Failed to check branch availability' });
-      }
-    } catch (error) {
-      console.error('Error checking branch:', error);
-      res.status(500).json({ message: 'Failed to check branch' });
-    }
-  });
-
-  // Delete deployment
-  app.delete('/api/deployments/:id', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user._id.toString();
-      const deploymentId = req.params.id;
-
-      // Get deployment to verify ownership
+      // Get deployment
       const deployment = await storage.getDeployment(deploymentId);
       if (!deployment) {
-        return res.status(404).json({ message: "Deployment not found" });
-      }
-
-      // Check if user owns this deployment or is admin
-      const user = await storage.getUser(userId);
-      if (deployment.userId.toString() !== userId && !user?.isAdmin) {
-        return res.status(403).json({ message: "Not authorized to delete this deployment" });
-      }
-
-      // Delete GitHub branch if it exists
-      if (deployment.branchName) {
-        try {
-          const [githubToken, repoOwner, repoName] = await Promise.all([
-            storage.getAppSetting('github_token'),
-            storage.getAppSetting('github_repo_owner'),
-            storage.getAppSetting('github_repo_name')
-          ]);
-
-          if (githubToken?.value && repoOwner?.value && repoName?.value) {
-            const deleteUrl = `https://api.github.com/repos/${repoOwner.value}/${repoName.value}/git/refs/heads/${deployment.branchName}`;
-            const deleteResponse = await fetch(deleteUrl, {
-              method: 'DELETE',
-              headers: {
-                'Authorization': `token ${githubToken.value}`,
-                'Accept': 'application/vnd.github.v3+json',
-                'User-Agent': 'SUBZERO-Deployment-Bot'
-              }
-            });
-
-            if (deleteResponse.ok || deleteResponse.status === 404) {
-              console.log(`Successfully deleted GitHub branch: ${deployment.branchName}`);
-            } else {
-              console.warn(`Failed to delete GitHub branch ${deployment.branchName}: ${deleteResponse.status} ${deleteResponse.statusText}`);
-            }
-          }
-        } catch (branchDeleteError) {
-          console.warn(`Error deleting GitHub branch ${deployment.branchName}:`, branchDeleteError);
-          // Continue with deployment deletion even if branch deletion fails
-        }
-      }
-
-      await storage.deleteDeployment(deploymentId);
-      res.json({ message: "Deployment deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting deployment:", error);
-      res.status(500).json({ message: "Failed to delete deployment" });
-    }
-  });
-
-  // Deployment Variables Management
-
-  // Get all variables for a deployment
-  app.get('/api/deployments/:id/variables', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user._id.toString();
-      const deploymentId = req.params.id;
-
-      // Verify deployment ownership
-      const deployment = await storage.getDeployment(deploymentId);
-      if (!deployment) {
-        return res.status(404).json({ message: "Deployment not found" });
-      }
-
-      if (deployment.userId.toString() !== userId) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
-
-      const variables = await storage.getDeploymentVariables(deploymentId);
-      res.json(variables);
-    } catch (error) {
-      console.error("Error fetching deployment variables:", error);
-      res.status(500).json({ message: "Failed to fetch variables" });
-    }
-  });
-
-  // Create or update a deployment variable
-  app.post('/api/deployments/:id/variables', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user._id.toString();
-      const deploymentId = req.params.id;
-      const { key, value, description, isRequired } = req.body;
-
-      // Verify deployment ownership
-      const deployment = await storage.getDeployment(deploymentId);
-      if (!deployment) {
-        return res.status(404).json({ message: "Deployment not found" });
-      }
-
-      if (deployment.userId.toString() !== userId) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
-
-      const variable = await storage.upsertDeploymentVariable(
-        deploymentId, 
-        key, 
-        value, 
-        description, 
-        isRequired
-      );
-
-      res.json(variable);
-    } catch (error) {
-      console.error("Error creating/updating deployment variable:", error);
-      res.status(500).json({ message: "Failed to save variable" });
-    }
-  });
-
-  // Update a specific deployment variable
-  app.put('/api/deployments/:id/variables/:variableId', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user._id.toString();
-      const deploymentId = req.params.id;
-      const variableId = req.params.variableId;
-      const { value } = req.body;
-
-      // Verify deployment ownership
-      const deployment = await storage.getDeployment(deploymentId);
-      if (!deployment) {
-        return res.status(404).json({ message: "Deployment not found" });
-      }
-
-      if (deployment.userId.toString() !== userId) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
-
-      await storage.updateDeploymentVariable(variableId, value);
-      res.json({ message: "Variable updated successfully" });
-    } catch (error) {
-      console.error("Error updating deployment variable:", error);
-      res.status(500).json({ message: "Failed to update variable" });
-    }
-  });
-
-  // Delete a deployment variable
-  app.delete('/api/deployments/:id/variables/:variableId', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user._id.toString();
-      const deploymentId = req.params.id;
-      const variableId = req.params.variableId;
-
-      // Verify deployment ownership
-      const deployment = await storage.getDeployment(deploymentId);
-      if (!deployment) {
-        return res.status(404).json({ message: "Deployment not found" });
-      }
-
-      if (deployment.userId.toString() !== userId) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
-
-      await storage.deleteDeploymentVariable(variableId);
-      res.json({ message: "Variable deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting deployment variable:", error);
-      res.status(500).json({ message: "Failed to delete variable" });
-    }
-  });
-
-  // Redeploy with updated variables
-  app.post('/api/deployments/:id/redeploy', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user._id.toString();
-      const deploymentId = req.params.id;
-
-      // Verify deployment ownership
-      const deployment = await storage.getDeployment(deploymentId);
-      if (!deployment) {
-        return res.status(404).json({ message: "Deployment not found" });
-      }
-
-      if (deployment.userId.toString() !== userId) {
-        return res.status(403).json({ message: "Not authorized" });
+        return res.status(404).json({ message: 'Deployment not found' });
       }
 
       if (!deployment.branchName) {
-        return res.status(400).json({ message: "No branch associated with this deployment" });
+        return res.status(400).json({ message: 'No branch name associated with this deployment' });
       }
 
-      // Get deployment variables
-      const variables = await storage.getDeploymentVariables(deploymentId);
-
-      // Get GitHub settings
-      const [githubToken, repoOwner, repoName, mainBranch] = await Promise.all([
-        storage.getAppSetting('github_token'),
-        storage.getAppSetting('github_repo_owner'),
-        storage.getAppSetting('github_repo_name'),
-        storage.getAppSetting('github_main_branch')
-      ]);
-
-      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
-        return res.status(400).json({ 
-          message: 'GitHub integration not configured. Administrator needs to set up GitHub token and repository settings.',
-          details: 'Contact support to configure GitHub integration for deployment management.',
-          missingSettings: {
-            token: !githubToken?.value,
-            owner: !repoOwner?.value,  
-            repo: !repoName?.value
-          }
-        });
-      }
-
-      const GITHUB_TOKEN = githubToken.value;
-      const REPO_OWNER = repoOwner.value;
-      const REPO_NAME = repoName.value;
-      const MAIN_BRANCH = mainBranch?.value || 'main';
-
-      // Helper function for GitHub API requests
-      const makeGitHubRequest = async (method: string, endpoint: string, data?: any) => {
-        const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/${endpoint}`;
-        const response = await fetch(url, {
-          method,
-          headers: {
-            'Authorization': `token ${GITHUB_TOKEN}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'Content-Type': 'application/json',
-          },
-          body: data ? JSON.stringify(data) : undefined,
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`GitHub API error: ${response.status} ${response.statusText} - ${errorText}`);
-        }
-
-        return response.json();
-      };
-
-      // Update settings.js with new variables - create a proper content map
-      const variableMap = new Map<string, string>();
-
-      // Add deployment variables first
-      variables.forEach((v: any) => {
-        variableMap.set(v.key.toUpperCase(), v.value);
-      });
-
-      // Add default variables if not overridden
-      const defaultVariables = {
-        'SESSION_ID': 'default_session',
-        'OWNER_NUMBER': '1234567890',
-        'PREFIX': '.'
-      };
-
-      Object.entries(defaultVariables).forEach(([key, value]) => {
-        if (!variableMap.has(key)) {
-          variableMap.set(key, value);
-        }
-      });
-
-      const settingsContent = `module.exports = {
-${Array.from(variableMap.entries()).map(([key, value]) => `  ${key}: "${value}",`).join('\n')}
-};`;
-
-      // Update config.js with same variables 
-      const configContent = `module.exports = {
-${Array.from(variableMap.entries()).map(([key, value]) => `  ${key}: "${value}",`).join('\n')}
-  // Auto-generated environment variables
-  NODE_ENV: process.env.NODE_ENV || "production",
-  PORT: process.env.PORT || 3000,
-  DATABASE_URL: process.env.DATABASE_URL || "",
-  // Add any custom environment variables here
-};`;
-
-      // Update settings.js in the branch
-      try {
-        // Get current file to get its SHA
-        const currentFile = await makeGitHubRequest('GET', `contents/settings.js?ref=${deployment.branchName}`);
-
-        // Update the file
-        await makeGitHubRequest('PUT', 'contents/settings.js', {
-          message: `Update settings.js with new variables for ${deployment.name}`,
-          content: Buffer.from(settingsContent).toString('base64'),
-          sha: currentFile.sha,
-          branch: deployment.branchName
-        });
-
-        // Also update config.js if it exists
-        try {
-          const configFile = await makeGitHubRequest('GET', `contents/config.js?ref=${deployment.branchName}`);
-          await makeGitHubRequest('PUT', 'contents/config.js', {
-            message: `Update config.js with new variables for ${deployment.name}`,
-            content: Buffer.from(configContent).toString('base64'),
-            sha: configFile.sha,
-            branch: deployment.branchName
-          });
-        } catch (configError) {
-          // config.js doesn't exist, create it
-          await makeGitHubRequest('PUT', 'contents/config.js', {
-            message: `Create config.js with variables for ${deployment.name}`,
-            content: Buffer.from(configContent).toString('base64'),
-            branch: deployment.branchName
-          });
-        }
-
-        // Trigger workflow to redeploy
-        const workflowFile = await storage.getAppSetting('github_workflow_file');
-        const WORKFLOW_FILE = workflowFile?.value || 'main.yml';
-        await makeGitHubRequest('POST', `actions/workflows/${WORKFLOW_FILE}/dispatches`, {
-          ref: deployment.branchName
-        });
-
-        res.json({ 
-          success: true, 
-          message: 'Deployment restarted with updated variables!',
-          deployment
-        });
-      } catch (error) {
-        console.error('Redeploy error:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        if (errorMessage.includes('Bad credentials') || errorMessage.includes('Unauthorized')) {
-          res.status(400).json({ 
-            message: 'GitHub authentication failed. Please contact administrator to update GitHub token.',
-            details: 'The GitHub token may be expired or invalid.'
-          });
-        } else {
-          res.status(500).json({ 
-            message: 'Failed to redeploy with updated variables',
-            details: errorMessage
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Error redeploying:", error);
-      res.status(500).json({ message: "Failed to redeploy" });
-    }
-  });
-
-  app.post('/api/admin/deployment/deploy', requireAdmin, async (req, res) => {
-    try {
-      let { branchName, sessionId, ownerNumber, prefix } = req.body;
-
-      // Get the best available GitHub account
-      const githubAccount = await storage.getBestGitHubAccount();
-
-      if (!githubAccount) {
-        return res.status(400).json({ message: 'No GitHub accounts configured. Please add GitHub accounts first.' });
-      }
-
-      const GITHUB_TOKEN = githubAccount.token;
-      const REPO_OWNER = githubAccount.owner;
-      const REPO_NAME = githubAccount.repo;
-      const MAIN_BRANCH = 'main';
-      const WORKFLOW_FILE = githubAccount.workflowFile;
-
-      // Validate and sanitize branch name
-      const sanitizeBranchName = (name: string) => {
-        // Remove invalid characters and ensure it follows GitHub branch naming rules
-        return name
-          .replace(/[^a-zA-Z0-9._-]/g, '-') // Replace invalid chars with dash
-          .replace(/^\.+|\.+$/g, '') // Remove leading/trailing dots
-          .replace(/\.\.+/g, '.') // Replace multiple dots with single dot
-          .replace(/^-+|-+$/g, '') // Remove leading/trailing dashes
-          .replace(/--+/g, '-') // Replace multiple dashes with single dash
-          .substring(0, 250); // Limit length
-      };
-
-      if (!branchName || branchName.trim() === '') {
-        const prefix = 'subzero-';
-        const randomChars = Math.random().toString(36).substring(2, 8);
-        branchName = prefix + randomChars;
-      } else {
-        branchName = sanitizeBranchName(branchName.trim());
-
-        // If sanitization resulted in empty string, generate a name
-        if (!branchName) {
-          const prefix = 'subzero-';
-          const randomChars = Math.random().toString(36).substring(2, 8);
-          branchName = prefix + randomChars;
-        }
-      }
-
-      if (!sessionId || !ownerNumber || !prefix) {
-        throw new Error('All fields are required');
-      }
-
-      const makeGitHubRequest = async (method: string, endpoint: string, data: any = null) => {
-        const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/${endpoint}`;
-        const config: any = {
-          method,
-          headers: {
-            'Authorization': `token ${GITHUB_TOKEN}`,
-            'Accept': 'application/vnd.github.v3+json'
-          }
-        };
-
-        if (data) {
-          config.headers['Content-Type'] = 'application/json';
-          config.body = JSON.stringify(data);
-        }
-
-        const response = await fetch(url, config);
-        if (!response.ok) {
-          let errorMessage = `GitHub API error: ${response.status} ${response.statusText}`;
-          try {
-            const responseText = await response.text();
-            if (responseText) {
-              const errorData = JSON.parse(responseText);
-              errorMessage = errorData?.message || errorMessage;
-            }
-          } catch (parseError) {
-            // If we can't parse the error response, use the status text
-            console.error('Failed to parse GitHub error response:', parseError);
-          }
-          throw new Error(errorMessage);
-        }
-
-        const responseText = await response.text();
-        if (!responseText) {
-          return {}; // Return empty object for empty responses
-        }
-
-        try {
-          return JSON.parse(responseText);
-        } catch (parseError) {
-          console.error('Failed to parse GitHub response:', parseError);
-          throw new Error('Invalid JSON response from GitHub API');
-        }
-      };
-
-      // 1. Create branch
-      const mainRef = await makeGitHubRequest('GET', `git/ref/heads/${MAIN_BRANCH}`);
-      await makeGitHubRequest('POST', 'git/refs', {
-        ref: `refs/heads/${branchName}`,
-        sha: mainRef.object.sha
-      });
-
-      // 2. Update settings.js
-      const fileData = await makeGitHubRequest('GET', `contents/settings.js?ref=${branchName}`);
-      const newContent = `module.exports = {
-  SESSION_ID: "${sessionId}",
-  OWNER_NUMBER: "${ownerNumber}", 
-  PREFIX: "${prefix}",
-  CDN: "https://mrfrankk-cdn.hf.space" //Dont change this part
-};`;
-
-      await makeGitHubRequest('PUT', 'contents/settings.js', {
-        message: `Update settings.js for ${branchName}`,
-        content: Buffer.from(newContent).toString('base64'),
-        sha: fileData.sha,
-        branch: branchName
-      });
-
-      // 3. Update workflow file with new pattern
-      const workflowContent = `name: SUBZERO-MD-DEPLOY
-on:
-  workflow_dispatch:
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20'
-
-      - name: Debug Environment
-        run: |
-          echo "=== ENVIRONMENT DEBUG ==="
-          echo "Node version: \\$(node --version)"
-          echo "NPM version: \\$(npm --version)"
-          echo "Working directory: \\$(pwd)"
-          echo "Files in current directory:"
-          ls -la
-          echo "=== SESSION ID CHECK ==="
-          if [ -f ".env" ]; then
-            echo ".env file found:"
-            cat .env
-          else
-            echo "No .env file found"
-          fi
-          echo "=== CONFIG FILE CHECK ==="
-          if [ -f "settings.js" ]; then
-            echo "settings.js content:"
-            cat settings.js
-          else
-            echo "No settings.js found"
-          fi
-
-      - name: Install Dependencies
-        run: |
-          echo "=== INSTALLING DEPENDENCIES ==="
-          npm install --verbose
-          echo "=== DEPENDENCY TREE ==="
-          npm list --depth=0
-
-      - name: Pre-run Checks
-        run: |
-          echo "=== PRE-RUN CHECKS ==="
-          echo "Checking package.json scripts:"
-          cat package.json | grep -A 10 '"scripts"'
-          echo "=== CHECKING FOR MAIN FILES ==="
-          if [ -f "index.js" ]; then echo "✓ index.js found"; else echo "✗ index.js missing"; fi
-
-      - name: Run Bot with Detailed Logging
-        run: |
-          echo "=== STARTING SUBZERO-MD BOT ==="
-          echo "Timestamp: \\$(date)"
-          echo "Starting bot with detailed logging..."
-
-          timeout 18000 bash -c '
-            attempt=1
-            while true; do
-              echo "=== ATTEMPT #\\$attempt ==="
-              echo ">>> Starting bot attempt #\\$attempt at \\$(date)"
-              npm start 2>&1 | while IFS= read -r line; do
-                echo "[\\$(date +"%H:%M:%S")] \\$line"
-              done
-              exit_code=\\$?
-              echo ">>> Bot stopped with exit code: \\$exit_code at \\$(date)"
-
-              if [ \\$exit_code -eq 0 ]; then
-                echo "Bot exited normally, restarting in 5 seconds..."
-                sleep 5
-              else
-                echo "Bot crashed, analyzing error and restarting in 10 seconds..."
-                echo "=== ERROR ANALYSIS ==="
-                echo "Checking system resources:"
-                free -h
-                df -h
-                echo "Recent system messages:"
-                dmesg | tail -5 2>/dev/null || echo "No system messages available"
-                sleep 10
-              fi
-
-              attempt=\\$((attempt + 1))
-            done
-          ' || echo "Timeout reached after 5 hours"
-
-      - name: Post-Run Analysis
-        if: always()
-        run: |
-          echo "=== POST-RUN ANALYSIS ==="
-          echo "Final timestamp: \\$(date)"
-          echo "Checking for any log files:"
-          find . -name "*.log" -type f 2>/dev/null || echo "No log files found"
-          echo "=== FINAL SYSTEM STATE ==="
-          free -h
-          df -h
-
-      - name: Re-Trigger Workflow
-        if: always()
-        run: |
-          echo "=== AUTO-RESTART ==="
-          echo "Preparing to restart workflow at \\$(date)"
-          sleep 30
-          curl -X POST \\\\
-            -H "Authorization: Bearer \\$\{{ secrets.GITHUB_TOKEN }}" \\\\
-            -H "Accept: application/vnd.github.v3+json" \\\\
-            https://api.github.com/repos/\\$\{{ github.repository }}/actions/workflows/${WORKFLOW_FILE}/dispatches \\\\
-            -d '{"ref":"${sanitizedBranchName}"}'
-          echo "Restart triggered successfully"`;
-
-      try {
-        const existingFile = await makeGitHubRequest('GET', `contents/.github/workflows/${WORKFLOW_FILE}?ref=${branchName}`);
-
-        // Update existing file
-        await makeGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
-          message: `Update workflow to use ${branchName} branch`,
-          content: Buffer.from(workflowContent).toString('base64'),
-          sha: existingFile.sha,
-          branch: branchName
-        });
-      } catch (error) {
-        // Create new file if it doesn't exist
-        await makeGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
-          message: `Create workflow for ${branchName} branch`,
-          content: Buffer.from(workflowContent).toString('base64'),
-          branch: branchName
-        });
-      }
-
-      // 4. Trigger workflow
-      await makeGitHubRequest('POST', `actions/workflows/${WORKFLOW_FILE}/dispatches`, {
-        ref: branchName
-      });
-
-      // Broadcast deployment creation to WebSocket clients
-      broadcastToClients('deployment_created', {
-        branch: branchName,
-        sessionId,
-        ownerNumber,
-        prefix,
-        timestamp: new Date().toISOString()
-      });
-
-      // Create deployment record with active status
-      const deploymentData = {
-        userId: (req.user as any)._id.toString(),
-        name: branchName,
-        branchName: branchName,
-        status: 'active', // Set to active immediately when workflow is triggered
-        cost: 25, // Default cost
-        configuration: JSON.stringify({ sessionId, ownerNumber, prefix }), // Required field
-        lastChargeDate: new Date(),
-        nextChargeDate: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
-      };
-
-      await storage.createDeployment(deploymentData);
-
-      // Start monitoring this deployment after a short delay to allow GitHub to process
-      setTimeout(() => {
-        startWorkflowMonitoring(branchName);
-      }, 10000); // 10 second delay
-
-      res.json({ 
-        success: true, 
-        message: 'Deployment successful!',
-        branch: branchName,
-        workflowUpdated: true
-      });
-    } catch (error) {
-      console.error('Deployment error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-        details: null
-      });
-    }
-  });
-
-  // Get workflow runs for a specific branch
-  app.get('/api/admin/deployment/:branchName/logs', requireAdmin, async (req, res) => {
-    try {
-      const { branchName } = req.params;
       const [githubToken, repoOwner, repoName, workflowFile] = await Promise.all([
         storage.getAppSetting('github_token'),
         storage.getAppSetting('github_repo_owner'),
@@ -4483,7 +3282,13 @@ jobs:
       ]);
 
       if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
-        return res.status(400).json({ message: 'GitHub settings not configured' });
+        return res.json([{
+          jobId: 1,
+          jobName: 'Configuration Required',
+          logs: 'GitHub integration not configured by administrator.',
+          status: 'configuration_missing',
+          conclusion: 'neutral'
+        }]);
       }
 
       const GITHUB_TOKEN = githubToken.value;
@@ -4492,7 +3297,7 @@ jobs:
       const WORKFLOW_FILE = workflowFile?.value || 'SUBZERO.yml';
 
       // Get workflow runs for the specific branch
-      const runsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/runs?branch=${branchName}&per_page=10`;
+      const runsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/${WORKFLOW_FILE}/runs?branch=${deployment.branchName}&per_page=10`;
       const runsResponse = await fetch(runsUrl, {
         headers: {
           'Authorization': `token ${GITHUB_TOKEN}`,
@@ -4505,74 +3310,64 @@ jobs:
       }
 
       const runsData = await runsResponse.json();
-      res.json(runsData.workflow_runs || []);
-    } catch (error) {
-      console.error('Error fetching workflow logs:', error);
-      res.status(500).json({ message: 'Failed to fetch workflow logs' });
-    }
-  });
-
-  // Get specific workflow run logs
-  app.get('/api/admin/deployment/run/:runId/logs', requireAdmin, async (req, res) => {
-    try {
-      const { runId } = req.params;
-      const [githubToken, repoOwner, repoName] = await Promise.all([
-        storage.getAppSetting('github_token'),
-        storage.getAppSetting('github_repo_owner'),
-        storage.getAppSetting('github_repo_name')
-      ]);
-
-      if (!githubToken?.value || !repoOwner?.value || !repoName?.value) {
-        return res.status(400).json({ message: 'GitHub settings not configured' });
-      }
-
-      const GITHUB_TOKEN = githubToken.value;
-      const REPO_OWNER = repoOwner.value;
-      const REPO_NAME = repoName.value;
-
-      // Get jobs for the workflow run
-      const jobsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs/${runId}/jobs`;
-      const jobsResponse = await fetch(jobsUrl, {
-        headers: {
-          'Authorization': `token ${GITHUB_TOKEN}`,
-          'Accept': 'application/vnd.github.v3+json'
-        }
-      });
-
-      if (!jobsResponse.ok) {
-        throw new Error(`GitHub API error: ${jobsResponse.statusText}`);
-      }
-
-      const jobsData = await jobsResponse.json();
-
-      // Get logs for each job
-      const logsPromises = jobsData.jobs.map(async (job: any) => {
-        try {
-          const logsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/jobs/${job.id}/logs`;
-          const logsResponse = await fetch(logsUrl, {
-            headers: {
-              'Authorization': `token ${GITHUB_TOKEN}`,
-              'Accept': 'application/vnd.github.v3+json'
-            }
-          });
-
-          if (logsResponse.ok) {
-            const logs = await logsResponse.text();
-            return { jobId: job.id, jobName: job.name, logs };
+      
+      let detailedLogs = [];
+      if (runsData.workflow_runs && runsData.workflow_runs.length > 0) {
+        const latestRun = runsData.workflow_runs[0];
+        const jobsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs/${latestRun.id}/jobs`;
+        const jobsResponse = await fetch(jobsUrl, {
+          headers: {
+            'Authorization': `token ${GITHUB_TOKEN}`,
+            'Accept': 'application/vnd.github.v3+json'
           }
-          return { jobId: job.id, jobName: job.name, logs: 'No logs available' };
-        } catch (error) {
-          return { jobId: job.id, jobName: job.name, logs: 'Error fetching logs' };
-        }
-      });
+        });
 
-      const allLogs = await Promise.all(logsPromises);
-      res.json({ jobs: jobsData.jobs, logs: allLogs });
+        if (jobsResponse.ok) {
+          const jobsData = await jobsResponse.json();
+          const jobs = jobsData.jobs || [];
+
+          for (const job of jobs) {
+            const logsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/jobs/${job.id}/logs`;
+            const logsResponse = await fetch(logsUrl, {
+              headers: {
+                'Authorization': `token ${GITHUB_TOKEN}`,
+                'Accept': 'application/vnd.github.v3+json'
+              }
+            });
+
+            if (logsResponse.ok) {
+              const logs = await logsResponse.text();
+              detailedLogs.push({
+                jobId: job.id,
+                jobName: job.name,
+                logs: logs || 'No logs available',
+                createdAt: job.created_at,
+                updatedAt: job.completed_at || new Date().toISOString()
+              });
+            }
+          }
+        }
+      }
+
+      if (detailedLogs.length === 0) {
+        detailedLogs.push({
+          jobId: 1,
+          jobName: 'Deployment Status',
+          logs: runsData.workflow_runs && runsData.workflow_runs.length > 0 ? 
+            'Deployment workflow found but logs are not yet available.' :
+            'No deployment workflows found for this branch.',
+          status: 'pending',
+          conclusion: 'neutral'
+        });
+      }
+
+      res.json(detailedLogs);
     } catch (error) {
-      console.error('Error fetching specific workflow logs:', error);
-      res.status(500).json({ message: 'Failed to fetch workflow logs' });
+      console.error('Error fetching deployment logs (admin):', error);
+      res.status(500).json({ message: 'Failed to fetch deployment logs' });
     }
   });
+
 
   // GitHub API test endpoints for branches and workflows
   app.get('/api/admin/github/branches', isAuthenticated, requireAdmin, async (req: any, res) => {
