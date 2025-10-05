@@ -163,7 +163,7 @@ export async function setupGitHubAuth(app: Express) {
         console.error('Error in GitHub OAuth callback:', error);
       }
       
-      res.redirect('/');
+      res.redirect('/dashboard');
     }
   );
 }

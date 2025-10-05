@@ -20,7 +20,7 @@ import express from "express";
 async function checkDeviceBan(req: any, res: any, next: any) {
   try {
     const deviceFingerprint = req.body?.deviceFingerprint || req.headers['x-device-fingerprint'];
-    
+
     if (deviceFingerprint) {
       const isBanned = await storage.isDeviceFingerprintBanned(deviceFingerprint);
       if (isBanned) {
@@ -30,7 +30,7 @@ async function checkDeviceBan(req: any, res: any, next: any) {
         });
       }
     }
-    
+
     next();
   } catch (error) {
     console.error('Error checking device ban:', error);
@@ -126,16 +126,16 @@ async function monitorWorkflowStatus(branchName: string) {
     if (response.ok) {
       const data = await response.json();
       const runs = data.workflow_runs || [];
-      
+
       if (runs.length > 0) {
         const latestRun = runs[0];
-        
+
         // Get live logs for this run
         const logsData = await getWorkflowRunLogs(GITHUB_TOKEN, REPO_OWNER, REPO_NAME, latestRun.id);
-        
+
         // Check if npm start is detected in logs
         const isAppActive = detectAppStartInLogs(logsData);
-        
+
         // Update deployment status if app becomes active
         if (isAppActive) {
           try {
@@ -148,7 +148,7 @@ async function monitorWorkflowStatus(branchName: string) {
             console.error(`Error updating deployment status for ${branchName}:`, error);
           }
         }
-        
+
         broadcastToClients('workflow_status_update', {
           branch: branchName,
           run: {
@@ -197,7 +197,7 @@ async function getWorkflowRunLogs(token: string, owner: string, repo: string, ru
     if (!jobsResponse.ok) return [];
 
     const jobsData = await jobsResponse.json();
-    
+
     // Get logs for each job
     const logsPromises = jobsData.jobs.map(async (job: any) => {
       try {
@@ -208,7 +208,7 @@ async function getWorkflowRunLogs(token: string, owner: string, repo: string, ru
             'Accept': 'application/vnd.github.v3+json'
           }
         });
-        
+
         if (logsResponse.ok) {
           const logs = await logsResponse.text();
           return { 
@@ -253,7 +253,7 @@ async function getWorkflowRunLogs(token: string, owner: string, repo: string, ru
 // Helper function to detect if app has started in logs
 function detectAppStartInLogs(logsData: any[]): boolean {
   if (!logsData || logsData.length === 0) return false;
-  
+
   const appStartIndicators = [
     'npm start',
     'node index.js',
@@ -265,7 +265,7 @@ function detectAppStartInLogs(logsData: any[]): boolean {
     'Ready to serve',
     'Application started'
   ];
-  
+
   for (const logEntry of logsData) {
     if (logEntry.logs) {
       const logs = logEntry.logs.toLowerCase();
@@ -276,7 +276,7 @@ function detectAppStartInLogs(logsData: any[]): boolean {
       }
     }
   }
-  
+
   return false;
 }
 
@@ -291,7 +291,7 @@ function startWorkflowMonitoring(branchName: string) {
   // Monitor every 30 seconds indefinitely for auto-restarting workflows
   let attempts = 0;
   const maxAttempts = 9999; // Effectively infinite for auto-restarting workflows
-  
+
   const monitor = () => {
     if (attempts >= maxAttempts) {
       // For auto-restarting workflows, reset attempts counter instead of stopping
@@ -301,10 +301,10 @@ function startWorkflowMonitoring(branchName: string) {
         message: 'Monitoring reset - workflow continues auto-restarting' 
       });
     }
-    
+
     monitorWorkflowStatus(branchName);
     attempts++;
-    
+
     const timeoutId = setTimeout(monitor, 30000); // 30 seconds
     monitoringDeployments.set(branchName, timeoutId);
   };
@@ -321,15 +321,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     'https://subzero-deploy.koyeb.app',
     process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null,
   ].filter((origin): origin is string => origin !== null);
-  
+
   const corsOptions = {
     origin: allowedOrigins,
     credentials: true,
     optionsSuccessStatus: 200,
   };
-  
+
   app.use(cors(corsOptions));
-  
+
   // Auth middleware
   await setupAuth(app);
   await setupGitHubAuth(app);
@@ -337,7 +337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Maintenance mode middleware - check before all routes except maintenance and admin
   const maintenanceMiddleware = async (req: any, res: any, next: any) => {
     const url = req.originalUrl || req.url;
-    
+
     // Skip maintenance check for maintenance info, admin routes, and auth routes
     if (url.startsWith('/api/maintenance') || 
         url.startsWith('/api/admin') || 
@@ -370,7 +370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error checking maintenance mode:', error);
     }
-    
+
     next();
   };
 
@@ -401,7 +401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error('Error destroying session:', err);
           }
         });
-        
+
         // For API requests, return JSON response
         if (url.startsWith('/api/')) {
           return res.status(403).json({ 
@@ -410,14 +410,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             forceLogout: true
           });
         }
-        
+
         // For regular requests, redirect to login
         return res.redirect('/login?error=account_banned');
       }
     } catch (error) {
       console.error('Error checking user status:', error);
     }
-    
+
     next();
   };
 
@@ -427,7 +427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/auth/check-device-limit', async (req, res) => {
     try {
       const { deviceFingerprint, cookieValue } = req.body;
-      
+
       if (!deviceFingerprint || !cookieValue) {
         return res.status(400).json({ 
           allowed: false, 
@@ -462,10 +462,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user._id.toString();
       await storage.markAllMessagesAsRead(userId);
-      
+
       // Update user activity
       await storage.updateUserActivity(userId);
-      
+
       res.json({ success: true });
     } catch (error) {
       console.error('Error marking messages as read:', error);
@@ -478,7 +478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const months = req.body.months || 3; // Default to 3 months
       const deletedCount = await storage.deleteInactiveUsers(months);
-      
+
       res.json({ 
         success: true, 
         message: `Deleted ${deletedCount} inactive users (inactive for ${months} months)`,
@@ -495,7 +495,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const days = req.body.days || 30; // Default to 30 days for group messages
       const reason = req.body.reason || 'admin_cleanup';
       const deletedCount = await storage.deleteMessagesOlderThan(days, reason);
-      
+
       res.json({ 
         success: true, 
         message: `Deleted ${deletedCount} messages older than ${days} days`,
@@ -510,7 +510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/cleanup/stats', requireSuperAdmin, async (req, res) => {
     try {
       const lastCleanupStats = await storage.getAppSetting('last_cleanup_stats');
-      
+
       res.json({
         lastCleanupStats: lastCleanupStats?.value || '{}',
         lastCleanup: lastCleanupStats?.value ? JSON.parse(lastCleanupStats.value).lastCleanup : null
@@ -569,19 +569,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const alreadyReferred = existingReferrals.some(ref => 
               ref.referredId.toString() === req.user._id.toString()
             );
-            
+
             if (!alreadyReferred) {
               // Get referral bonus from admin settings
               const referralBonusSetting = await storage.getAppSetting('referral_bonus');
               const referralBonus = parseInt(referralBonusSetting?.value) || 10;
-              
+
               await storage.createReferral({
                 referrerId: referrer._id.toString(),
                 referredId: req.user._id.toString(),
                 rewardClaimed: false,
                 rewardAmount: referralBonus,
               });
-              
+
               // Award referral bonus
               await storage.updateUserBalance(referrer._id.toString(), referralBonus);
               await storage.createTransaction({
@@ -598,7 +598,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         console.error('Error processing Google OAuth referral:', error);
       }
-      
+
       // Track user device fingerprint for login/registration
       try {
         const deviceFingerprint = (req.session as any)?.deviceFingerprint;
@@ -608,7 +608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         console.error('Error tracking user device fingerprint:', error);
       }
-      
+
       // Successful authentication, redirect to dashboard
       res.redirect('/dashboard');
     }
@@ -639,7 +639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const isMaintenanceMode = await storage.isMaintenanceModeEnabled();
       const isAdmin = req.user && ((req.user as any).isAdmin || (req.user as any).role === 'admin' || (req.user as any).role === 'super_admin');
-      
+
       res.json({ 
         maintenanceMode: isMaintenanceMode,
         canBypass: isAdmin 
@@ -694,7 +694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user._id.toString();
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
@@ -733,7 +733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user._id.toString();
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
@@ -868,7 +868,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user._id.toString();
       const repositories = await storage.getUserRepositories(userId);
-      
+
       // Remove sensitive token field before sending to client
       const sanitizedRepositories = repositories.map(repo => ({
         _id: repo._id,
@@ -881,7 +881,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdAt: repo.createdAt,
         updatedAt: repo.updatedAt
       }));
-      
+
       res.json(sanitizedRepositories);
     } catch (error) {
       console.error('Error fetching repositories:', error);
@@ -933,27 +933,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/auth/check-username', async (req, res) => {
     try {
       const { username } = req.body;
-      
+
       if (!username) {
         return res.status(400).json({ message: 'Username is required' });
       }
-      
+
       if (username.length < 3 || username.length > 20) {
         return res.status(400).json({ 
           available: false,
           message: 'Username must be between 3 and 20 characters' 
         });
       }
-      
+
       if (!/^[a-zA-Z0-9_]+$/.test(username)) {
         return res.status(400).json({ 
           available: false,
           message: 'Username can only contain letters, numbers, and underscores' 
         });
       }
-      
+
       const isAvailable = await storage.checkUsernameAvailability(username);
-      
+
       res.json({
         available: isAvailable,
         message: isAvailable ? 'Username is available' : 'Username is already taken'
@@ -968,28 +968,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/auth/check-device-limit', async (req, res) => {
     try {
       const { deviceFingerprint } = req.body;
-      
+
       if (!deviceFingerprint) {
         return res.status(400).json({ message: 'Device fingerprint is required' });
       }
-      
-      const existingAccountsFromDevice = await storage.getUsersByDeviceFingerprint(deviceFingerprint);
-      
-      // Get configurable max accounts per device from admin settings (default to 1)
-      const maxAccountsSetting = await storage.getAppSetting('max_accounts_per_device');
-      const maxAccountsPerDevice = maxAccountsSetting?.value || 1;
-      
-      const activeAccounts = existingAccountsFromDevice.filter(user => 
-        user.status !== 'banned' && user.status !== 'restricted'
-      );
-      
-      const allowed = activeAccounts.length < maxAccountsPerDevice;
-      
-      res.json({
-        allowed,
-        currentCount: activeAccounts.length,
-        maxAllowed: maxAccountsPerDevice
-      });
+
+      const deviceLimit = await storage.checkDeviceAccountLimit(deviceFingerprint);
+      res.json(deviceLimit);
     } catch (error) {
       console.error('Error checking device limit:', error);
       res.status(500).json({ message: 'Error checking device limit' });
@@ -1020,19 +1005,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get device fingerprint for registration tracking and duplicate account prevention
       const { deviceFingerprint } = req.body;
-      
+
       // Check for existing accounts from same device fingerprint
       if (deviceFingerprint) {
         const existingAccountsFromDevice = await storage.getUsersByDeviceFingerprint(deviceFingerprint);
-        
+
         // Get configurable max accounts per device from admin settings (default to 1)
         const maxAccountsSetting = await storage.getAppSetting('max_accounts_per_device');
         const maxAccountsPerDevice = maxAccountsSetting?.value || 1;
-        
+
         const activeAccounts = existingAccountsFromDevice.filter(user => 
           user.status !== 'banned' && user.status !== 'restricted'
         );
-        
+
         if (activeAccounts.length >= maxAccountsPerDevice) {
           return res.status(400).json({ 
             message: `Only 1 account allowed per device. Contact support if you believe this is an error.`
@@ -1046,7 +1031,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate verification token
       const verificationToken = crypto.randomBytes(32).toString('hex');
       const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-      
+
       // Create user with unverified status
       const newUser = await storage.createLocalUser({
         firstName,
@@ -1066,9 +1051,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
       const host = req.get('host') || req.headers['x-forwarded-host'] || 'localhost:5000';
       const baseUrl = `${protocol}://${host}`;
-      
+
       const emailSent = await sendVerificationEmail(email, verificationToken, baseUrl);
-      
+
       if (!emailSent) {
         console.error('Failed to send verification email');
         // Continue anyway, user can request resend
@@ -1088,13 +1073,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/auth/verify-email', async (req, res) => {
     try {
       const { token } = req.query;
-      
+
       if (!token) {
         return res.status(400).json({ message: 'Verification token is required' });
       }
 
       const user = await storage.getUserByVerificationToken(token as string);
-      
+
       if (!user) {
         return res.status(400).json({ message: 'Invalid or expired verification token' });
       }
@@ -1110,7 +1095,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
       const host = req.get('host') || req.headers['x-forwarded-host'] || 'localhost:5000';
       const baseUrl = `${protocol}://${host}`;
-      
+
       await sendWelcomeEmail(user.email, user.firstName, baseUrl);
 
       res.json({ message: 'Email verified successfully. You can now sign in.' });
@@ -1130,7 +1115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const user = await storage.getUserByEmailOrUsername(emailOrUsername);
-      
+
       if (!user || !user.password) {
         return res.status(401).json({ message: 'Invalid email/username or password' });
       }
@@ -1140,7 +1125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const isValidPassword = await bcrypt.compare(password, user.password);
-      
+
       if (!isValidPassword) {
         return res.status(401).json({ message: 'Invalid email/username or password' });
       }
@@ -1151,13 +1136,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error('Login error:', err);
           return res.status(500).json({ message: 'Login failed' });
         }
-        
+
         // Track user device fingerprint and create login history
         try {
           const { deviceFingerprint } = req.body;
           const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
           const userAgent = req.get('User-Agent') || 'unknown';
-          
+
           if (deviceFingerprint) {
             await storage.updateUserDeviceFingerprint(user._id.toString(), deviceFingerprint);
           }
@@ -1179,7 +1164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (error) {
           console.error('Error tracking user device fingerprint and login history:', error);
         }
-        
+
         res.json({ message: 'Login successful', user: { _id: user._id, email: user.email, firstName: user.firstName, lastName: user.lastName, username: user.username } });
       });
     } catch (error) {
@@ -1198,7 +1183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const user = await storage.getUserByEmail(email);
-      
+
       if (!user) {
         // Return success even if user not found for security reasons
         return res.json({ message: 'If an account with that email exists, we have sent password reset instructions.' });
@@ -1219,9 +1204,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
       const host = req.get('host') || req.headers['x-forwarded-host'] || 'localhost:5000';
       const baseUrl = `${protocol}://${host}`;
-      
+
       const emailSent = await sendPasswordResetEmail(email, resetToken, baseUrl);
-      
+
       if (!emailSent) {
         console.error('Failed to send password reset email');
         return res.status(500).json({ message: 'Failed to send password reset email. Please try again.' });
@@ -1248,7 +1233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const user = await storage.getUserByResetToken(token);
-      
+
       if (!user) {
         return res.status(400).json({ message: 'Invalid or expired reset token' });
       }
@@ -1280,7 +1265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const user = await storage.getUserByEmail(email);
-      
+
       if (!user) {
         return res.status(404).json({ message: 'No account found with this email address' });
       }
@@ -1304,9 +1289,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
       const host = req.get('host') || req.headers['x-forwarded-host'] || 'localhost:5000';
       const baseUrl = `${protocol}://${host}`;
-      
+
       const emailSent = await sendVerificationEmail(email, verificationToken, baseUrl);
-      
+
       if (!emailSent) {
         console.error('Failed to resend verification email');
         return res.status(500).json({ message: 'Failed to send verification email. Please try again.' });
@@ -1323,7 +1308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/auth/check-username', async (req, res) => {
     try {
       const { username } = req.body;
-      
+
       if (!username) {
         return res.status(400).json({ message: 'Username is required' });
       }
@@ -1355,7 +1340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/auth/check-device-limit', async (req, res) => {
     try {
       const { deviceFingerprint } = req.body;
-      
+
       if (!deviceFingerprint) {
         return res.status(400).json({ message: 'Device fingerprint is required' });
       }
@@ -1373,7 +1358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user._id.toString();
       const limit = parseInt(req.query.limit as string) || 50;
-      
+
       const loginHistory = await storage.getUserLoginHistory(userId, limit);
       res.json({ loginHistory });
     } catch (error) {
@@ -1387,7 +1372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { branchName } = req.query;
       const userId = req.user._id.toString();
-      
+
       if (!branchName) {
         return res.status(400).json({ message: 'Branch name is required' });
       }
@@ -1420,7 +1405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { branchName } = req.body;
       const userId = req.user._id.toString();
-      
+
       if (!branchName) {
         return res.status(400).json({ message: 'Branch name is required' });
       }
@@ -1463,7 +1448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/developer-info', requireAdmin, async (req: any, res) => {
     try {
       const { name, appName, channels } = req.body;
-      
+
       if (!name) {
         return res.status(400).json({ message: 'Developer name is required' });
       }
@@ -1487,7 +1472,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const updates = req.body;
-      
+
       await storage.updateDeveloperInfo(id, updates);
       res.json({ message: 'Developer info updated successfully' });
     } catch (error) {
@@ -1501,7 +1486,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.params;
       const user = await storage.getUserProfileById(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
@@ -1537,7 +1522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       const deploymentStats = await storage.getDeploymentStats(userId);
       const referralStats = await storage.getReferralStats(userId);
-      
+
       res.json({
         coinBalance: user?.coinBalance || 0,
         ...deploymentStats,
@@ -1688,7 +1673,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Sanitize the branch name
       const originalName = branchName.toString().trim();
       const sanitizedName = sanitizeBranchName(originalName);
-      
+
       if (!sanitizedName) {
         const generatedName = generateBranchName();
         return res.json({ 
@@ -1729,7 +1714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               `${baseName}-${new Date().getFullYear()}`,
               `${baseName}-${Math.floor(Math.random() * 100)}`
             ];
-            
+
             // Check which suggestions are available
             for (const suggestion of suggestions) {
               try {
@@ -1750,7 +1735,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Fallback if all suggestions are taken
             return `${baseName}-${Date.now().toString().slice(-6)}`;
           };
-          
+
           const suggestedName = await generateSuggestions(sanitizedName);
           return res.json({ 
             available: false, 
@@ -1776,17 +1761,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user._id.toString();
       const deploymentId = req.params.id;
-      
+
       const deployment = await storage.getDeployment(deploymentId);
       if (!deployment) {
         return res.status(404).json({ message: "Deployment not found" });
       }
-      
+
       // Ensure user owns the deployment (unless admin)
       if (deployment.userId.toString() !== userId && !req.user.isAdmin) {
         return res.status(403).json({ message: "Access denied" });
       }
-      
+
       res.json(deployment);
     } catch (error) {
       console.error("Error fetching deployment:", error);
@@ -1798,17 +1783,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user._id.toString();
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
 
       const now = new Date();
       const nextChargeDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
-      
+
       // Get deployment number for user
       const deploymentNumber = await storage.getNextDeploymentNumber(userId);
-      
+
       const deploymentData = insertDeploymentSchema.parse({
         ...req.body,
         userId,
@@ -1840,7 +1825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user._id.toString();
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1854,7 +1839,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { branchName, sessionId, ownerNumber, prefix } = req.body;
-      
+
       if (!branchName || !sessionId || !ownerNumber || !prefix) {
         return res.status(400).json({ message: 'All fields are required' });
       }
@@ -1866,7 +1851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check user's current wallet balance
       const currentUser = await storage.getUser(userId); // Get fresh user data
       const userBalance = currentUser?.coinBalance || 0;
-      
+
       // Validate user has sufficient funds for deployment
       if (userBalance < deploymentFee) {
         return res.status(400).json({ 
@@ -1917,11 +1902,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Update user's fork status
           await storage.updateUserGitHubForkStatus(userId, `${REPO_OWNER}/subzero-md`, true);
-          
+
           // Wait for fork to be ready
           console.log('Fork created, waiting for GitHub to initialize...');
           await new Promise(resolve => setTimeout(resolve, 5000));
-          
+
           return true;
         } else if (checkResponse.ok) {
           return false; // Already exists
@@ -1956,7 +1941,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!sanitizedBranchName) {
         return res.status(400).json({ message: 'Invalid branch name. Please provide a valid app name.' });
       }
-      
+
       // Use the exact sanitized name without modifications
       // The frontend should have already validated availability
 
@@ -1978,7 +1963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           config.body = JSON.stringify(data);
           config.headers['Content-Type'] = 'application/json';
         }
-        
+
         const response = await fetch(url, config);
         if (!response.ok) {
           const errorText = await response.text();
@@ -1991,11 +1976,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           throw new Error(`GitHub API error: ${response.status} ${response.statusText} - ${errorText}`);
         }
-        
+
         if (response.status === 204) {
           return {};
         }
-        
+
         return await response.json();
       };
 
@@ -2008,12 +1993,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (error) {
           // Branch doesn't exist, which is what we want - continue with deployment
         }
-        
+
         // Create branch from main with retry logic
         let mainBranchData;
         let attempts = 0;
         const maxAttempts = 3;
-        
+
         while (attempts < maxAttempts) {
           try {
             mainBranchData = await makeGitHubRequest('GET', `git/refs/heads/${MAIN_BRANCH}`);
@@ -2027,9 +2012,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await new Promise(resolve => setTimeout(resolve, 2000));
           }
         }
-        
+
         const mainSha = mainBranchData.object.sha;
-        
+
         // Create branch with retry logic
         attempts = 0;
         while (attempts < maxAttempts) {
@@ -2057,7 +2042,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   PREFIX: "${prefix}",
   CDN: "https://mrfrankk-cdn.hf.space" // 
 };`;
-        
+
         await makeGitHubRequest('PUT', 'contents/settings.js', {
           message: `Update settings.js for ${sanitizedBranchName}`,
           content: Buffer.from(newContent).toString('base64'),
@@ -2078,7 +2063,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   DATABASE_URL: process.env.DATABASE_URL || "",
   // Add any custom environment variables here
 };`;
-          
+
           await makeGitHubRequest('PUT', 'contents/config.js', {
             message: `Update config.js for ${sanitizedBranchName}`,
             content: Buffer.from(configContent).toString('base64'),
@@ -2097,14 +2082,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   DATABASE_URL: process.env.DATABASE_URL || "",
   // Add any custom environment variables here
 };`;
-          
+
           await makeGitHubRequest('PUT', 'contents/config.js', {
             message: `Create config.js for ${sanitizedBranchName}`,
             content: Buffer.from(configContent).toString('base64'),
             branch: sanitizedBranchName
           });
         }
-        
+
         // 3. Update workflow file - Get from main branch, update it, commit to deployment branch
         const workflowContent = `name: SUBZERO-MD-DEPLOY
 on:
@@ -2115,12 +2100,12 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
-        
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
-          
+
       - name: Debug Environment
         run: |
           echo "=== ENVIRONMENT DEBUG ==="
@@ -2143,14 +2128,14 @@ jobs:
           else
             echo "No settings.js found"
           fi
-          
+
       - name: Install Dependencies
         run: |
           echo "=== INSTALLING DEPENDENCIES ==="
           npm install --verbose
           echo "=== DEPENDENCY TREE ==="
           npm list --depth=0
-          
+
       - name: Pre-run Checks
         run: |
           echo "=== PRE-RUN CHECKS ==="
@@ -2158,13 +2143,13 @@ jobs:
           cat package.json | grep -A 10 '"scripts"'
           echo "=== CHECKING FOR MAIN FILES ==="
           if [ -f "index.js" ]; then echo "✓ index.js found"; else echo "✗ index.js missing"; fi
-          
+
       - name: Run Bot with Detailed Logging
         run: |
           echo "=== STARTING SUBZERO-MD BOT ==="
           echo "Timestamp: \\$(date)"
           echo "Starting bot with detailed logging..."
-          
+
           timeout 18000 bash -c '
             attempt=1
             while true; do
@@ -2175,7 +2160,7 @@ jobs:
               done
               exit_code=\\$?
               echo ">>> Bot stopped with exit code: \\$exit_code at \\$(date)"
-              
+
               if [ \\$exit_code -eq 0 ]; then
                 echo "Bot exited normally, restarting in 5 seconds..."
                 sleep 5
@@ -2189,11 +2174,11 @@ jobs:
                 dmesg | tail -5 2>/dev/null || echo "No system messages available"
                 sleep 10
               fi
-              
+
               attempt=\\$((attempt + 1))
             done
           ' || echo "Timeout reached after 5 hours"
-          
+
       - name: Post-Run Analysis
         if: always()
         run: |
@@ -2204,7 +2189,7 @@ jobs:
           echo "=== FINAL SYSTEM STATE ==="
           free -h
           df -h
-          
+
       - name: Re-Trigger Workflow
         if: always()
         run: |
@@ -2228,10 +2213,10 @@ jobs:
           } catch (getError) {
             console.log('No workflow file exists yet, will create it');
           }
-          
+
           if (existingFile) {
             // Update existing file
-            await makeGitHubRequest('PUT', `contents/.github/workflows/deploy.yml`, {
+            await makeGitHubRequest('PUT', 'contents/.github/workflows/deploy.yml', {
               message: `Update workflow for ${sanitizedBranchName}`,
               content: Buffer.from(workflowContent).toString('base64'),
               sha: existingFile.sha,
@@ -2240,7 +2225,7 @@ jobs:
             console.log(`✓ Workflow file updated on branch ${sanitizedBranchName}`);
           } else {
             // Create new file
-            await makeGitHubRequest('PUT', `contents/.github/workflows/deploy.yml`, {
+            await makeGitHubRequest('PUT', 'contents/.github/workflows/deploy.yml', {
               message: `Create workflow for ${sanitizedBranchName}`,
               content: Buffer.from(workflowContent).toString('base64'),
               branch: sanitizedBranchName
@@ -2251,7 +2236,7 @@ jobs:
           console.error('Error creating/updating workflow file:', workflowError);
           throw new Error(`Failed to create workflow file: ${workflowError instanceof Error ? workflowError.message : 'Unknown error'}`);
         }
-        
+
         // 4. Trigger workflow with advanced waiting logic
         console.log(`Triggering workflow for branch: ${sanitizedBranchName}`);
         await makeGitHubRequest('POST', `actions/workflows/deploy.yml/dispatches`, {
@@ -2261,7 +2246,7 @@ jobs:
         // Create deployment record
         const now = new Date();
         const nextChargeDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
-        
+
         const deploymentData = insertDeploymentSchema.parse({
           userId,
           name: sanitizedBranchName,
@@ -2278,7 +2263,7 @@ jobs:
 
         // Start monitoring this deployment for workflow status
         startWorkflowMonitoring(sanitizedBranchName);
-        
+
         // Wait for GitHub to initialize the workflow (5-10 seconds)
         setTimeout(async () => {
           try {
@@ -2318,7 +2303,7 @@ jobs:
       const userId = req.user._id.toString();
       console.log('User ID:', userId);
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         console.error('User not found:', userId);
         return res.status(404).json({ message: "User not found" });
@@ -2341,7 +2326,7 @@ jobs:
 
       const { repositoryId, branchName, sessionId, ownerNumber, prefix } = req.body;
       console.log('Deployment request:', { repositoryId, branchName, sessionId, ownerNumber, prefix });
-      
+
       if (!repositoryId || !branchName || !sessionId || !ownerNumber || !prefix) {
         console.error('Missing required fields');
         return res.status(400).json({ message: 'All fields are required' });
@@ -2366,7 +2351,7 @@ jobs:
 
       // Check user's wallet balance
       const userBalance = user.coinBalance || 0;
-      
+
       if (userBalance < deploymentFee) {
         return res.status(400).json({ 
           message: `Insufficient coins. You need ${deploymentFee} coins to deploy this bot. You currently have ${userBalance} coins.`,
@@ -2377,7 +2362,7 @@ jobs:
       }
 
       const deploymentNumber = await storage.getNextDeploymentNumber(userId);
-      
+
       const USER_GITHUB_TOKEN = repository.token;
       const USER_GITHUB_USERNAME = repository.githubUsername;
       const FORKED_REPO_NAME = repository.repositoryName;
@@ -2418,7 +2403,7 @@ jobs:
           config.body = JSON.stringify(data);
           config.headers['Content-Type'] = 'application/json';
         }
-        
+
         const response = await fetch(url, config);
         if (!response.ok) {
           const errorText = await response.text();
@@ -2430,11 +2415,11 @@ jobs:
           });
           throw new Error(`GitHub API error: ${response.status} ${response.statusText} - ${errorText}`);
         }
-        
+
         if (response.status === 204) {
           return {};
         }
-        
+
         return await response.json();
       };
 
@@ -2461,17 +2446,17 @@ jobs:
               'User-Agent': 'SUBZERO-Deploy'
             }
           });
-          
+
           if (!forkResponse.ok) {
             const errorText = await forkResponse.text();
             console.error('Fork failed:', errorText);
             throw new Error(`Failed to fork repository: ${forkResponse.statusText}`);
           }
-          
+
           console.log('✓ Fork created successfully');
           // Wait for fork to be ready
           await new Promise(resolve => setTimeout(resolve, 5000));
-          
+
           // Update user's fork status
           await storage.updateUserGitHubForkStatus(userId, `${USER_GITHUB_USERNAME}/${FORKED_REPO_NAME}`, true);
         }
@@ -2487,13 +2472,13 @@ jobs:
         } catch (error) {
           console.log('✓ Branch name available');
         }
-        
+
         // Get main branch SHA
         console.log('Getting main branch SHA...');
         const mainBranchData = await makeUserGitHubRequest('GET', `git/refs/heads/${MAIN_BRANCH}`);
         const mainSha = mainBranchData.object.sha;
         console.log('✓ Main branch SHA:', mainSha);
-        
+
         // Create new branch
         console.log(`Creating branch '${sanitizedBranchName}'...`);
         await makeUserGitHubRequest('POST', 'git/refs', {
@@ -2511,7 +2496,7 @@ jobs:
   PREFIX: "${prefix}",
   CDN: "https://mrfrankk-cdn.hf.space"
 };`;
-        
+
         await makeUserGitHubRequest('PUT', 'contents/settings.js', {
           message: `Update settings.js for ${sanitizedBranchName}`,
           content: Buffer.from(newContent).toString('base64'),
@@ -2531,12 +2516,12 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
-        
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
-          
+
       - name: Debug Environment
         run: |
           echo "=== ENVIRONMENT DEBUG ==="
@@ -2559,14 +2544,14 @@ jobs:
           else
             echo "No settings.js found"
           fi
-          
+
       - name: Install Dependencies
         run: |
           echo "=== INSTALLING DEPENDENCIES ==="
           npm install --verbose
           echo "=== DEPENDENCY TREE ==="
           npm list --depth=0
-          
+
       - name: Pre-run Checks
         run: |
           echo "=== PRE-RUN CHECKS ==="
@@ -2574,13 +2559,13 @@ jobs:
           cat package.json | grep -A 10 '"scripts"'
           echo "=== CHECKING FOR MAIN FILES ==="
           if [ -f "index.js" ]; then echo "✓ index.js found"; else echo "✗ index.js missing"; fi
-          
+
       - name: Run Bot with Detailed Logging
         run: |
           echo "=== STARTING SUBZERO-MD BOT ==="
           echo "Timestamp: \\$(date)"
           echo "Starting bot with detailed logging..."
-          
+
           timeout 18000 bash -c '
             attempt=1
             while true; do
@@ -2591,7 +2576,7 @@ jobs:
               done
               exit_code=\\$?
               echo ">>> Bot stopped with exit code: \\$exit_code at \\$(date)"
-              
+
               if [ \\$exit_code -eq 0 ]; then
                 echo "Bot exited normally, restarting in 5 seconds..."
                 sleep 5
@@ -2605,11 +2590,11 @@ jobs:
                 dmesg | tail -5 2>/dev/null || echo "No system messages available"
                 sleep 10
               fi
-              
+
               attempt=\\$((attempt + 1))
             done
           ' || echo "Timeout reached after 5 hours"
-          
+
       - name: Post-Run Analysis
         if: always()
         run: |
@@ -2620,7 +2605,7 @@ jobs:
           echo "=== FINAL SYSTEM STATE ==="
           free -h
           df -h
-          
+
       - name: Re-Trigger Workflow
         if: always()
         run: |
@@ -2644,7 +2629,7 @@ jobs:
             // File doesn't exist on deployment branch, that's okay for new branches
             console.log('No workflow file on deployment branch yet, will create it');
           }
-          
+
           if (existingFile) {
             // Update existing file on deployment branch
             await makeUserGitHubRequest('PUT', `contents/.github/workflows/deploy.yml`, {
@@ -2667,7 +2652,7 @@ jobs:
           console.error('Error managing workflow file:', error);
           throw new Error(`Failed to create/update workflow file: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
-        
+
         // Trigger workflow
         console.log(`Triggering workflow for branch: ${sanitizedBranchName}`);
         await makeUserGitHubRequest('POST', `actions/workflows/deploy.yml/dispatches`, {
@@ -2678,7 +2663,7 @@ jobs:
         // Create deployment record
         const now = new Date();
         const nextChargeDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        
+
         const deploymentData = insertDeploymentSchema.parse({
           userId,
           name: sanitizedBranchName,
@@ -2730,7 +2715,7 @@ jobs:
       const deploymentId = req.params.id;
       const { status } = req.body;
       const userId = req.user._id.toString();
-      
+
       const deployment = await storage.getDeployment(deploymentId);
       if (!deployment || deployment.userId.toString() !== userId) {
         return res.status(404).json({ message: "Deployment not found" });
@@ -2759,7 +2744,7 @@ jobs:
   app.post('/api/wallet/claim-daily', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user._id.toString();
-      
+
       // Award daily reward (simplified - in production, check if already claimed today)
       await storage.updateUserBalance(userId, 10);
       await storage.createTransaction({
@@ -2793,7 +2778,7 @@ jobs:
       const userId = req.user._id.toString();
       const user = await storage.getUser(userId);
       const stats = await storage.getReferralStats(userId);
-      
+
       res.json({
         ...stats,
         referralCode: user?.referralCode,
@@ -2809,7 +2794,7 @@ jobs:
     try {
       const { code } = req.params;
       const user = await storage.getUserByReferralCode(code);
-      
+
       if (user) {
         res.json({ valid: true, referrerId: user._id.toString() });
       } else {
@@ -2826,7 +2811,7 @@ jobs:
     try {
       const userId = req.user._id.toString();
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
@@ -2834,7 +2819,7 @@ jobs:
       const now = new Date();
       const lastClaim = user.lastClaimDate;
       const canClaim = !lastClaim || (now.getTime() - lastClaim.getTime()) >= 24 * 60 * 60 * 1000; // 24 hours
-      
+
       let timeUntilNextClaim = 0;
       if (!canClaim && lastClaim) {
         const nextClaimTime = new Date(lastClaim.getTime() + 24 * 60 * 60 * 1000);
@@ -2861,14 +2846,14 @@ jobs:
     try {
       const userId = req.user._id.toString();
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
 
       const now = new Date();
       const lastClaim = user.lastClaimDate;
-      
+
       // Check if 24 hours have passed
       if (lastClaim && (now.getTime() - lastClaim.getTime()) < 24 * 60 * 60 * 1000) {
         const nextClaimTime = new Date(lastClaim.getTime() + 24 * 60 * 60 * 1000);
@@ -2885,7 +2870,7 @@ jobs:
       // Update user's last claim date and coin balance
       await storage.updateUserClaimDate(userId, now);
       await storage.updateUserBalance(userId, claimAmount);
-      
+
       // Create transaction record
       await storage.createTransaction({
         userId,
@@ -2929,14 +2914,14 @@ jobs:
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
       const search = req.query.search as string;
-      
+
       let users;
       if (search) {
         users = await storage.searchUsers(search, limit);
       } else {
         users = await storage.getAllUsers(limit, offset);
       }
-      
+
       res.json(users);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -2948,14 +2933,14 @@ jobs:
   app.patch('/api/admin/users/:userId/status', requireAdmin, async (req, res) => {
     const { userId } = req.params;
     const { status, restrictions } = req.body;
-    
+
     if (!status || !['active', 'banned', 'restricted'].includes(status)) {
       return res.status(400).json({ message: 'Valid status required: active, banned, or restricted' });
     }
 
     try {
       await storage.updateUserStatus(userId, status, restrictions);
-      
+
       // Create notification
       await storage.createAdminNotification({
         type: 'user_status_change',
@@ -2964,7 +2949,7 @@ jobs:
         data: { userId, status, restrictions },
         read: false
       });
-      
+
       res.json({ message: 'User status updated successfully' });
     } catch (error) {
       console.error('Error updating user status:', error);
@@ -2977,11 +2962,11 @@ jobs:
     const { userId } = req.params;
     const { amount, reason } = req.body;
     const adminId = (req.user as any)?._id?.toString();
-    
+
     if (typeof amount !== 'number') {
       return res.status(400).json({ message: 'Amount must be a number' });
     }
-    
+
     if (!reason) {
       return res.status(400).json({ message: 'Reason is required' });
     }
@@ -3056,7 +3041,7 @@ jobs:
   // Get users by device fingerprint
   app.get('/api/admin/users/by-device/:fingerprint', requireAdmin, async (req, res) => {
     const { fingerprint } = req.params;
-    
+
     try {
       const users = await storage.getUsersByDeviceFingerprint(fingerprint);
       res.json(users);
@@ -3084,11 +3069,11 @@ jobs:
   app.post('/api/admin/device/ban', requireAdmin, async (req, res) => {
     const { deviceFingerprint, reason } = req.body;
     const adminId = (req.user as any)?._id?.toString();
-    
+
     if (!deviceFingerprint) {
       return res.status(400).json({ message: 'Device fingerprint is required' });
     }
-    
+
     if (!reason) {
       return res.status(400).json({ message: 'Reason is required' });
     }
@@ -3104,7 +3089,7 @@ jobs:
 
   app.post('/api/admin/device/unban', requireAdmin, async (req, res) => {
     const { deviceFingerprint } = req.body;
-    
+
     if (!deviceFingerprint) {
       return res.status(400).json({ message: 'Device fingerprint is required' });
     }
@@ -3132,11 +3117,11 @@ jobs:
   app.post('/api/auth/set-device-fingerprint', async (req, res) => {
     try {
       const { deviceFingerprint } = req.body;
-      
+
       if (!deviceFingerprint) {
         return res.status(400).json({ message: 'Device fingerprint is required' });
       }
-      
+
       // Store device fingerprint in session for OAuth callback
       (req as any).session.deviceFingerprint = deviceFingerprint;
       res.json({ success: true });
@@ -3172,7 +3157,7 @@ jobs:
   // Mark notification as read
   app.patch('/api/admin/notifications/:id/read', requireAdmin, async (req, res) => {
     const { id } = req.params;
-    
+
     try {
       await storage.markNotificationRead(id);
       res.json({ message: 'Notification marked as read' });
@@ -3185,7 +3170,7 @@ jobs:
   // Admin delete deployment
   app.delete('/api/admin/deployments/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
-    
+
     try {
       const deployment = await storage.getDeployment(id);
       if (!deployment) {
@@ -3193,7 +3178,7 @@ jobs:
       }
 
       await storage.deleteDeployment(id);
-      
+
       // Log admin action
       await storage.createAdminNotification({
         type: 'admin_action',
@@ -3202,7 +3187,7 @@ jobs:
         read: false,
         data: { deploymentId: id, deploymentName: deployment.name }
       });
-      
+
       res.json({ message: 'Deployment deleted successfully' });
     } catch (error) {
       console.error('Error deleting deployment:', error);
@@ -3224,7 +3209,7 @@ jobs:
   // Get specific setting
   app.get('/api/admin/settings/:key', requireAdmin, async (req, res) => {
     const { key } = req.params;
-    
+
     try {
       const setting = await storage.getAppSetting(key);
       if (!setting) {
@@ -3242,7 +3227,7 @@ jobs:
     const { key } = req.params;
     const { value, description } = req.body;
     const adminId = (req.user as any)?._id?.toString();
-    
+
     try {
       const settingData = insertAppSettingsSchema.parse({
         key,
@@ -3250,7 +3235,7 @@ jobs:
         description,
         updatedBy: adminId
       });
-      
+
       const setting = await storage.setAppSetting(settingData);
       res.json(setting);
     } catch (error) {
@@ -3266,7 +3251,7 @@ jobs:
       const existingSetting = await storage.getAppSetting('max_accounts_per_ip');
       const defaultCoinSetting = await storage.getAppSetting('default_coin_balance');
       const adminId = (req.user as any)?._id?.toString();
-      
+
       // Initialize IP restriction setting
       if (!existingSetting) {
         const settingData = insertAppSettingsSchema.parse({
@@ -3275,10 +3260,10 @@ jobs:
           description: 'Maximum number of accounts allowed per IP address',
           updatedBy: adminId
         });
-        
+
         await storage.setAppSetting(settingData);
       }
-      
+
       // Initialize default coin balance setting
       if (!defaultCoinSetting) {
         const coinSettingData = insertAppSettingsSchema.parse({
@@ -3287,7 +3272,7 @@ jobs:
           description: 'Default coin balance for new users',
           updatedBy: adminId
         });
-        
+
         await storage.setAppSetting(coinSettingData);
       }
 
@@ -3306,7 +3291,7 @@ jobs:
 
   // GitHub deployment settings
   // GitHub Account Management Routes
-  
+
   // Get all GitHub accounts
   app.get('/api/admin/github/accounts', requireAdmin, async (req, res) => {
     try {
@@ -3328,7 +3313,7 @@ jobs:
   app.post('/api/admin/github/accounts', requireAdmin, async (req, res) => {
     try {
       const { name, token, owner, repo, workflowFile } = req.body;
-      
+
       if (!name || !token || !owner || !repo || !workflowFile) {
         return res.status(400).json({ message: 'All fields are required' });
       }
@@ -3358,7 +3343,7 @@ jobs:
     try {
       const { id } = req.params;
       const updates = req.body;
-      
+
       await storage.updateGitHubAccount(id, updates);
       res.json({ message: 'GitHub account updated successfully' });
     } catch (error) {
@@ -3463,7 +3448,7 @@ jobs:
   app.post('/api/admin/github/accounts', requireAdmin, async (req, res) => {
     try {
       const { name, token, owner, repo, workflowFile } = req.body;
-      
+
       if (!name || !token || !owner || !repo) {
         return res.status(400).json({ error: 'All fields (name, token, owner, repo) are required' });
       }
@@ -3487,7 +3472,7 @@ jobs:
     try {
       const { id } = req.params;
       const { active } = req.body;
-      
+
       await storage.setGitHubAccountActive(id, active);
       res.json({ success: true });
     } catch (error) {
@@ -3512,21 +3497,21 @@ jobs:
     try {
       const userId = req.user._id.toString();
       const { deploymentId } = req.params;
-      
+
       // Get deployment and verify ownership
       const deployment = await storage.getDeployment(deploymentId);
       if (!deployment) {
         return res.status(404).json({ message: 'Deployment not found' });
       }
-      
+
       if (deployment.userId.toString() !== userId) {
         return res.status(403).json({ message: 'Access denied' });
       }
-      
+
       if (!deployment.branchName) {
         return res.status(400).json({ message: 'No branch name associated with this deployment' });
       }
-      
+
       const [githubToken, repoOwner, repoName, workflowFile] = await Promise.all([
         storage.getAppSetting('github_token'),
         storage.getAppSetting('github_repo_owner'),
@@ -3566,7 +3551,7 @@ jobs:
       }
 
       const runsData = await runsResponse.json();
-      
+
       // If no runs found, try to get the latest runs regardless of branch
       let workflowRuns = runsData.workflow_runs || [];
       if (workflowRuns.length === 0) {
@@ -3578,7 +3563,7 @@ jobs:
             'Accept': 'application/vnd.github.v3+json'
           }
         });
-        
+
         if (allRunsResponse.ok) {
           const allRunsData = await allRunsResponse.json();
           // Filter runs that might be related to this deployment
@@ -3589,7 +3574,7 @@ jobs:
           );
         }
       }
-      
+
       // Get detailed logs for the most recent run
       let detailedLogs = [];
       if (workflowRuns.length > 0) {
@@ -3607,7 +3592,7 @@ jobs:
           if (jobsResponse.ok) {
             const jobsData = await jobsResponse.json();
             const jobs = jobsData.jobs || [];
-            
+
             // Get logs for each job
             for (const job of jobs) {
               const logsUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/jobs/${job.id}/logs`;
@@ -3620,14 +3605,14 @@ jobs:
 
               if (logsResponse.ok) {
                 const logs = await logsResponse.text();
-                
+
                 // Check if app has started in logs for automatic status detection
                 const hasAppStarted = logs.includes('npm start') || 
                                     logs.includes('node index.js') || 
                                     logs.includes('Server is running') ||
                                     logs.includes('Application started') ||
                                     logs.includes('listening on port');
-                
+
                 // Update deployment status if app has started
                 if (hasAppStarted && deployment.status === 'deploying') {
                   try {
@@ -3637,7 +3622,7 @@ jobs:
                     console.error('Error updating deployment status:', updateError);
                   }
                 }
-                
+
                 detailedLogs.push({
                   jobId: job.id,
                   jobName: job.name,
@@ -3680,17 +3665,17 @@ jobs:
     try {
       const userId = req.user._id.toString();
       const { deploymentId, runId } = req.params;
-      
+
       // Get deployment and verify ownership
       const deployment = await storage.getDeployment(deploymentId);
       if (!deployment) {
         return res.status(404).json({ message: 'Deployment not found' });
       }
-      
+
       if (deployment.userId.toString() !== userId) {
         return res.status(403).json({ message: 'Access denied' });
       }
-      
+
       const [githubToken, repoOwner, repoName] = await Promise.all([
         storage.getAppSetting('github_token'),
         storage.getAppSetting('github_repo_owner'),
@@ -3726,7 +3711,7 @@ jobs:
       }
 
       const jobsData = await jobsResponse.json();
-      
+
       // Get logs for each job
       const logsPromises = jobsData.jobs.map(async (job: any) => {
         try {
@@ -3737,7 +3722,7 @@ jobs:
               'Accept': 'application/vnd.github.v3+json'
             }
           });
-          
+
           if (logsResponse.ok) {
             const logs = await logsResponse.text();
             return { jobId: job.id, jobName: job.name, logs };
@@ -3784,8 +3769,8 @@ jobs:
         // Remove invalid characters and ensure it follows GitHub branch naming rules
         return name
           .replace(/[^a-zA-Z0-9._-]/g, '-') // Replace invalid chars with dash
-          .replace(/^\\.+|\\.+$/g, '') // Remove leading/trailing dots
-          .replace(/\\.\\.+/g, '.') // Replace multiple dots with single dot
+          .replace(/^\.+|\.+$/g, '') // Remove leading/trailing dots
+          .replace(/\.\.+/g, '.') // Replace multiple dots with single dot
           .replace(/^-+|-+$/g, '') // Remove leading/trailing dashes
           .replace(/--+/g, '-') // Replace multiple dashes with single dash
           .substring(0, 250); // Limit length
@@ -3803,7 +3788,7 @@ jobs:
       // Sanitize the branch name
       const originalName = branchName.toString().trim();
       const sanitizedName = sanitizeBranchName(originalName);
-      
+
       if (!sanitizedName) {
         const generatedName = generateBranchName();
         return res.json({ 
@@ -3860,19 +3845,19 @@ jobs:
     try {
       const userId = req.user._id.toString();
       const deploymentId = req.params.id;
-      
+
       // Get deployment to verify ownership
       const deployment = await storage.getDeployment(deploymentId);
       if (!deployment) {
         return res.status(404).json({ message: "Deployment not found" });
       }
-      
+
       // Check if user owns this deployment or is admin
       const user = await storage.getUser(userId);
       if (deployment.userId.toString() !== userId && !user?.isAdmin) {
         return res.status(403).json({ message: "Not authorized to delete this deployment" });
       }
-      
+
       // Delete GitHub branch if it exists
       if (deployment.branchName) {
         try {
@@ -3904,7 +3889,7 @@ jobs:
           // Continue with deployment deletion even if branch deletion fails
         }
       }
-      
+
       await storage.deleteDeployment(deploymentId);
       res.json({ message: "Deployment deleted successfully" });
     } catch (error) {
@@ -3920,17 +3905,17 @@ jobs:
     try {
       const userId = req.user._id.toString();
       const deploymentId = req.params.id;
-      
+
       // Verify deployment ownership
       const deployment = await storage.getDeployment(deploymentId);
       if (!deployment) {
         return res.status(404).json({ message: "Deployment not found" });
       }
-      
+
       if (deployment.userId.toString() !== userId) {
         return res.status(403).json({ message: "Not authorized" });
       }
-      
+
       const variables = await storage.getDeploymentVariables(deploymentId);
       res.json(variables);
     } catch (error) {
@@ -3945,17 +3930,17 @@ jobs:
       const userId = req.user._id.toString();
       const deploymentId = req.params.id;
       const { key, value, description, isRequired } = req.body;
-      
+
       // Verify deployment ownership
       const deployment = await storage.getDeployment(deploymentId);
       if (!deployment) {
         return res.status(404).json({ message: "Deployment not found" });
       }
-      
+
       if (deployment.userId.toString() !== userId) {
         return res.status(403).json({ message: "Not authorized" });
       }
-      
+
       const variable = await storage.upsertDeploymentVariable(
         deploymentId, 
         key, 
@@ -3963,7 +3948,7 @@ jobs:
         description, 
         isRequired
       );
-      
+
       res.json(variable);
     } catch (error) {
       console.error("Error creating/updating deployment variable:", error);
@@ -3978,17 +3963,17 @@ jobs:
       const deploymentId = req.params.id;
       const variableId = req.params.variableId;
       const { value } = req.body;
-      
+
       // Verify deployment ownership
       const deployment = await storage.getDeployment(deploymentId);
       if (!deployment) {
         return res.status(404).json({ message: "Deployment not found" });
       }
-      
+
       if (deployment.userId.toString() !== userId) {
         return res.status(403).json({ message: "Not authorized" });
       }
-      
+
       await storage.updateDeploymentVariable(variableId, value);
       res.json({ message: "Variable updated successfully" });
     } catch (error) {
@@ -4003,17 +3988,17 @@ jobs:
       const userId = req.user._id.toString();
       const deploymentId = req.params.id;
       const variableId = req.params.variableId;
-      
+
       // Verify deployment ownership
       const deployment = await storage.getDeployment(deploymentId);
       if (!deployment) {
         return res.status(404).json({ message: "Deployment not found" });
       }
-      
+
       if (deployment.userId.toString() !== userId) {
         return res.status(403).json({ message: "Not authorized" });
       }
-      
+
       await storage.deleteDeploymentVariable(variableId);
       res.json({ message: "Variable deleted successfully" });
     } catch (error) {
@@ -4027,24 +4012,24 @@ jobs:
     try {
       const userId = req.user._id.toString();
       const deploymentId = req.params.id;
-      
+
       // Verify deployment ownership
       const deployment = await storage.getDeployment(deploymentId);
       if (!deployment) {
         return res.status(404).json({ message: "Deployment not found" });
       }
-      
+
       if (deployment.userId.toString() !== userId) {
         return res.status(403).json({ message: "Not authorized" });
       }
-      
+
       if (!deployment.branchName) {
         return res.status(400).json({ message: "No branch associated with this deployment" });
       }
-      
+
       // Get deployment variables
       const variables = await storage.getDeploymentVariables(deploymentId);
-      
+
       // Get GitHub settings
       const [githubToken, repoOwner, repoName, mainBranch] = await Promise.all([
         storage.getAppSetting('github_token'),
@@ -4093,19 +4078,19 @@ jobs:
 
       // Update settings.js with new variables - create a proper content map
       const variableMap = new Map<string, string>();
-      
+
       // Add deployment variables first
       variables.forEach((v: any) => {
         variableMap.set(v.key.toUpperCase(), v.value);
       });
-      
+
       // Add default variables if not overridden
       const defaultVariables = {
         'SESSION_ID': 'default_session',
         'OWNER_NUMBER': '1234567890',
         'PREFIX': '.'
       };
-      
+
       Object.entries(defaultVariables).forEach(([key, value]) => {
         if (!variableMap.has(key)) {
           variableMap.set(key, value);
@@ -4130,7 +4115,7 @@ ${Array.from(variableMap.entries()).map(([key, value]) => `  ${key}: "${value}",
       try {
         // Get current file to get its SHA
         const currentFile = await makeGitHubRequest('GET', `contents/settings.js?ref=${deployment.branchName}`);
-        
+
         // Update the file
         await makeGitHubRequest('PUT', 'contents/settings.js', {
           message: `Update settings.js with new variables for ${deployment.name}`,
@@ -4193,10 +4178,10 @@ ${Array.from(variableMap.entries()).map(([key, value]) => `  ${key}: "${value}",
   app.post('/api/admin/deployment/deploy', requireAdmin, async (req, res) => {
     try {
       let { branchName, sessionId, ownerNumber, prefix } = req.body;
-      
+
       // Get the best available GitHub account
       const githubAccount = await storage.getBestGitHubAccount();
-      
+
       if (!githubAccount) {
         return res.status(400).json({ message: 'No GitHub accounts configured. Please add GitHub accounts first.' });
       }
@@ -4218,14 +4203,14 @@ ${Array.from(variableMap.entries()).map(([key, value]) => `  ${key}: "${value}",
           .replace(/--+/g, '-') // Replace multiple dashes with single dash
           .substring(0, 250); // Limit length
       };
-      
+
       if (!branchName || branchName.trim() === '') {
         const prefix = 'subzero-';
         const randomChars = Math.random().toString(36).substring(2, 8);
         branchName = prefix + randomChars;
       } else {
         branchName = sanitizeBranchName(branchName.trim());
-        
+
         // If sanitization resulted in empty string, generate a name
         if (!branchName) {
           const prefix = 'subzero-';
@@ -4247,12 +4232,12 @@ ${Array.from(variableMap.entries()).map(([key, value]) => `  ${key}: "${value}",
             'Accept': 'application/vnd.github.v3+json'
           }
         };
-        
+
         if (data) {
           config.headers['Content-Type'] = 'application/json';
           config.body = JSON.stringify(data);
         }
-        
+
         const response = await fetch(url, config);
         if (!response.ok) {
           let errorMessage = `GitHub API error: ${response.status} ${response.statusText}`;
@@ -4268,12 +4253,12 @@ ${Array.from(variableMap.entries()).map(([key, value]) => `  ${key}: "${value}",
           }
           throw new Error(errorMessage);
         }
-        
+
         const responseText = await response.text();
         if (!responseText) {
           return {}; // Return empty object for empty responses
         }
-        
+
         try {
           return JSON.parse(responseText);
         } catch (parseError) {
@@ -4288,23 +4273,23 @@ ${Array.from(variableMap.entries()).map(([key, value]) => `  ${key}: "${value}",
         ref: `refs/heads/${branchName}`,
         sha: mainRef.object.sha
       });
-      
+
       // 2. Update settings.js
       const fileData = await makeGitHubRequest('GET', `contents/settings.js?ref=${branchName}`);
       const newContent = `module.exports = {
   SESSION_ID: "${sessionId}",
   OWNER_NUMBER: "${ownerNumber}", 
   PREFIX: "${prefix}",
-  CDN: "https://mrfrankk-cdn.hf.space" // Dont change this part
+  CDN: "https://mrfrankk-cdn.hf.space" //Dont change this part
 };`;
-      
+
       await makeGitHubRequest('PUT', 'contents/settings.js', {
         message: `Update settings.js for ${branchName}`,
         content: Buffer.from(newContent).toString('base64'),
         sha: fileData.sha,
         branch: branchName
       });
-      
+
       // 3. Update workflow file with new pattern
       const workflowContent = `name: SUBZERO-MD-DEPLOY
 on:
@@ -4315,12 +4300,12 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
-        
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
-          
+
       - name: Debug Environment
         run: |
           echo "=== ENVIRONMENT DEBUG ==="
@@ -4343,14 +4328,14 @@ jobs:
           else
             echo "No settings.js found"
           fi
-          
+
       - name: Install Dependencies
         run: |
           echo "=== INSTALLING DEPENDENCIES ==="
           npm install --verbose
           echo "=== DEPENDENCY TREE ==="
           npm list --depth=0
-          
+
       - name: Pre-run Checks
         run: |
           echo "=== PRE-RUN CHECKS ==="
@@ -4358,13 +4343,13 @@ jobs:
           cat package.json | grep -A 10 '"scripts"'
           echo "=== CHECKING FOR MAIN FILES ==="
           if [ -f "index.js" ]; then echo "✓ index.js found"; else echo "✗ index.js missing"; fi
-          
+
       - name: Run Bot with Detailed Logging
         run: |
           echo "=== STARTING SUBZERO-MD BOT ==="
           echo "Timestamp: \\$(date)"
           echo "Starting bot with detailed logging..."
-          
+
           timeout 18000 bash -c '
             attempt=1
             while true; do
@@ -4375,7 +4360,7 @@ jobs:
               done
               exit_code=\\$?
               echo ">>> Bot stopped with exit code: \\$exit_code at \\$(date)"
-              
+
               if [ \\$exit_code -eq 0 ]; then
                 echo "Bot exited normally, restarting in 5 seconds..."
                 sleep 5
@@ -4389,11 +4374,11 @@ jobs:
                 dmesg | tail -5 2>/dev/null || echo "No system messages available"
                 sleep 10
               fi
-              
+
               attempt=\\$((attempt + 1))
             done
           ' || echo "Timeout reached after 5 hours"
-          
+
       - name: Post-Run Analysis
         if: always()
         run: |
@@ -4404,7 +4389,7 @@ jobs:
           echo "=== FINAL SYSTEM STATE ==="
           free -h
           df -h
-          
+
       - name: Re-Trigger Workflow
         if: always()
         run: |
@@ -4415,12 +4400,12 @@ jobs:
             -H "Authorization: Bearer \\$\{{ secrets.GITHUB_TOKEN }}" \\\\
             -H "Accept: application/vnd.github.v3+json" \\\\
             https://api.github.com/repos/\\$\{{ github.repository }}/actions/workflows/${WORKFLOW_FILE}/dispatches \\\\
-            -d '{"ref":"\\$\{{ github.ref_name }}"}'
+            -d '{"ref":"${sanitizedBranchName}"}'
           echo "Restart triggered successfully"`;
 
       try {
         const existingFile = await makeGitHubRequest('GET', `contents/.github/workflows/${WORKFLOW_FILE}?ref=${branchName}`);
-        
+
         // Update existing file
         await makeGitHubRequest('PUT', `contents/.github/workflows/${WORKFLOW_FILE}`, {
           message: `Update workflow to use ${branchName} branch`,
@@ -4436,12 +4421,12 @@ jobs:
           branch: branchName
         });
       }
-      
+
       // 4. Trigger workflow
       await makeGitHubRequest('POST', `actions/workflows/${WORKFLOW_FILE}/dispatches`, {
         ref: branchName
       });
-      
+
       // Broadcast deployment creation to WebSocket clients
       broadcastToClients('deployment_created', {
         branch: branchName,
@@ -4450,7 +4435,7 @@ jobs:
         prefix,
         timestamp: new Date().toISOString()
       });
-      
+
       // Create deployment record with active status
       const deploymentData = {
         userId: (req.user as any)._id.toString(),
@@ -4469,7 +4454,7 @@ jobs:
       setTimeout(() => {
         startWorkflowMonitoring(branchName);
       }, 10000); // 10 second delay
-      
+
       res.json({ 
         success: true, 
         message: 'Deployment successful!',
@@ -4559,7 +4544,7 @@ jobs:
       }
 
       const jobsData = await jobsResponse.json();
-      
+
       // Get logs for each job
       const logsPromises = jobsData.jobs.map(async (job: any) => {
         try {
@@ -4570,7 +4555,7 @@ jobs:
               'Accept': 'application/vnd.github.v3+json'
             }
           });
-          
+
           if (logsResponse.ok) {
             const logs = await logsResponse.text();
             return { jobId: job.id, jobName: job.name, logs };
@@ -4654,7 +4639,7 @@ jobs:
     }
   });
 
-  app.delete('/api/admin/github/branches', isAuthenticated, requireAdmin, async (req: any, res) => {
+  app.delete('/api/admin/github/branches', isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { branches } = req.body;
       if (!Array.isArray(branches) || branches.length === 0) {
@@ -4733,7 +4718,7 @@ jobs:
       const adminId = (req.user as any)?._id?.toString();
 
       await storage.setMaintenanceMode(enabled, adminId, message);
-      
+
       if (estimatedTime) {
         await storage.setAppSetting({
           key: 'maintenance_estimated_time',
@@ -4771,7 +4756,7 @@ jobs:
     try {
       const claimAmountSetting = await storage.getAppSetting('daily_claim_amount');
       const claimAmount = claimAmountSetting?.value || 50;
-      
+
       res.json({
         dailyClaimAmount: claimAmount
       });
@@ -4785,7 +4770,7 @@ jobs:
     try {
       const { dailyClaimAmount } = req.body;
       const adminId = (req.user as any)?._id?.toString();
-      
+
       if (!dailyClaimAmount || dailyClaimAmount < 1 || dailyClaimAmount > 1000) {
         return res.status(400).json({ error: 'Daily claim amount must be between 1 and 1000 coins' });
       }
@@ -4824,7 +4809,7 @@ jobs:
     try {
       const { deploymentFee } = req.body;
       const adminId = (req.user as any)?._id?.toString();
-      
+
       if (typeof deploymentFee !== 'number' || deploymentFee < 0) {
         return res.status(400).json({ message: 'Valid deployment fee required' });
       }
@@ -4860,7 +4845,7 @@ jobs:
     try {
       const { dailyCharge } = req.body;
       const adminId = (req.user as any)?._id?.toString();
-      
+
       if (typeof dailyCharge !== 'number' || dailyCharge < 0) {
         return res.status(400).json({ message: 'Valid daily charge required' });
       }
@@ -4947,7 +4932,7 @@ jobs:
       // Read file and convert to base64
       const fileBuffer = fs.readFileSync(req.file.path);
       const base64Data = `data:${req.file.mimetype};base64,${fileBuffer.toString('base64')}`;
-      
+
       // Clean up temporary file
       fs.unlinkSync(req.file.path);
 
@@ -4971,27 +4956,27 @@ jobs:
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   const httpServer = createServer(app);
-  
+
   // Setup WebSocket server
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
-  
+
   wss.on('connection', (ws: WebSocket, req) => {
     const clientId = crypto.randomUUID();
     wsConnections.set(clientId, ws);
-    
+
     console.log(`WebSocket client connected: ${clientId}`);
-    
+
     // Send connection confirmation
     ws.send(JSON.stringify({ 
       type: 'connected', 
       data: { clientId },
       timestamp: new Date().toISOString()
     }));
-    
+
     ws.on('message', async (message) => {
       try {
         const data = JSON.parse(message.toString());
-        
+
         // Handle deployment monitoring requests
         if (data.type === 'monitor_deployment' && data.branch) {
           startWorkflowMonitoring(data.branch);
@@ -5016,7 +5001,7 @@ jobs:
               return;
             }
           }
-          
+
           const chatClient: ChatClient = {
             ws,
             userId: data.userId,
@@ -5024,9 +5009,9 @@ jobs:
             isAdmin: data.isAdmin,
             role: data.role
           };
-          
+
           chatClients.set(clientId, chatClient);
-          
+
           // Send chat history to the new client
           try {
             const messages = await storage.getChatMessages(50);
@@ -5039,7 +5024,7 @@ jobs:
                 createdAt: msg.createdAt.toISOString()
               }))
             }));
-            
+
             // Send current users list
             const users = Array.from(chatClients.values()).map(client => ({
               userId: client.userId,
@@ -5048,12 +5033,12 @@ jobs:
               role: client.role,
               isRestricted: false
             }));
-            
+
             ws.send(JSON.stringify({
               type: 'users_list',
               users
             }));
-            
+
             // Broadcast user joined to other clients
             broadcastToChatClients('user_joined', {
               user: {
@@ -5064,7 +5049,7 @@ jobs:
                 isRestricted: false
               }
             }, clientId);
-            
+
           } catch (error) {
             console.error('Error handling chat join:', error);
           }
@@ -5082,7 +5067,7 @@ jobs:
                 }));
                 return;
               }
-              
+
               // Create and broadcast message
               const messageData: any = {
                 userId: chatClient.userId,
@@ -5109,7 +5094,7 @@ jobs:
               }
 
               const chatMessage = await storage.createChatMessage(messageData);
-              
+
               broadcastToChatClients('chat_message', {
                 message: {
                   ...chatMessage,
@@ -5118,7 +5103,7 @@ jobs:
                   createdAt: chatMessage.createdAt.toISOString()
                 }
               });
-              
+
             } catch (error) {
               console.error('Error sending chat message:', error);
               ws.send(JSON.stringify({
@@ -5133,13 +5118,13 @@ jobs:
           if (chatClient && chatClient.isAdmin) {
             try {
               await storage.restrictUserFromChat(data.userId, chatClient.userId, data.reason);
-              
+
               broadcastToChatClients('user_restricted', {
                 userId: data.userId,
                 restrictedBy: chatClient.userId,
                 reason: data.reason
               });
-              
+
             } catch (error) {
               console.error('Error restricting user:', error);
               ws.send(JSON.stringify({
@@ -5154,12 +5139,12 @@ jobs:
           if (chatClient && chatClient.isAdmin) {
             try {
               await storage.unrestrictUserFromChat(data.userId);
-              
+
               broadcastToChatClients('user_unrestricted', {
                 userId: data.userId,
                 unrestrictedBy: chatClient.userId
               });
-              
+
             } catch (error) {
               console.error('Error unrestricting user:', error);
               ws.send(JSON.stringify({
@@ -5176,7 +5161,7 @@ jobs:
               const message = await storage.getChatMessage(data.messageId);
               if (message && message.userId.toString() === chatClient.userId) {
                 await storage.updateChatMessage(data.messageId, data.newMessage, chatClient.userId);
-                
+
                 broadcastToChatClients('message_updated', {
                   messageId: data.messageId,
                   newMessage: data.newMessage,
@@ -5193,11 +5178,11 @@ jobs:
           if (chatClient) {
             try {
               await storage.deleteChatMessage(data.messageId, chatClient.userId, chatClient.isAdmin);
-              
+
               broadcastToChatClients('message_deleted', {
                 messageId: data.messageId
               });
-              
+
             } catch (error) {
               console.error('Error deleting message:', error);
               ws.send(JSON.stringify({
@@ -5214,11 +5199,11 @@ jobs:
               for (const messageId of data.messageIds) {
                 await storage.deleteChatMessage(messageId, chatClient.userId, chatClient.isAdmin);
               }
-              
+
               broadcastToChatClients('messages_deleted', {
                 messageIds: data.messageIds
               });
-              
+
             } catch (error) {
               console.error('Error deleting selected messages:', error);
               ws.send(JSON.stringify({
@@ -5240,16 +5225,16 @@ jobs:
                 bannedAt: new Date(),
                 reason: data.reason || 'Chat violations'
               };
-              
+
               // Note: banUser functionality should be implemented in storage if needed
               // await storage.banUser(bannedUser);
-              
+
               broadcastToChatClients('user_banned', {
                 userId: data.userId,
                 bannedBy: chatClient.userId,
                 reason: data.reason
               });
-              
+
             } catch (error) {
               console.error('Error banning user:', error);
               ws.send(JSON.stringify({
@@ -5263,7 +5248,7 @@ jobs:
         console.error('WebSocket message error:', error);
       }
     });
-    
+
     ws.on('close', () => {
       wsConnections.delete(clientId);
       const chatClient = chatClients.get(clientId);
@@ -5276,14 +5261,14 @@ jobs:
       }
       console.log(`WebSocket client disconnected: ${clientId}`);
     });
-    
+
     ws.on('error', (error) => {
       console.error('WebSocket error:', error);
       wsConnections.delete(clientId);
       chatClients.delete(clientId);
     });
   });
-  
+
   // Chat API routes for message management
   app.patch('/api/chat/messages/:id', isAuthenticated, async (req: any, res) => {
     try {
@@ -5321,7 +5306,7 @@ jobs:
     try {
       const { id } = req.params;
       const message = await storage.getChatMessage(id);
-      
+
       if (!message) {
         return res.status(404).json({ message: 'Message not found' });
       }
@@ -5338,7 +5323,7 @@ jobs:
     try {
       const userId = req.user._id.toString();
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
@@ -5414,18 +5399,18 @@ jobs:
     }
   });
 
-  // Deployment monitoring endpoints
+  // Deployment logs API routes
   app.post('/api/deployments/:id/logs', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
       const { logs } = req.body;
-      
+
       if (!Array.isArray(logs)) {
         return res.status(400).json({ message: 'Logs must be an array' });
       }
 
       await storage.addDeploymentLogs(id, logs);
-      
+
       // Analyze logs to determine deployment status
       const analysis = await storage.analyzeDeploymentStatus(id);
       if (analysis.status !== 'deploying') {
@@ -5523,13 +5508,13 @@ jobs:
   app.get('/api/admin/deployments/all', requireAdmin, async (req, res) => {
     try {
       const deployments = await storage.getAllDeployments();
-      
+
       // Add deployment numbers for each user
       const deploymentsWithNumbers = await Promise.all(
         deployments.map(async (deployment) => {
           const totalDeployments = await storage.getUserTotalDeployments(deployment.userId.toString());
           const deploymentNumber = await storage.getNextDeploymentNumber(deployment.userId.toString()) - 1;
-          
+
           return {
             ...deployment,
             deploymentNumber,
@@ -5537,7 +5522,7 @@ jobs:
           };
         })
       );
-      
+
       res.json(deploymentsWithNumbers);
     } catch (error) {
       console.error('Error fetching all deployments:', error);
@@ -5550,9 +5535,9 @@ jobs:
     try {
       const limit = parseInt(req.query.limit as string) || 100;
       const search = req.query.search as string;
-      
+
       let users = await storage.getAllUsersWithCountryInfo(limit);
-      
+
       // Apply search filter if provided
       if (search) {
         users = users.filter(user => 
@@ -5653,7 +5638,7 @@ jobs:
   app.delete('/api/admin/banned-users/:userId', requireAdmin, async (req, res) => {
     try {
       const { userId } = req.params;
-      
+
       await storage.removeBannedUser(userId);
       await storage.updateUserStatus(userId, 'active', []);
 
@@ -5665,12 +5650,12 @@ jobs:
   });
 
   // Voucher Management Routes
-  
+
   // Admin: Create voucher code
   app.post('/api/admin/vouchers', requireAdmin, async (req: any, res) => {
     try {
       const { code, coinAmount, maxUsage, expiresAt } = req.body;
-      
+
       // Check if voucher code already exists
       const existingVoucher = await storage.getVoucherByCode(code);
       if (existingVoucher) {
@@ -5689,7 +5674,7 @@ jobs:
 
       // Validate the data
       const validatedData = insertVoucherCodeSchema.parse(voucherData);
-      
+
       const voucher = await storage.createVoucherCode(validatedData);
 
       res.json({ message: 'Voucher created successfully', voucher });
@@ -5753,7 +5738,7 @@ jobs:
       }
 
       const result = await storage.redeemVoucher(code.trim().toUpperCase(), req.user._id.toString());
-      
+
       if (result.success) {
         res.json(result);
       } else {
@@ -5788,17 +5773,17 @@ jobs:
 
   // Auto-check deployment status periodically - Fixed workflow rerun
   let deploymentCheckInterval: NodeJS.Timeout | null = null;
-  
+
   const startDeploymentMonitoring = () => {
     if (deploymentCheckInterval) {
       clearInterval(deploymentCheckInterval);
     }
-    
+
     deploymentCheckInterval = setInterval(async () => {
       try {
         const deployments = await storage.getDeployments();
         const deployingDeployments = deployments.filter(d => d.status === 'deploying');
-        
+
         for (const deployment of deployingDeployments) {
           const analysis = await storage.analyzeDeploymentStatus(deployment._id.toString());
           if (analysis.status !== 'deploying') {
