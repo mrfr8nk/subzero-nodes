@@ -86,6 +86,7 @@ interface UserProfile {
   githubProfileUrl?: string;
   githubId?: string;
   githubAccessToken?: string;
+  authProvider?: string;
 }
 
 interface WorkflowRun {
@@ -98,6 +99,8 @@ interface WorkflowRun {
 }
 
 function AvatarWithInitials({ name, imageUrl, size = "md" }: { name: string; imageUrl?: string; size?: "sm" | "md" | "lg" | "xl" }) {
+  const [imageError, setImageError] = useState(false);
+  
   const sizeClasses = {
     sm: "w-8 h-8 text-xs",
     md: "w-12 h-12 text-base",
@@ -128,12 +131,13 @@ function AvatarWithInitials({ name, imageUrl, size = "md" }: { name: string; ima
     return colors[index];
   };
   
-  if (imageUrl) {
+  if (imageUrl && !imageError) {
     return (
       <img 
         src={imageUrl} 
         alt={name} 
         className={`${sizeClasses[size]} rounded-full object-cover border-2 border-white dark:border-gray-700 shadow-lg`}
+        onError={() => setImageError(true)}
       />
     );
   }
@@ -216,7 +220,7 @@ export default function UserSettings() {
       });
       
       if (fullProfile.profilePicture || fullProfile.profileImageUrl) {
-        setProfilePicturePreview(fullProfile.profilePicture || fullProfile.profileImageUrl);
+        setProfilePicturePreview(fullProfile.profilePicture || fullProfile.profileImageUrl || null);
       }
       
       setPreferences({
@@ -617,10 +621,12 @@ export default function UserSettings() {
                       </p>
                     </div>
                   </div>
-                  <Badge className="bg-green-600 hover:bg-green-700 text-white">
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    Active
-                  </Badge>
+                  {fullProfile.authProvider === 'github' && (
+                    <Badge className="bg-green-600 hover:bg-green-700 text-white">
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Active
+                    </Badge>
+                  )}
                 </div>
                 
                 {fullProfile.githubProfileUrl && (
@@ -1131,7 +1137,13 @@ export default function UserSettings() {
       </div>
 
       {/* Workflow Viewer Dialog */}
-      <Dialog open={showWorkflowDialog} onOpenChange={setShowWorkflowDialog}>
+      <Dialog open={showWorkflowDialog} onOpenChange={(open) => {
+        setShowWorkflowDialog(open);
+        if (!open) {
+          setWorkflowLogs("");
+          setWorkflowLoading(false);
+        }
+      }}>
         <DialogContent className="max-w-3xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1160,6 +1172,7 @@ export default function UserSettings() {
               onClick={() => {
                 setShowWorkflowDialog(false);
                 setWorkflowLogs("");
+                setWorkflowLoading(false);
               }}
               data-testid="button-close-workflow"
             >
