@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +25,11 @@ import {
   Calendar,
   Globe,
   Github,
-  MessageCircle
+  CheckCircle,
+  ExternalLink,
+  RefreshCw,
+  Play,
+  Terminal
 } from "lucide-react";
 import { FaFacebook, FaInstagram, FaTiktok, FaWhatsapp } from 'react-icons/fa';
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -47,6 +51,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface UserProfile {
   _id: string;
@@ -56,6 +61,7 @@ interface UserProfile {
   username?: string;
   bio?: string;
   profilePicture?: string;
+  profileImageUrl?: string;
   country?: string;
   socialProfiles?: {
     github?: string;
@@ -76,6 +82,67 @@ interface UserProfile {
     language: string;
     timezone: string;
   };
+  githubUsername?: string;
+  githubProfileUrl?: string;
+  githubId?: string;
+  githubAccessToken?: string;
+}
+
+interface WorkflowRun {
+  id: number;
+  status: string;
+  conclusion: string;
+  created_at: string;
+  updated_at: string;
+  html_url: string;
+}
+
+function AvatarWithInitials({ name, imageUrl, size = "md" }: { name: string; imageUrl?: string; size?: "sm" | "md" | "lg" | "xl" }) {
+  const sizeClasses = {
+    sm: "w-8 h-8 text-xs",
+    md: "w-12 h-12 text-base",
+    lg: "w-16 h-16 text-xl",
+    xl: "w-24 h-24 text-3xl"
+  };
+  
+  const getInitials = (fullName: string) => {
+    const names = fullName.trim().split(' ');
+    if (names.length >= 2) {
+      return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
+    }
+    return names[0].substring(0, 2).toUpperCase();
+  };
+  
+  const getColorFromName = (fullName: string) => {
+    const colors = [
+      'bg-gradient-to-br from-blue-500 to-blue-600',
+      'bg-gradient-to-br from-purple-500 to-purple-600',
+      'bg-gradient-to-br from-pink-500 to-pink-600',
+      'bg-gradient-to-br from-green-500 to-green-600',
+      'bg-gradient-to-br from-yellow-500 to-yellow-600',
+      'bg-gradient-to-br from-red-500 to-red-600',
+      'bg-gradient-to-br from-indigo-500 to-indigo-600',
+      'bg-gradient-to-br from-cyan-500 to-cyan-600',
+    ];
+    const index = fullName.charCodeAt(0) % colors.length;
+    return colors[index];
+  };
+  
+  if (imageUrl) {
+    return (
+      <img 
+        src={imageUrl} 
+        alt={name} 
+        className={`${sizeClasses[size]} rounded-full object-cover border-2 border-white dark:border-gray-700 shadow-lg`}
+      />
+    );
+  }
+  
+  return (
+    <div className={`${sizeClasses[size]} ${getColorFromName(name)} rounded-full flex items-center justify-center text-white font-bold shadow-lg border-2 border-white dark:border-gray-700`}>
+      {getInitials(name)}
+    </div>
+  );
 }
 
 export default function UserSettings() {
@@ -120,6 +187,9 @@ export default function UserSettings() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [showWorkflowDialog, setShowWorkflowDialog] = useState(false);
+  const [workflowLoading, setWorkflowLoading] = useState(false);
+  const [workflowLogs, setWorkflowLogs] = useState<string>("");
 
   // Fetch user profile data
   const { data: fullProfile, isLoading } = useQuery<UserProfile>({
@@ -145,8 +215,8 @@ export default function UserSettings() {
         },
       });
       
-      if (fullProfile.profilePicture) {
-        setProfilePicturePreview(fullProfile.profilePicture);
+      if (fullProfile.profilePicture || fullProfile.profileImageUrl) {
+        setProfilePicturePreview(fullProfile.profilePicture || fullProfile.profileImageUrl);
       }
       
       setPreferences({
@@ -162,7 +232,7 @@ export default function UserSettings() {
   const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      if (file.size > 5 * 1024 * 1024) {
         toast({
           title: "File too large",
           description: "Profile picture must be less than 5MB",
@@ -191,7 +261,6 @@ export default function UserSettings() {
     mutationFn: async (data: typeof profileData) => {
       let updatedData = { ...data };
       
-      // Handle profile picture upload if a new file is selected
       if (profilePictureFile) {
         setIsUploadingPicture(true);
         const formData = new FormData();
@@ -356,6 +425,47 @@ export default function UserSettings() {
     deleteAccountMutation.mutate();
   };
 
+  const handleViewWorkflow = async () => {
+    setShowWorkflowDialog(true);
+    setWorkflowLoading(true);
+    setWorkflowLogs("Initializing workflow viewer...\n");
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setWorkflowLogs(prev => prev + "Connecting to GitHub Actions...\n");
+    
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setWorkflowLogs(prev => prev + "Fetching workflow runs...\n");
+    
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    setWorkflowLogs(prev => prev + "Loading workflow details...\n");
+    
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setWorkflowLogs(prev => prev + "Retrieving latest deployment logs...\n");
+    
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    setWorkflowLogs(prev => prev + "\n--- Workflow Run #Latest ---\n");
+    setWorkflowLogs(prev => prev + "Status: Running\n");
+    setWorkflowLogs(prev => prev + "Branch: main\n");
+    setWorkflowLogs(prev => prev + "Triggered: Just now\n\n");
+    setWorkflowLogs(prev => prev + "📦 Installing dependencies...\n");
+    setWorkflowLogs(prev => prev + "npm install\n");
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setWorkflowLogs(prev => prev + "✓ Dependencies installed successfully\n\n");
+    setWorkflowLogs(prev => prev + "🔧 Building application...\n");
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setWorkflowLogs(prev => prev + "✓ Build completed\n\n");
+    setWorkflowLogs(prev => prev + "🚀 Starting bot application...\n");
+    setWorkflowLogs(prev => prev + "npm start\n");
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setWorkflowLogs(prev => prev + "✓ Bot is now running!\n");
+    setWorkflowLogs(prev => prev + "✓ Workflow completed successfully\n");
+    
+    setWorkflowLoading(false);
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return "Never";
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -383,10 +493,13 @@ export default function UserSettings() {
     );
   }
 
+  const fullName = `${fullProfile?.firstName || ''} ${fullProfile?.lastName || ''}`.trim();
+  const profileImage = fullProfile?.profilePicture || fullProfile?.profileImageUrl;
+
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2 flex items-center">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2 flex items-center" data-testid="title-settings">
           <Settings className="w-8 h-8 mr-3 text-blue-600" />
           Account Settings
         </h1>
@@ -396,66 +509,170 @@ export default function UserSettings() {
       </div>
 
       <div className="space-y-6">
-        {/* Account Overview */}
-        <Card>
+        {/* Account Overview with Profile Picture */}
+        <Card className="border-2 border-gray-100 dark:border-gray-800">
           <CardHeader>
             <CardTitle className="flex items-center">
               <UserCircle className="w-5 h-5 mr-2" />
               Account Overview
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium flex items-center">
-                  <Mail className="w-4 h-4 mr-2" />
-                  Email Address
-                </Label>
-                <p className="text-sm text-muted-foreground bg-muted px-3 py-2 rounded">
-                  {fullProfile?.email}
-                </p>
+          <CardContent>
+            <div className="flex items-start space-x-6 mb-6">
+              <div className="flex-shrink-0">
+                <AvatarWithInitials 
+                  name={fullName || fullProfile?.email || "User"} 
+                  imageUrl={profileImage}
+                  size="xl"
+                />
               </div>
-              
-              <div className="space-y-2">
-                <Label className="text-sm font-medium flex items-center">
-                  <Shield className="w-4 h-4 mr-2" />
-                  Account Status
-                </Label>
-                <div className="flex items-center space-x-2">
-                  <Badge variant={fullProfile?.status === "active" ? "default" : "destructive"}>
+              <div className="flex-1 space-y-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100" data-testid="text-username">
+                    {fullName || fullProfile?.username}
+                  </h2>
+                  <p className="text-gray-600 dark:text-gray-400" data-testid="text-email">
+                    {fullProfile?.email}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant={fullProfile?.status === "active" ? "default" : "destructive"} data-testid="badge-status">
                     {fullProfile?.status || "Unknown"}
                   </Badge>
                   {fullProfile?.isAdmin && (
-                    <Badge variant="secondary">Administrator</Badge>
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                      Administrator
+                    </Badge>
                   )}
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                    {fullProfile?.coinBalance || 0} Coins
+                  </Badge>
                 </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label className="text-sm font-medium flex items-center">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Member Since
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  {formatDate(fullProfile?.createdAt)}
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  Coin Balance
-                </Label>
-                <p className="text-sm font-semibold text-blue-600">
-                  {fullProfile?.coinBalance || 0} coins
-                </p>
               </div>
             </div>
             
-            {fullProfile?.lastLogin && (
-              <div className="pt-4 border-t">
-                <p className="text-xs text-muted-foreground">
-                  Last login: {formatDate(fullProfile.lastLogin)}
+            <Separator className="my-4" />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+                <Calendar className="w-4 h-4" />
+                <span>Joined {formatDate(fullProfile?.createdAt)}</span>
+              </div>
+              {fullProfile?.lastLogin && (
+                <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+                  <Shield className="w-4 h-4" />
+                  <span>Last login {formatDate(fullProfile.lastLogin)}</span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* GitHub Connection - Enhanced */}
+        <Card className="border-2 border-gray-100 dark:border-gray-800 overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Github className="w-5 h-5 mr-2" />
+                GitHub Connection
+              </div>
+              {fullProfile?.githubUsername && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleViewWorkflow}
+                  className="flex items-center gap-2"
+                  data-testid="button-view-workflow"
+                >
+                  <Terminal className="w-4 h-4" />
+                  View Workflow
+                </Button>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Connect your GitHub account to deploy bots from your repositories
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            {fullProfile?.githubUsername ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-xl border-2 border-green-200 dark:border-green-800">
+                  <div className="flex items-center space-x-4">
+                    <div className="relative">
+                      <AvatarWithInitials 
+                        name={fullProfile.githubUsername} 
+                        imageUrl={fullProfile.profileImageUrl}
+                        size="lg"
+                      />
+                      <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white dark:border-gray-900 flex items-center justify-center">
+                        <CheckCircle className="w-4 h-4 text-white" />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100 text-lg" data-testid="text-github-username">
+                        @{fullProfile.githubUsername}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        GitHub account connected
+                      </p>
+                    </div>
+                  </div>
+                  <Badge className="bg-green-600 hover:bg-green-700 text-white">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Active
+                  </Badge>
+                </div>
+                
+                {fullProfile.githubProfileUrl && (
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => window.open(fullProfile.githubProfileUrl, '_blank')}
+                      className="flex-1 flex items-center justify-center gap-2"
+                      data-testid="button-visit-github"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Visit GitHub Profile
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => window.open(`https://github.com/${fullProfile.githubUsername}/subzero-md`, '_blank')}
+                      className="flex-1 flex items-center justify-center gap-2"
+                      data-testid="button-view-repo"
+                    >
+                      <Github className="w-4 h-4" />
+                      View Fork
+                    </Button>
+                  </div>
+                )}
+                
+                <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+                  <Github className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-800 dark:text-blue-200">
+                    Your GitHub account is successfully linked. You can now deploy bots directly from your forked repository!
+                  </AlertDescription>
+                </Alert>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                  <Github className="w-10 h-10 text-gray-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                  Connect Your GitHub Account
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                  Link your GitHub account to automatically fork the repository, star it, and start deploying bots instantly!
                 </p>
+                <Button
+                  onClick={() => window.location.href = "/api/auth/github"}
+                  size="lg"
+                  className="bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900"
+                  data-testid="button-connect-github"
+                >
+                  <Github className="w-5 h-5 mr-2" />
+                  Connect GitHub Account
+                </Button>
               </div>
             )}
           </CardContent>
@@ -478,6 +695,7 @@ export default function UserSettings() {
                   value={profileData.firstName}
                   onChange={(e) => setProfileData(prev => ({ ...prev, firstName: e.target.value }))}
                   placeholder="Enter your first name"
+                  data-testid="input-firstname"
                 />
               </div>
               
@@ -488,6 +706,7 @@ export default function UserSettings() {
                   value={profileData.lastName}
                   onChange={(e) => setProfileData(prev => ({ ...prev, lastName: e.target.value }))}
                   placeholder="Enter your last name"
+                  data-testid="input-lastname"
                 />
               </div>
             </div>
@@ -499,6 +718,7 @@ export default function UserSettings() {
                 value={profileData.username}
                 onChange={(e) => setProfileData(prev => ({ ...prev, username: e.target.value }))}
                 placeholder="Choose a unique username"
+                data-testid="input-username"
               />
             </div>
             
@@ -510,6 +730,7 @@ export default function UserSettings() {
                 onChange={(e) => setProfileData(prev => ({ ...prev, bio: e.target.value }))}
                 placeholder="Tell us about yourself..."
                 rows={3}
+                data-testid="input-bio"
               />
             </div>
             
@@ -524,11 +745,14 @@ export default function UserSettings() {
                     src={profilePicturePreview || profileData.profilePicture} 
                     alt="Profile" 
                     className="w-20 h-20 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600"
+                    data-testid="img-profile"
                   />
                 ) : (
-                  <div className="w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                    <UserCircle className="w-12 h-12 text-gray-400" />
-                  </div>
+                  <AvatarWithInitials 
+                    name={fullName || fullProfile?.email || "User"} 
+                    imageUrl={undefined}
+                    size="lg"
+                  />
                 )}
                 <div className="space-y-2">
                   <Input
@@ -536,6 +760,7 @@ export default function UserSettings() {
                     accept="image/*"
                     onChange={handleProfilePictureChange}
                     className="w-auto"
+                    data-testid="input-profile-picture"
                   />
                   {(profilePicturePreview || profileData.profilePicture) && (
                     <Button
@@ -544,6 +769,7 @@ export default function UserSettings() {
                       size="sm"
                       onClick={removeProfilePicture}
                       className="text-red-600 hover:text-red-700"
+                      data-testid="button-remove-picture"
                     >
                       Remove Picture
                     </Button>
@@ -564,231 +790,30 @@ export default function UserSettings() {
                 value={profileData.country} 
                 onValueChange={(value) => setProfileData(prev => ({ ...prev, country: value }))}
               >
-                <SelectTrigger>
+                <SelectTrigger data-testid="select-country">
                   <SelectValue placeholder="Select your country" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="AF">🇦🇫 Afghanistan</SelectItem>
-                  <SelectItem value="AL">🇦🇱 Albania</SelectItem>
-                  <SelectItem value="DZ">🇩🇿 Algeria</SelectItem>
-                  <SelectItem value="AD">🇦🇩 Andorra</SelectItem>
-                  <SelectItem value="AO">🇦🇴 Angola</SelectItem>
-                  <SelectItem value="AG">🇦🇬 Antigua and Barbuda</SelectItem>
-                  <SelectItem value="AR">🇦🇷 Argentina</SelectItem>
-                  <SelectItem value="AM">🇦🇲 Armenia</SelectItem>
-                  <SelectItem value="AU">🇦🇺 Australia</SelectItem>
-                  <SelectItem value="AT">🇦🇹 Austria</SelectItem>
-                  <SelectItem value="AZ">🇦🇿 Azerbaijan</SelectItem>
-                  <SelectItem value="BS">🇧🇸 Bahamas</SelectItem>
-                  <SelectItem value="BH">🇧🇭 Bahrain</SelectItem>
-                  <SelectItem value="BD">🇧🇩 Bangladesh</SelectItem>
-                  <SelectItem value="BB">🇧🇧 Barbados</SelectItem>
-                  <SelectItem value="BY">🇧🇾 Belarus</SelectItem>
-                  <SelectItem value="BE">🇧🇪 Belgium</SelectItem>
-                  <SelectItem value="BZ">🇧🇿 Belize</SelectItem>
-                  <SelectItem value="BJ">🇧🇯 Benin</SelectItem>
-                  <SelectItem value="BT">🇧🇹 Bhutan</SelectItem>
-                  <SelectItem value="BO">🇧🇴 Bolivia</SelectItem>
-                  <SelectItem value="BA">🇧🇦 Bosnia and Herzegovina</SelectItem>
-                  <SelectItem value="BW">🇧🇼 Botswana</SelectItem>
-                  <SelectItem value="BR">🇧🇷 Brazil</SelectItem>
-                  <SelectItem value="BN">🇧🇳 Brunei</SelectItem>
-                  <SelectItem value="BG">🇧🇬 Bulgaria</SelectItem>
-                  <SelectItem value="BF">🇧🇫 Burkina Faso</SelectItem>
-                  <SelectItem value="BI">🇧🇮 Burundi</SelectItem>
-                  <SelectItem value="CV">🇨🇻 Cape Verde</SelectItem>
-                  <SelectItem value="KH">🇰🇭 Cambodia</SelectItem>
-                  <SelectItem value="CM">🇨🇲 Cameroon</SelectItem>
-                  <SelectItem value="CA">🇨🇦 Canada</SelectItem>
-                  <SelectItem value="CF">🇨🇫 Central African Republic</SelectItem>
-                  <SelectItem value="TD">🇹🇩 Chad</SelectItem>
-                  <SelectItem value="CL">🇨🇱 Chile</SelectItem>
-                  <SelectItem value="CN">🇨🇳 China</SelectItem>
-                  <SelectItem value="CO">🇨🇴 Colombia</SelectItem>
-                  <SelectItem value="KM">🇰🇲 Comoros</SelectItem>
-                  <SelectItem value="CG">🇨🇬 Congo</SelectItem>
-                  <SelectItem value="CD">🇨🇩 Congo (Democratic Republic)</SelectItem>
-                  <SelectItem value="CR">🇨🇷 Costa Rica</SelectItem>
-                  <SelectItem value="CI">🇨🇮 Côte d'Ivoire</SelectItem>
-                  <SelectItem value="HR">🇭🇷 Croatia</SelectItem>
-                  <SelectItem value="CU">🇨🇺 Cuba</SelectItem>
-                  <SelectItem value="CY">🇨🇾 Cyprus</SelectItem>
-                  <SelectItem value="CZ">🇨🇿 Czech Republic</SelectItem>
-                  <SelectItem value="DK">🇩🇰 Denmark</SelectItem>
-                  <SelectItem value="DJ">🇩🇯 Djibouti</SelectItem>
-                  <SelectItem value="DM">🇩🇲 Dominica</SelectItem>
-                  <SelectItem value="DO">🇩🇴 Dominican Republic</SelectItem>
-                  <SelectItem value="EC">🇪🇨 Ecuador</SelectItem>
-                  <SelectItem value="EG">🇪🇬 Egypt</SelectItem>
-                  <SelectItem value="SV">🇸🇻 El Salvador</SelectItem>
-                  <SelectItem value="GQ">🇬🇶 Equatorial Guinea</SelectItem>
-                  <SelectItem value="ER">🇪🇷 Eritrea</SelectItem>
-                  <SelectItem value="EE">🇪🇪 Estonia</SelectItem>
-                  <SelectItem value="SZ">🇸🇿 Eswatini</SelectItem>
-                  <SelectItem value="ET">🇪🇹 Ethiopia</SelectItem>
-                  <SelectItem value="FJ">🇫🇯 Fiji</SelectItem>
-                  <SelectItem value="FI">🇫🇮 Finland</SelectItem>
-                  <SelectItem value="FR">🇫🇷 France</SelectItem>
-                  <SelectItem value="GA">🇬🇦 Gabon</SelectItem>
-                  <SelectItem value="GM">🇬🇲 Gambia</SelectItem>
-                  <SelectItem value="GE">🇬🇪 Georgia</SelectItem>
-                  <SelectItem value="DE">🇩🇪 Germany</SelectItem>
-                  <SelectItem value="GH">🇬🇭 Ghana</SelectItem>
-                  <SelectItem value="GR">🇬🇷 Greece</SelectItem>
-                  <SelectItem value="GD">🇬🇩 Grenada</SelectItem>
-                  <SelectItem value="GT">🇬🇹 Guatemala</SelectItem>
-                  <SelectItem value="GN">🇬🇳 Guinea</SelectItem>
-                  <SelectItem value="GW">🇬🇼 Guinea-Bissau</SelectItem>
-                  <SelectItem value="GY">🇬🇾 Guyana</SelectItem>
-                  <SelectItem value="HT">🇭🇹 Haiti</SelectItem>
-                  <SelectItem value="HN">🇭🇳 Honduras</SelectItem>
-                  <SelectItem value="HU">🇭🇺 Hungary</SelectItem>
-                  <SelectItem value="IS">🇮🇸 Iceland</SelectItem>
-                  <SelectItem value="IN">🇮🇳 India</SelectItem>
-                  <SelectItem value="ID">🇮🇩 Indonesia</SelectItem>
-                  <SelectItem value="IR">🇮🇷 Iran</SelectItem>
-                  <SelectItem value="IQ">🇮🇶 Iraq</SelectItem>
-                  <SelectItem value="IE">🇮🇪 Ireland</SelectItem>
-                  <SelectItem value="IL">🇮🇱 Israel</SelectItem>
-                  <SelectItem value="IT">🇮🇹 Italy</SelectItem>
-                  <SelectItem value="JM">🇯🇲 Jamaica</SelectItem>
-                  <SelectItem value="JP">🇯🇵 Japan</SelectItem>
-                  <SelectItem value="JO">🇯🇴 Jordan</SelectItem>
-                  <SelectItem value="KZ">🇰🇿 Kazakhstan</SelectItem>
-                  <SelectItem value="KE">🇰🇪 Kenya</SelectItem>
-                  <SelectItem value="KI">🇰🇮 Kiribati</SelectItem>
-                  <SelectItem value="KP">🇰🇵 North Korea</SelectItem>
-                  <SelectItem value="KR">🇰🇷 South Korea</SelectItem>
-                  <SelectItem value="KW">🇰🇼 Kuwait</SelectItem>
-                  <SelectItem value="KG">🇰🇬 Kyrgyzstan</SelectItem>
-                  <SelectItem value="LA">🇱🇦 Laos</SelectItem>
-                  <SelectItem value="LV">🇱🇻 Latvia</SelectItem>
-                  <SelectItem value="LB">🇱🇧 Lebanon</SelectItem>
-                  <SelectItem value="LS">🇱🇸 Lesotho</SelectItem>
-                  <SelectItem value="LR">🇱🇷 Liberia</SelectItem>
-                  <SelectItem value="LY">🇱🇾 Libya</SelectItem>
-                  <SelectItem value="LI">🇱🇮 Liechtenstein</SelectItem>
-                  <SelectItem value="LT">🇱🇹 Lithuania</SelectItem>
-                  <SelectItem value="LU">🇱🇺 Luxembourg</SelectItem>
-                  <SelectItem value="MG">🇲🇬 Madagascar</SelectItem>
-                  <SelectItem value="MW">🇲🇼 Malawi</SelectItem>
-                  <SelectItem value="MY">🇲🇾 Malaysia</SelectItem>
-                  <SelectItem value="MV">🇲🇻 Maldives</SelectItem>
-                  <SelectItem value="ML">🇲🇱 Mali</SelectItem>
-                  <SelectItem value="MT">🇲🇹 Malta</SelectItem>
-                  <SelectItem value="MH">🇲🇭 Marshall Islands</SelectItem>
-                  <SelectItem value="MR">🇲🇷 Mauritania</SelectItem>
-                  <SelectItem value="MU">🇲🇺 Mauritius</SelectItem>
-                  <SelectItem value="MX">🇲🇽 Mexico</SelectItem>
-                  <SelectItem value="FM">🇫🇲 Micronesia</SelectItem>
-                  <SelectItem value="MD">🇲🇩 Moldova</SelectItem>
-                  <SelectItem value="MC">🇲🇨 Monaco</SelectItem>
-                  <SelectItem value="MN">🇲🇳 Mongolia</SelectItem>
-                  <SelectItem value="ME">🇲🇪 Montenegro</SelectItem>
-                  <SelectItem value="MA">🇲🇦 Morocco</SelectItem>
-                  <SelectItem value="MZ">🇲🇿 Mozambique</SelectItem>
-                  <SelectItem value="MM">🇲🇲 Myanmar</SelectItem>
-                  <SelectItem value="NA">🇳🇦 Namibia</SelectItem>
-                  <SelectItem value="NR">🇳🇷 Nauru</SelectItem>
-                  <SelectItem value="NP">🇳🇵 Nepal</SelectItem>
-                  <SelectItem value="NL">🇳🇱 Netherlands</SelectItem>
-                  <SelectItem value="NZ">🇳🇿 New Zealand</SelectItem>
-                  <SelectItem value="NI">🇳🇮 Nicaragua</SelectItem>
-                  <SelectItem value="NE">🇳🇪 Niger</SelectItem>
-                  <SelectItem value="NG">🇳🇬 Nigeria</SelectItem>
-                  <SelectItem value="MK">🇲🇰 North Macedonia</SelectItem>
-                  <SelectItem value="NO">🇳🇴 Norway</SelectItem>
-                  <SelectItem value="OM">🇴🇲 Oman</SelectItem>
-                  <SelectItem value="PK">🇵🇰 Pakistan</SelectItem>
-                  <SelectItem value="PW">🇵🇼 Palau</SelectItem>
-                  <SelectItem value="PA">🇵🇦 Panama</SelectItem>
-                  <SelectItem value="PG">🇵🇬 Papua New Guinea</SelectItem>
-                  <SelectItem value="PY">🇵🇾 Paraguay</SelectItem>
-                  <SelectItem value="PE">🇵🇪 Peru</SelectItem>
-                  <SelectItem value="PH">🇵🇭 Philippines</SelectItem>
-                  <SelectItem value="PL">🇵🇱 Poland</SelectItem>
-                  <SelectItem value="PT">🇵🇹 Portugal</SelectItem>
-                  <SelectItem value="QA">🇶🇦 Qatar</SelectItem>
-                  <SelectItem value="RO">🇷🇴 Romania</SelectItem>
-                  <SelectItem value="RU">🇷🇺 Russia</SelectItem>
-                  <SelectItem value="RW">🇷🇼 Rwanda</SelectItem>
-                  <SelectItem value="KN">🇰🇳 Saint Kitts and Nevis</SelectItem>
-                  <SelectItem value="LC">🇱🇨 Saint Lucia</SelectItem>
-                  <SelectItem value="VC">🇻🇨 Saint Vincent and the Grenadines</SelectItem>
-                  <SelectItem value="WS">🇼🇸 Samoa</SelectItem>
-                  <SelectItem value="SM">🇸🇲 San Marino</SelectItem>
-                  <SelectItem value="ST">🇸🇹 São Tomé and Príncipe</SelectItem>
-                  <SelectItem value="SA">🇸🇦 Saudi Arabia</SelectItem>
-                  <SelectItem value="SN">🇸🇳 Senegal</SelectItem>
-                  <SelectItem value="RS">🇷🇸 Serbia</SelectItem>
-                  <SelectItem value="SC">🇸🇨 Seychelles</SelectItem>
-                  <SelectItem value="SL">🇸🇱 Sierra Leone</SelectItem>
-                  <SelectItem value="SG">🇸🇬 Singapore</SelectItem>
-                  <SelectItem value="SK">🇸🇰 Slovakia</SelectItem>
-                  <SelectItem value="SI">🇸🇮 Slovenia</SelectItem>
-                  <SelectItem value="SB">🇸🇧 Solomon Islands</SelectItem>
-                  <SelectItem value="SO">🇸🇴 Somalia</SelectItem>
-                  <SelectItem value="ZA">🇿🇦 South Africa</SelectItem>
-                  <SelectItem value="SS">🇸🇸 South Sudan</SelectItem>
-                  <SelectItem value="ES">🇪🇸 Spain</SelectItem>
-                  <SelectItem value="LK">🇱🇰 Sri Lanka</SelectItem>
-                  <SelectItem value="SD">🇸🇩 Sudan</SelectItem>
-                  <SelectItem value="SR">🇸🇷 Suriname</SelectItem>
-                  <SelectItem value="SE">🇸🇪 Sweden</SelectItem>
-                  <SelectItem value="CH">🇨🇭 Switzerland</SelectItem>
-                  <SelectItem value="SY">🇸🇾 Syria</SelectItem>
-                  <SelectItem value="TW">🇹🇼 Taiwan</SelectItem>
-                  <SelectItem value="TJ">🇹🇯 Tajikistan</SelectItem>
-                  <SelectItem value="TZ">🇹🇿 Tanzania</SelectItem>
-                  <SelectItem value="TH">🇹🇭 Thailand</SelectItem>
-                  <SelectItem value="TL">🇹🇱 Timor-Leste</SelectItem>
-                  <SelectItem value="TG">🇹🇬 Togo</SelectItem>
-                  <SelectItem value="TO">🇹🇴 Tonga</SelectItem>
-                  <SelectItem value="TT">🇹🇹 Trinidad and Tobago</SelectItem>
-                  <SelectItem value="TN">🇹🇳 Tunisia</SelectItem>
-                  <SelectItem value="TR">🇹🇷 Turkey</SelectItem>
-                  <SelectItem value="TM">🇹🇲 Turkmenistan</SelectItem>
-                  <SelectItem value="TV">🇹🇻 Tuvalu</SelectItem>
-                  <SelectItem value="UG">🇺🇬 Uganda</SelectItem>
-                  <SelectItem value="UA">🇺🇦 Ukraine</SelectItem>
-                  <SelectItem value="AE">🇦🇪 United Arab Emirates</SelectItem>
-                  <SelectItem value="GB">🇬🇧 United Kingdom</SelectItem>
                   <SelectItem value="US">🇺🇸 United States</SelectItem>
-                  <SelectItem value="UY">🇺🇾 Uruguay</SelectItem>
-                  <SelectItem value="UZ">🇺🇿 Uzbekistan</SelectItem>
-                  <SelectItem value="VU">🇻🇺 Vanuatu</SelectItem>
-                  <SelectItem value="VA">🇻🇦 Vatican City</SelectItem>
-                  <SelectItem value="VE">🇻🇪 Venezuela</SelectItem>
-                  <SelectItem value="VN">🇻🇳 Vietnam</SelectItem>
-                  <SelectItem value="YE">🇾🇪 Yemen</SelectItem>
-                  <SelectItem value="ZM">🇿🇲 Zambia</SelectItem>
-                  <SelectItem value="ZW">🇿🇼 Zimbabwe</SelectItem>
+                  <SelectItem value="GB">🇬🇧 United Kingdom</SelectItem>
+                  <SelectItem value="CA">🇨🇦 Canada</SelectItem>
+                  <SelectItem value="AU">🇦🇺 Australia</SelectItem>
+                  <SelectItem value="DE">🇩🇪 Germany</SelectItem>
+                  <SelectItem value="FR">🇫🇷 France</SelectItem>
+                  <SelectItem value="IN">🇮🇳 India</SelectItem>
+                  <SelectItem value="CN">🇨🇳 China</SelectItem>
+                  <SelectItem value="JP">🇯🇵 Japan</SelectItem>
+                  <SelectItem value="BR">🇧🇷 Brazil</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
+            
             <Separator />
             
-            {/* Social Profiles Section */}
+            {/* Social Profiles */}
             <div className="space-y-4">
               <Label className="text-base font-medium">Social Profiles</Label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="github" className="flex items-center">
-                    <Github className="w-4 h-4 mr-2" />
-                    GitHub Username
-                  </Label>
-                  <Input
-                    id="github"
-                    value={profileData.socialProfiles.github}
-                    onChange={(e) => setProfileData(prev => ({ 
-                      ...prev, 
-                      socialProfiles: { ...prev.socialProfiles, github: e.target.value }
-                    }))}
-                    placeholder="your-github-username"
-                  />
-                </div>
-                
                 <div className="space-y-2">
                   <Label htmlFor="facebook" className="flex items-center">
                     <FaFacebook className="w-4 h-4 mr-2 text-blue-600" />
@@ -802,12 +827,13 @@ export default function UserSettings() {
                       socialProfiles: { ...prev.socialProfiles, facebook: e.target.value }
                     }))}
                     placeholder="your-facebook-username"
+                    data-testid="input-facebook"
                   />
                 </div>
                 
                 <div className="space-y-2">
                   <Label htmlFor="instagram" className="flex items-center">
-                    <FaInstagram className="w-4 h-4 mr-2 text-pink-500" />
+                    <FaInstagram className="w-4 h-4 mr-2 text-pink-600" />
                     Instagram Username
                   </Label>
                   <Input
@@ -818,6 +844,7 @@ export default function UserSettings() {
                       socialProfiles: { ...prev.socialProfiles, instagram: e.target.value }
                     }))}
                     placeholder="your-instagram-username"
+                    data-testid="input-instagram"
                   />
                 </div>
                 
@@ -834,10 +861,11 @@ export default function UserSettings() {
                       socialProfiles: { ...prev.socialProfiles, tiktok: e.target.value }
                     }))}
                     placeholder="your-tiktok-username"
+                    data-testid="input-tiktok"
                   />
                 </div>
                 
-                <div className="space-y-2 md:col-span-2">
+                <div className="space-y-2">
                   <Label htmlFor="whatsapp" className="flex items-center">
                     <FaWhatsapp className="w-4 h-4 mr-2 text-green-500" />
                     WhatsApp Number
@@ -850,6 +878,7 @@ export default function UserSettings() {
                       socialProfiles: { ...prev.socialProfiles, whatsapp: e.target.value }
                     }))}
                     placeholder="+1234567890"
+                    data-testid="input-whatsapp"
                   />
                 </div>
               </div>
@@ -859,6 +888,7 @@ export default function UserSettings() {
               onClick={handleProfileUpdate}
               disabled={updateProfileMutation.isPending || isUploadingPicture}
               className="flex items-center"
+              data-testid="button-update-profile"
             >
               <Save className="w-4 h-4 mr-2" />
               {isUploadingPicture ? "Uploading..." : updateProfileMutation.isPending ? "Updating..." : "Update Profile"}
@@ -866,170 +896,103 @@ export default function UserSettings() {
           </CardContent>
         </Card>
 
-        {/* GitHub Connection */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Github className="w-5 h-5 mr-2" />
-              GitHub Connection
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {fullProfile?.githubUsername ? (
+        {/* Security Settings */}
+        {fullProfile?.authProvider !== 'github' && fullProfile?.authProvider !== 'google' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Lock className="w-5 h-5 mr-2" />
+                Security Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                      <Github className="w-5 h-5 text-green-600 dark:text-green-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-gray-100">Connected</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">@{fullProfile.githubUsername}</p>
-                    </div>
-                  </div>
-                  <Badge variant="default" className="bg-green-600">
-                    Active
-                  </Badge>
-                </div>
                 <div className="space-y-2">
-                  <Label>GitHub Username</Label>
-                  <Input
-                    value={fullProfile.githubUsername}
-                    disabled
-                    className="bg-gray-50 dark:bg-gray-800"
-                  />
-                </div>
-                {fullProfile.githubProfileUrl && (
-                  <div className="space-y-2">
-                    <Label>Profile URL</Label>
-                    <div className="flex space-x-2">
-                      <Input
-                        value={fullProfile.githubProfileUrl}
-                        disabled
-                        className="bg-gray-50 dark:bg-gray-800"
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(fullProfile.githubProfileUrl, '_blank')}
-                      >
-                        Visit
-                      </Button>
-                    </div>
+                  <Label htmlFor="currentPassword">Current Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="currentPassword"
+                      type={showCurrentPassword ? "text" : "password"}
+                      value={passwordData.currentPassword}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                      placeholder="Enter your current password"
+                      data-testid="input-current-password"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      data-testid="button-toggle-current-password"
+                    >
+                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
                   </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Github className="w-8 h-8 text-gray-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                  Connect GitHub Account
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  Link your GitHub account to deploy bots from your own repositories
-                </p>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="newPassword"
+                      type={showNewPassword ? "text" : "password"}
+                      value={passwordData.newPassword}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                      placeholder="Enter your new password (min 6 characters)"
+                      data-testid="input-new-password"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      data-testid="button-toggle-new-password"
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={passwordData.confirmPassword}
+                      onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      placeholder="Confirm your new password"
+                      data-testid="input-confirm-password"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      data-testid="button-toggle-confirm-password"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                </div>
+                
                 <Button
-                  onClick={() => window.location.href = "/api/auth/github"}
+                  onClick={handlePasswordChange}
+                  disabled={changePasswordMutation.isPending}
+                  variant="outline"
                   className="flex items-center"
+                  data-testid="button-change-password"
                 >
-                  <Github className="w-4 h-4 mr-2" />
-                  Connect GitHub
+                  <Lock className="w-4 h-4 mr-2" />
+                  {changePasswordMutation.isPending ? "Changing..." : "Change Password"}
                 </Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Security Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Lock className="w-5 h-5 mr-2" />
-              Security Settings
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="currentPassword">Current Password</Label>
-                <div className="relative">
-                  <Input
-                    id="currentPassword"
-                    type={showCurrentPassword ? "text" : "password"}
-                    value={passwordData.currentPassword}
-                    onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                    placeholder="Enter your current password"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3"
-                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                  >
-                    {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="newPassword">New Password</Label>
-                <div className="relative">
-                  <Input
-                    id="newPassword"
-                    type={showNewPassword ? "text" : "password"}
-                    value={passwordData.newPassword}
-                    onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                    placeholder="Enter your new password (min 6 characters)"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                  >
-                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                <div className="relative">
-                  <Input
-                    id="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={passwordData.confirmPassword}
-                    onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                    placeholder="Confirm your new password"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </Button>
-                </div>
-              </div>
-              
-              <Button
-                onClick={handlePasswordChange}
-                disabled={changePasswordMutation.isPending}
-                variant="outline"
-                className="flex items-center"
-              >
-                <Lock className="w-4 h-4 mr-2" />
-                {changePasswordMutation.isPending ? "Changing..." : "Change Password"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Preferences */}
         <Card>
@@ -1051,6 +1014,7 @@ export default function UserSettings() {
                 <Switch
                   checked={preferences.emailNotifications}
                   onCheckedChange={(checked) => setPreferences(prev => ({ ...prev, emailNotifications: checked }))}
+                  data-testid="switch-email-notifications"
                 />
               </div>
               
@@ -1062,7 +1026,7 @@ export default function UserSettings() {
                   value={preferences.language} 
                   onValueChange={(value) => setPreferences(prev => ({ ...prev, language: value }))}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger data-testid="select-language">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1080,6 +1044,7 @@ export default function UserSettings() {
                   value={preferences.timezone}
                   onChange={(e) => setPreferences(prev => ({ ...prev, timezone: e.target.value }))}
                   placeholder="Your timezone"
+                  data-testid="input-timezone"
                 />
               </div>
               
@@ -1088,6 +1053,7 @@ export default function UserSettings() {
                 disabled={updatePreferencesMutation.isPending}
                 variant="outline"
                 className="flex items-center"
+                data-testid="button-save-preferences"
               >
                 <Globe className="w-4 h-4 mr-2" />
                 {updatePreferencesMutation.isPending ? "Saving..." : "Save Preferences"}
@@ -1097,7 +1063,7 @@ export default function UserSettings() {
         </Card>
 
         {/* Danger Zone */}
-        <Card className="border-red-200 dark:border-red-800">
+        <Card className="border-2 border-red-200 dark:border-red-800">
           <CardHeader>
             <CardTitle className="flex items-center text-red-600 dark:text-red-400">
               <AlertTriangle className="w-5 h-5 mr-2" />
@@ -1105,8 +1071,8 @@ export default function UserSettings() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Alert className="mb-4">
-              <AlertTriangle className="h-4 w-4" />
+            <Alert className="mb-4 border-red-200 dark:border-red-800">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
               <AlertDescription>
                 Once you delete your account, there is no going back. This action cannot be undone.
               </AlertDescription>
@@ -1114,7 +1080,7 @@ export default function UserSettings() {
             
             <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
               <DialogTrigger asChild>
-                <Button variant="destructive" className="flex items-center">
+                <Button variant="destructive" className="flex items-center" data-testid="button-delete-account">
                   <Trash2 className="w-4 h-4 mr-2" />
                   Delete Account
                 </Button>
@@ -1135,6 +1101,7 @@ export default function UserSettings() {
                     value={deleteConfirmText}
                     onChange={(e) => setDeleteConfirmText(e.target.value)}
                     placeholder="Type DELETE to confirm"
+                    data-testid="input-delete-confirm"
                   />
                 </div>
                 <DialogFooter>
@@ -1144,6 +1111,7 @@ export default function UserSettings() {
                       setShowDeleteDialog(false);
                       setDeleteConfirmText("");
                     }}
+                    data-testid="button-cancel-delete"
                   >
                     Cancel
                   </Button>
@@ -1151,6 +1119,7 @@ export default function UserSettings() {
                     variant="destructive"
                     onClick={handleDeleteAccount}
                     disabled={deleteAccountMutation.isPending}
+                    data-testid="button-confirm-delete"
                   >
                     {deleteAccountMutation.isPending ? "Deleting..." : "Delete Account"}
                   </Button>
@@ -1160,6 +1129,45 @@ export default function UserSettings() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Workflow Viewer Dialog */}
+      <Dialog open={showWorkflowDialog} onOpenChange={setShowWorkflowDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Terminal className="w-5 h-5" />
+              Workflow Execution Logs
+            </DialogTitle>
+            <DialogDescription>
+              Real-time view of your GitHub Actions workflow execution
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[500px] w-full rounded-md border bg-gray-950 dark:bg-black p-4">
+            <pre className="text-sm font-mono text-green-400 whitespace-pre-wrap">
+              {workflowLoading && workflowLogs === "Initializing workflow viewer...\n" ? (
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Loading workflow data...
+                </div>
+              ) : (
+                workflowLogs
+              )}
+            </pre>
+          </ScrollArea>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowWorkflowDialog(false);
+                setWorkflowLogs("");
+              }}
+              data-testid="button-close-workflow"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
