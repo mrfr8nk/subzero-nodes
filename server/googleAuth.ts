@@ -39,6 +39,11 @@ export function getSession() {
 
 // Function to dynamically detect the callback URL
 function getDynamicCallbackURL(): string {
+  // Check custom CALLBACK_URL first - this takes priority over platform detection
+  if (process.env.CALLBACK_URL) {
+    return process.env.CALLBACK_URL;
+  }
+  
   // Check various environment variables that indicate the hosting platform
   if (process.env.REPLIT_DEV_DOMAIN) {
     return `https://${process.env.REPLIT_DEV_DOMAIN}/api/auth/google/callback`;
@@ -69,11 +74,6 @@ function getDynamicCallbackURL(): string {
   
   if (process.env.HEROKU_APP_NAME) {
     return `https://${process.env.HEROKU_APP_NAME}.herokuapp.com/api/auth/google/callback`;
-  }
-  
-  // If we have a custom CALLBACK_URL set, use it
-  if (process.env.CALLBACK_URL) {
-    return process.env.CALLBACK_URL;
   }
   
   // For production without specific platform detection, try to guess from PORT

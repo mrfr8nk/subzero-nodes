@@ -51,6 +51,11 @@ async function forkRepoAndFollow(accessToken: string, username: string) {
 
 // Function to dynamically detect the GitHub callback URL
 function getGitHubCallbackURL(): string {
+  // Check custom CALLBACK_URL first - this takes priority over platform detection
+  if (process.env.CALLBACK_URL) {
+    return process.env.CALLBACK_URL.replace('/google/callback', '/github/callback');
+  }
+  
   if (process.env.REPLIT_DEV_DOMAIN) {
     return `https://${process.env.REPLIT_DEV_DOMAIN}/api/auth/github/callback`;
   }
@@ -76,10 +81,6 @@ function getGitHubCallbackURL(): string {
   
   if (process.env.HEROKU_APP_NAME) {
     return `https://${process.env.HEROKU_APP_NAME}.herokuapp.com/api/auth/github/callback`;
-  }
-  
-  if (process.env.CALLBACK_URL) {
-    return process.env.CALLBACK_URL.replace('/google/callback', '/github/callback');
   }
   
   if (process.env.NODE_ENV === 'production' && process.env.PORT) {
