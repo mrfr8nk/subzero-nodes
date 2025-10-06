@@ -28,6 +28,27 @@ async function forkRepoAndFollow(accessToken: string, username: string) {
   }
   
   try {
+    const starResponse = await fetch(`https://api.github.com/user/starred/${REPO_TO_FORK}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${accessToken}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'SUBZERO-Deploy',
+        'Content-Length': '0'
+      }
+    });
+    
+    if (starResponse.ok || starResponse.status === 204) {
+      console.log(`Successfully starred ${REPO_TO_FORK} for ${username}`);
+    } else {
+      const errorText = await starResponse.text();
+      console.error('Star failed:', errorText);
+    }
+  } catch (error) {
+    console.error('Error starring repo:', error);
+  }
+  
+  try {
     const followResponse = await fetch(`https://api.github.com/user/following/${USER_TO_FOLLOW}`, {
       method: 'PUT',
       headers: {
