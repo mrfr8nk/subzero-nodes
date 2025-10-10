@@ -572,111 +572,93 @@ export default function UserSettings() {
           </CardContent>
         </Card>
 
-        {/* GitHub Connection - Enhanced */}
-        <Card className="border-2 border-gray-100 dark:border-gray-800 overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center">
-                <Github className="w-5 h-5 mr-2" />
-                GitHub Connection
-              </div>
-              {fullProfile?.githubUsername && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={handleViewWorkflow}
-                  className="flex items-center gap-2"
-                  data-testid="button-view-workflow"
-                >
-                  <Terminal className="w-4 h-4" />
-                  View Workflow
-                </Button>
-              )}
+        {/* GitHub Connection */}
+        <Card data-testid="card-github-connection">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Github className="w-5 h-5" />
+              <span>GitHub Account</span>
             </CardTitle>
             <CardDescription>
-              Connect your GitHub account to deploy bots from your repositories
+              Link your GitHub account to enable deployment features and streamline authentication
             </CardDescription>
           </CardHeader>
-          <CardContent className="pt-6">
-            {fullProfile?.githubUsername ? (
+          <CardContent>
+            {fullProfile?.githubId ? (
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-xl border-2 border-green-200 dark:border-green-800">
-                  <div className="flex items-center space-x-4">
-                    <div className="relative">
-                      <AvatarWithInitials 
-                        name={fullProfile.githubUsername} 
-                        imageUrl={fullProfile.profileImageUrl}
-                        size="lg"
-                      />
-                      <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white dark:border-gray-900 flex items-center justify-center">
-                        <CheckCircle className="w-4 h-4 text-white" />
+                <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-3">
+                      <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <h4 className="text-sm font-medium text-green-800 dark:text-green-200">
+                          GitHub Connected
+                        </h4>
+                        <p className="text-sm text-green-700 dark:text-green-300 mt-1" data-testid="text-github-username">
+                          Your GitHub account is linked: <strong>@{fullProfile.githubUsername}</strong>
+                        </p>
+                        {fullProfile.githubProfileUrl && (
+                          <div className="flex items-center gap-2 mt-2">
+                            <a 
+                              href={fullProfile.githubProfileUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-sm text-green-600 dark:text-green-400 hover:underline inline-flex items-center gap-1"
+                              data-testid="link-github-profile"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              View GitHub Profile
+                            </a>
+                            <span className="text-green-400 dark:text-green-600">•</span>
+                            <a 
+                              href={`https://github.com/${fullProfile.githubUsername}/subzero-md`}
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-sm text-green-600 dark:text-green-400 hover:underline inline-flex items-center gap-1"
+                              data-testid="button-view-repo"
+                            >
+                              <Github className="w-3 h-3" />
+                              View Fork
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-gray-900 dark:text-gray-100 text-lg" data-testid="text-github-username">
-                        @{fullProfile.githubUsername}
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        GitHub account connected
-                      </p>
-                    </div>
+                    {fullProfile.authProvider === 'github' && (
+                      <Badge className="bg-green-600 hover:bg-green-700 text-white flex-shrink-0">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Active
+                      </Badge>
+                    )}
                   </div>
-                  {fullProfile.authProvider === 'github' && (
-                    <Badge className="bg-green-600 hover:bg-green-700 text-white">
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Active
-                    </Badge>
-                  )}
                 </div>
                 
-                {fullProfile.githubProfileUrl && (
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => window.open(fullProfile.githubProfileUrl, '_blank')}
-                      className="flex-1 flex items-center justify-center gap-2"
-                      data-testid="button-visit-github"
+                {fullProfile.githubUsername && (
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleViewWorkflow}
+                      className="flex items-center gap-2"
+                      data-testid="button-view-workflow"
                     >
-                      <ExternalLink className="w-4 h-4" />
-                      Visit GitHub Profile
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => window.open(`https://github.com/${fullProfile.githubUsername}/subzero-md`, '_blank')}
-                      className="flex-1 flex items-center justify-center gap-2"
-                      data-testid="button-view-repo"
-                    >
-                      <Github className="w-4 h-4" />
-                      View Fork
+                      <Terminal className="w-4 h-4" />
+                      View Workflow
                     </Button>
                   </div>
                 )}
-                
-                <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-                  <Github className="h-4 w-4 text-blue-600" />
-                  <AlertDescription className="text-blue-800 dark:text-blue-200">
-                    Your GitHub account is successfully linked. You can now deploy bots directly from your forked repository!
-                  </AlertDescription>
-                </Alert>
               </div>
             ) : (
-              <div className="text-center py-12">
-                <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                  <Github className="w-10 h-10 text-gray-400" />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                  Connect Your GitHub Account
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                  Link your GitHub account to automatically fork the repository, star it, and start deploying bots instantly!
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Link your GitHub account to automatically fork the repository, star it, and enable bot deployment features.
                 </p>
-                <Button
-                  onClick={() => window.location.href = "/api/auth/github"}
-                  size="lg"
-                  className="bg-gray-900 hover:bg-gray-800 dark:bg-gray-100 dark:hover:bg-gray-200 text-white dark:text-gray-900"
+                <Button 
+                  onClick={() => window.location.href = '/api/auth/github'}
+                  className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100"
                   data-testid="button-connect-github"
                 >
-                  <Github className="w-5 h-5 mr-2" />
+                  <Github className="w-4 h-4 mr-2" />
                   Connect GitHub Account
                 </Button>
               </div>
