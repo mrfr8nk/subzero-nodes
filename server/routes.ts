@@ -2041,6 +2041,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Wait for GitHub to process file update
         await new Promise(resolve => setTimeout(resolve, 2000));
 
+        // Enable GitHub Actions for the fork if not already enabled
+        console.log('Ensuring GitHub Actions is enabled...');
+        try {
+          // Enable Actions on the repository
+          const actionsPermUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/permissions`;
+          await fetch(actionsPermUrl, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `token ${GITHUB_TOKEN}`,
+              'Accept': 'application/vnd.github.v3+json',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              enabled: true,
+              allowed_actions: 'all'
+            })
+          });
+          console.log('✓ GitHub Actions enabled');
+        } catch (actionsError) {
+          console.warn('Warning: Could not auto-enable GitHub Actions:', actionsError);
+          // Continue anyway - user might need to enable manually
+        }
+
         // Create/update workflow file with the new workflow content
         console.log('Creating/updating workflow file...');
     
