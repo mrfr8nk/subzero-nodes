@@ -12,6 +12,7 @@ export interface User {
   githubForkedRepo?: string;
   githubFollowedMrfr8nk?: boolean;
   hasSeenGitHubActionsNotice?: boolean; // Track if user has seen the notice about enabling GitHub Actions
+  hasCompletedGitHubSetup: boolean; // Track if user has completed the GitHub setup flow
   email: string;
   firstName?: string;
   lastName?: string;
@@ -341,6 +342,9 @@ export const insertUserSchema = z.object({
   githubUsername: z.string().optional(),
   githubProfileUrl: z.string().optional(),
   githubAccessToken: z.string().optional(),
+  githubRefreshToken: z.string().optional(),
+  hasCompletedGitHubSetup: z.boolean().default(false),
+  isEmailVerified: z.boolean().default(false),
   githubForkedRepo: z.string().optional(),
   githubFollowedMrfr8nk: z.boolean().optional(),
   email: z.string().email(),

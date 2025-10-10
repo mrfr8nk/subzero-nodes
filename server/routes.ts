@@ -17,6 +17,7 @@ import fs from "fs";
 import express from "express";
 import { ObjectId } from "mongodb";
 import { getDb } from "./db";
+import { Octokit } from "@octokit/rest";
 
 // Middleware to check if device fingerprint is banned
 async function checkDeviceBan(req: any, res: any, next: any) {
@@ -1643,201 +1644,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // User deployment branch checking - MUST come before /api/deployments/:id
-  app.get('/api/deployments/check-branch', isAuthenticated, async (req: any, res) => {
-    try {
-      const { branchName } = req.query;
-      const userId = req.user._id.toString();
-      const user = await storage.getUser(userId);
-
-      // Check if user has connected their GitHub account
-      if (!user?.githubAccessToken || !user?.githubUsername) {
-        return res.status(400).json({ 
-          message: 'GitHub account not connected. Please log in with GitHub to check branch availability.',
-          requiresGitHubConnection: true
-        });
-      }
-
-      const githubToken = user.githubAccessToken;
-      const repoOwner = user.githubUsername;
-      const repoName = 'subzero-md';
-
-      const generateBranchName = () => {
-        const prefix = 'user-';
-        const randomChars = Math.random().toString(36).substring(2, 8);
-        return prefix + randomChars;
-      };
-
-      const sanitizeBranchName = (name: string) => {
-        // Remove invalid characters and ensure it follows GitHub branch naming rules
-        return name
-          .replace(/[^a-zA-Z0-9._-]/g, '-') // Replace invalid chars with dash
-          .replace(/^\.+|\.+$/g, '') // Remove leading/trailing dots
-          .replace(/\.\.+/g, '.') // Replace multiple dots with single dot
-          .replace(/^-+|-+$/g, '') // Remove leading/trailing dashes
-          .replace(/--+/g, '-') // Replace multiple dashes with single dash
-          .substring(0, 250); // Limit length
-      };
-
-      if (!branchName || branchName.toString().trim() === '') {
-        const generatedName = generateBranchName();
-        return res.json({ 
-          available: true, 
-          suggested: generatedName,
-          message: `Try this available name: ${generatedName}`
-        });
-      }
-
-      // Sanitize the branch name
-      const originalName = branchName.toString().trim();
-      const sanitizedName = sanitizeBranchName(originalName);
-
-      if (!sanitizedName) {
-        const generatedName = generateBranchName();
-        return res.json({ 
-          available: false, 
-          suggested: generatedName,
-          message: `Invalid name. Try: ${generatedName}`
-        });
-      }
-
-      // Use sanitized name for checking
-      const nameToCheck = sanitizedName;
-
-      // Check if branch exists using sanitized name
-      const url = `https://api.github.com/repos/${repoOwner}/${repoName}/git/ref/heads/${nameToCheck}`;
-      try {
-        const response = await fetch(url, {
-          headers: {
-            'Authorization': `token ${githubToken}`,
-            'Accept': 'application/vnd.github.v3+json'
-          }
-        });
-
-        if (response.status === 404) {
-          return res.json({ 
-            available: true,
-            sanitized: originalName !== sanitizedName ? sanitizedName : undefined,
-            message: originalName !== sanitizedName ? 
-              `Name available! (Auto-corrected to: ${sanitizedName})` : 
-              'Name available!'
-          });
-        } else if (response.ok) {
-          // Generate better suggestions when name is taken
-          const generateSuggestions = async (baseName: string) => {
-            const suggestions = [
-              `${baseName}-2`,
-              `${baseName}-new`,
-              `${baseName}-v2`,
-              `${baseName}-${new Date().getFullYear()}`,
-              `${baseName}-${Math.floor(Math.random() * 100)}`
-            ];
-
-            // Check which suggestions are available
-            for (const suggestion of suggestions) {
-              try {
-                const checkUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/git/ref/heads/${suggestion}`;
-                const checkResponse = await fetch(checkUrl, {
-                  headers: {
-                    'Authorization': `token ${githubToken}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                  }
-                });
-                if (checkResponse.status === 404) {
-                  return suggestion; // This name is available
-                }
-              } catch (error) {
-                return suggestion; // Assume available if check fails
-              }
-            }
-            // Fallback if all suggestions are taken
-            return `${baseName}-${Date.now().toString().slice(-6)}`;
-          };
-
-          const suggestedName = await generateSuggestions(sanitizedName);
-          return res.json({ 
-            available: false, 
-            suggested: suggestedName,
-            sanitized: originalName !== sanitizedName ? sanitizedName : undefined,
-            message: `Name '${sanitizedName}' is already taken. Try: ${suggestedName}`
-          });
-        } else {
-          throw new Error(`GitHub API error: ${response.statusText}`);
-        }
-      } catch (error) {
-        console.error('Branch check error:', error);
-        res.status(500).json({ message: 'Failed to check branch availability' });
-      }
-    } catch (error) {
-      console.error('Error checking branch:', error);
-      res.status(500).json({ message: 'Failed to check branch' });
-    }
-  });
-
-  // Get single deployment by ID
-  app.get('/api/deployments/:id', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user._id.toString();
-      const deploymentId = req.params.id;
-
-      const deployment = await storage.getDeployment(deploymentId);
-      if (!deployment) {
-        return res.status(404).json({ message: "Deployment not found" });
-      }
-
-      // Ensure user owns the deployment (unless admin)
-      if (deployment.userId.toString() !== userId && !req.user.isAdmin) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      res.json(deployment);
-    } catch (error) {
-      console.error("Error fetching deployment:", error);
-      res.status(500).json({ message: "Failed to fetch deployment" });
-    }
-  });
-
-  app.post('/api/deployments', checkDeviceBan, isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user._id.toString();
-      const user = await storage.getUser(userId);
-
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      const now = new Date();
-      const nextChargeDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
-
-      // Get deployment number for user
-      const deploymentNumber = await storage.getNextDeploymentNumber(userId);
-
-      const deploymentData = insertDeploymentSchema.parse({
-        ...req.body,
-        userId,
-        deploymentNumber,
-        lastChargeDate: now,
-        nextChargeDate: nextChargeDate,
-      });
-
-      // Check if user has enough coins using database configuration
-      const userBalance = user.coinBalance || 0;
-      const deploymentFeeSetting = await storage.getAppSetting('deployment_fee');
-      const deploymentFee = deploymentFeeSetting?.value || 10; // Fallback to 10 coins
-      if (userBalance < deploymentFee) {
-        return res.status(400).json({ 
-          message: `Insufficient coins. You need ${deploymentFee} coins to deploy this bot. You currently have ${userBalance} coins.`
-        });
-      }
-
-      const deployment = await storage.createDeployment(deploymentData);
-      res.json(deployment);
-    } catch (error) {
-      console.error("Error creating deployment:", error);
-      res.status(400).json({ message: "Failed to create deployment" });
-    }
-  });
-
   // User GitHub deployment - uses user's connected GitHub account
   app.post('/api/deployments/github', checkDeviceBan, isAuthenticated, async (req: any, res) => {
     console.log('=== USER GITHUB DEPLOYMENT STARTED ===');
@@ -2039,7 +1845,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sha: mainSha
         });
         console.log('✓ Branch created successfully');
-        
+
         // Wait for GitHub to process branch creation
         await new Promise(resolve => setTimeout(resolve, 3000));
 
@@ -2060,7 +1866,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           branch: sanitizedBranchName
         });
         console.log('✓ settings.js updated');
-        
+
         // Wait for GitHub to process file update
         await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -2094,7 +1900,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Create/update workflow file with the new workflow content
         console.log('Creating/updating workflow file...');
-    
+
 
    /* const workflowContent = `name: SUBZERO-MD-DEPLOY
 on:
@@ -2204,12 +2010,12 @@ jobs:
           curl -X POST \\\\
             -H "Authorization: Bearer \\$\{{ secrets.GITHUB_TOKEN }}" \\\\
             -H "Accept: application/vnd.github.v3+json" \\\\
-            https://api.github.com/repos/\\$\{{ github.repository }}/actions/workflows/${WORKFLOW_FILE}/dispatches \\\\
+            https://api.github.com/repos/\\$\{{ github.repository }}/actions/workflows/deploy.yml/dispatches \\\\
             -d '{"ref":"${sanitizedBranchName}"}'
           echo "Restart triggered successfully"`;
-          
+
           */
-          
+
    /* const workflowContent = `name: SUBZERO-MD-DEPLOY
 
 on:
@@ -2255,17 +2061,17 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
-        
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
-          
+
       - name: Install Dependencies
         run: |
           echo "=== INSTALLING DEPENDENCIES ==="
           npm install --production
-          
+
       - name: Verify Configuration
         run: |
           echo "=== CONFIGURATION CHECK ==="
@@ -2276,31 +2082,31 @@ jobs:
             echo "✗ Configuration file missing!"
             exit 1
           fi
-          
+
       - name: Run Bot
         timeout-minutes: 300
         run: |
           echo "=== STARTING BOT AT $(date) ==="
-          
+
           # Run bot with automatic restart on crash
           attempt=1
           max_attempts=999
-          
+
           while [ $attempt -le $max_attempts ]; do
             echo ">>> Bot Start Attempt #$attempt at $(date '+%Y-%m-%d %H:%M:%S')"
-            
+
             npm start 2>&1 | tee -a bot.log | while IFS= read -r line; do
               echo "[$(date '+%H:%M:%S')] $line"
-              
+
               # Detect successful startup
               if echo "$line" | grep -qiE "(connected|online|ready|started|listening)"; then
                 echo "✓ Bot activity detected!"
               fi
             done
-            
+
             exit_code=\${PIPESTATUS[0]}
             echo ">>> Bot stopped (exit code: $exit_code) at $(date '+%Y-%m-%d %H:%M:%S')"
-            
+
             if [ $exit_code -eq 0 ]; then
               echo "Normal exit detected, restarting in 3 seconds..."
               sleep 3
@@ -2308,10 +2114,10 @@ jobs:
               echo "Crash detected, restarting in 8 seconds..."
               sleep 8
             fi
-            
+
             attempt=$((attempt + 1))
           done
-          
+
       - name: Workflow Completion
         if: always()
         run: |
@@ -2320,19 +2126,19 @@ jobs:
             echo "Last 50 log lines:"
             tail -50 bot.log
           fi
-          
+
       - name: Auto Re-trigger
         if: always()
         run: |
           echo "Scheduling workflow restart in 60 seconds..."
           sleep 60
-          
+
           curl -X POST \\
             -H "Authorization: Bearer \${{ secrets.GITHUB_TOKEN }}" \\
             -H "Accept: application/vnd.github.v3+json" \\
             https://api.github.com/repos/\${{ github.repository }}/actions/workflows/deploy.yml/dispatches \\
             -d '{"ref":"\${{ github.ref_name }}"}'
-          
+
           echo "✓ Workflow restart triggered successfully"`;
 
 
@@ -2369,7 +2175,7 @@ jobs:
           console.error('Error managing workflow file:', error);
           throw new Error(`Failed to create/update workflow file: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
-        
+
         // Wait for GitHub to process workflow file and make it available for dispatches
         console.log('Waiting for GitHub to process workflow file...');
         await new Promise(resolve => setTimeout(resolve, 5000));
@@ -3519,7 +3325,7 @@ jobs:
       }
 
       const runsData = await runsResponse.json();
-      
+
       let detailedLogs = [];
       if (runsData.workflow_runs && runsData.workflow_runs.length > 0) {
         const latestRun = runsData.workflow_runs[0];
