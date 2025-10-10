@@ -11,6 +11,7 @@ export interface User {
   githubAccessToken?: string;
   githubForkedRepo?: string;
   githubFollowedMrfr8nk?: boolean;
+  hasSeenGitHubActionsNotice?: boolean; // Track if user has seen the notice about enabling GitHub Actions
   email: string;
   firstName?: string;
   lastName?: string;

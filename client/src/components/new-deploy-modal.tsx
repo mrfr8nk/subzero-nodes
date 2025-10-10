@@ -171,6 +171,44 @@ export default function NewDeployModal({ isOpen, onClose }: NewDeployModalProps)
                 </AlertDescription>
               </Alert>
             )}
+            
+            {/* GitHub Actions Notice for First-Time Users */}
+            {user?.githubUsername && user?.githubAccessToken && !user?.hasSeenGitHubActionsNotice && (
+              <Alert className="bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800">
+                <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                <AlertDescription>
+                  <div className="space-y-3">
+                    <div className="text-yellow-800 dark:text-yellow-200 text-sm">
+                      <strong>Important: Enable GitHub Actions</strong>
+                      <p className="mt-1">Before your first deployment, you must enable GitHub Actions on your forked repository:</p>
+                      <ol className="list-decimal list-inside mt-2 space-y-1 ml-2">
+                        <li>Go to your forked repository on GitHub</li>
+                        <li>Click the "Actions" tab</li>
+                        <li>Click "I understand my workflows, go ahead and enable them"</li>
+                      </ol>
+                      <p className="mt-2">Without this, your bot deployment will fail with a 404 error.</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await apiRequest("/api/user/acknowledge-github-actions", "POST", {});
+                          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+                        } catch (error) {
+                          console.error("Error acknowledging notice:", error);
+                        }
+                      }}
+                      className="border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300 hover:bg-yellow-100 dark:hover:bg-yellow-900"
+                      data-testid="button-acknowledge-github-actions"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      I've enabled GitHub Actions
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
 
             {/* Repository Selection */}
             <div className="space-y-4">

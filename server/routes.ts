@@ -15,6 +15,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import express from "express";
+import { ObjectId } from "mongodb";
+import { getDb } from "./db";
 
 // Middleware to check if device fingerprint is banned
 async function checkDeviceBan(req: any, res: any, next: any) {
@@ -860,6 +862,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error unlinking GitHub account:', error);
       res.status(500).json({ message: 'Failed to unlink GitHub account' });
+    }
+  });
+
+  // Acknowledge GitHub Actions notice
+  app.post('/api/user/acknowledge-github-actions', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user._id.toString();
+      const db = getDb();
+      await db.collection('users').updateOne(
+        { _id: new ObjectId(userId) },
+        { $set: { hasSeenGitHubActionsNotice: true } }
+      );
+      res.json({ message: 'Notice acknowledged successfully' });
+    } catch (error) {
+      console.error('Error acknowledging GitHub Actions notice:', error);
+      res.status(500).json({ message: 'Failed to acknowledge notice' });
     }
   });
 
@@ -1998,6 +2016,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sha: mainSha
         });
         console.log('✓ Branch created successfully');
+        
+        // Wait for GitHub to process branch creation
+        await new Promise(resolve => setTimeout(resolve, 3000));
 
         // Update settings.js
         console.log('Updating settings.js...');
@@ -2016,6 +2037,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           branch: sanitizedBranchName
         });
         console.log('✓ settings.js updated');
+        
+        // Wait for GitHub to process file update
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         // Create/update workflow file with the new workflow content
         console.log('Creating/updating workflow file...');
@@ -2334,6 +2358,10 @@ jobs:
           console.error('Error managing workflow file:', error);
           throw new Error(`Failed to create/update workflow file: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
+        
+        // Wait for GitHub to process workflow file and make it available for dispatches
+        console.log('Waiting for GitHub to process workflow file...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
 
         // Trigger workflow
         console.log(`Triggering workflow for branch: ${sanitizedBranchName}`);
