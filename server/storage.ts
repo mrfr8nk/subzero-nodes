@@ -57,7 +57,7 @@ export interface IStorage {
   updateVerificationToken(email: string, token: string, expiry: Date): Promise<void>;
   upsertUser(user: InsertUser, registrationIp?: string): Promise<User>;
   checkUsernameAvailability(username: string): Promise<boolean>;
-  
+
   // Deployment operations
   createDeployment(deployment: InsertDeployment): Promise<Deployment>;
   deleteDeployment(id: string): Promise<void>;
@@ -75,19 +75,19 @@ export interface IStorage {
   updateDeploymentChargeDate(id: string, lastChargeDate: Date, nextChargeDate: Date): Promise<void>;
   updateDeploymentStatus(id: string, status: string): Promise<void>;
   getActiveDeploymentsForBilling(): Promise<Deployment[]>;
-  
+
   // Deployment variable operations
   createDeploymentVariable(variable: InsertDeploymentVariable): Promise<DeploymentVariable>;
   getDeploymentVariables(deploymentId: string): Promise<DeploymentVariable[]>;
   updateDeploymentVariable(id: string, value: string): Promise<void>;
   deleteDeploymentVariable(id: string): Promise<void>;
   upsertDeploymentVariable(deploymentId: string, key: string, value: string, description?: string, isRequired?: boolean): Promise<DeploymentVariable>;
-  
+
   // Transaction operations
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   getUserTransactions(userId: string, limit?: number): Promise<Transaction[]>;
   updateUserBalance(userId: string, amount: number): Promise<void>;
-  
+
   // Referral operations
   generateReferralCode(): Promise<string>;
   createReferral(referral: InsertReferral): Promise<Referral>;
@@ -98,7 +98,7 @@ export interface IStorage {
     monthlyReferrals: number;
   }>;
   getUserByReferralCode(code: string): Promise<User | undefined>;
-  
+
   // Admin operations
   getAdminStats(): Promise<{
     totalUsers: number;
@@ -119,40 +119,40 @@ export interface IStorage {
   getUsersByDeviceFingerprint(fingerprint: string): Promise<User[]>;
   updateUserDeviceFingerprint(userId: string, fingerprint: string): Promise<void>;
   updateUserGitHubForkStatus(userId: string, forkedRepo: string, followedMrfr8nk: boolean): Promise<void>;
-  
+
   // Device fingerprint banning operations
   banDeviceFingerprint(fingerprint: string, reason: string, bannedBy: string): Promise<void>;
   unbanDeviceFingerprint(fingerprint: string): Promise<void>;
   getBannedDeviceFingerprints(): Promise<BannedDeviceFingerprint[]>;
   isDeviceFingerprintBanned(fingerprint: string): Promise<boolean>;
-  
+
   // Admin notification operations
   createAdminNotification(notification: InsertAdminNotification): Promise<AdminNotification>;
   getAdminNotifications(limit?: number): Promise<AdminNotification[]>;
   markNotificationRead(id: string): Promise<void>;
-  
+
   // App settings operations
   getAppSetting(key: string): Promise<AppSettings | undefined>;
   setAppSetting(setting: InsertAppSettings): Promise<AppSettings>;
   getAllAppSettings(): Promise<AppSettings[]>;
-  
+
   // Deployment lookup operations
   getDeploymentByBranchName(branchName: string): Promise<Deployment | undefined>;
-  
+
   // Maintenance mode operations
   isMaintenanceModeEnabled(): Promise<boolean>;
   setMaintenanceMode(enabled: boolean, adminId: string, message?: string): Promise<void>;
-  
-  // User deletion and device management  
+
+  // User deletion and device management
   deleteUser(userId: string, adminId: string): Promise<void>;
-  
+
   // Daily billing operations
   processDeploymentDailyCharges(): Promise<void>;
-  
+
   // Enhanced deployment monitoring operations
   addDeploymentLogs(deploymentId: string, logs: string[]): Promise<void>;
   analyzeDeploymentStatus(deploymentId: string): Promise<{ status: string; logs?: string[]; lastCheck?: Date }>;
-  
+
   // Chat operations
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessages(limit?: number): Promise<ChatMessage[]>;
@@ -162,7 +162,7 @@ export interface IStorage {
   restrictUserFromChat(userId: string, restrictedBy: string, reason?: string): Promise<void>;
   unrestrictUserFromChat(userId: string): Promise<void>;
   isChatRestricted(userId: string): Promise<boolean>;
-  
+
   // Coin transfer operations
   createCoinTransfer(transfer: InsertCoinTransfer): Promise<CoinTransfer>;
   getUserByUsernameOrEmail(usernameOrEmail: string): Promise<User | undefined>;
@@ -170,19 +170,19 @@ export interface IStorage {
   processCoinTransfer(transferId: string): Promise<void>;
   getCoinTransfers(userId: string): Promise<CoinTransfer[]>;
   updateCoinTransferStatus(transferId: string, status: string): Promise<void>;
-  
+
   // Banned user management
   createBannedUser(bannedUser: InsertBannedUser): Promise<BannedUser>;
   getBannedUsers(limit?: number): Promise<BannedUser[]>;
   removeBannedUser(userId: string): Promise<void>;
   isBannedUser(userId: string): Promise<boolean>;
-  
+
   // Deployment number tracking
   getNextDeploymentNumber(userId: string): Promise<number>;
   getUserTotalDeployments(userId: string): Promise<number>;
   getAllUsersWithCountryInfo(limit?: number): Promise<User[]>;
   updateUserCountry(userId: string, country: string): Promise<void>;
-  
+
   // GitHub account management
   createGitHubAccount(account: {
     name: string;
@@ -200,66 +200,66 @@ export interface IStorage {
   updateGitHubAccountUsage(id: string): Promise<void>;
   setGitHubAccountActive(id: string, active: boolean): Promise<void>;
   testGitHubAccountToken(id: string): Promise<{ isValid: boolean; error?: string; rateLimitRemaining?: number }>;
-  
+
   // Repository operations
   createRepository(repository: InsertRepository): Promise<Repository>;
   getUserRepositories(userId: string): Promise<Repository[]>;
   getRepository(id: string): Promise<Repository | undefined>;
   updateRepositoryBranches(id: string, branches: string[]): Promise<void>;
   deleteRepository(id: string): Promise<void>;
-  
+
   // User password change operations
   changeUserPassword(userId: string, currentPassword: string, newPassword: string): Promise<void>;
-  
+
   // Username operations
   checkUsernameAvailability(username: string): Promise<boolean>;
   updateUsername(userId: string, username: string): Promise<void>;
   updateUserLastLogin(userId: string, ipAddress: string): Promise<void>;
-  
+
   // Login history operations
   createLoginHistory(loginHistory: InsertLoginHistory): Promise<LoginHistory>;
   getUserLoginHistory(userId: string, limit?: number): Promise<LoginHistory[]>;
   updateLoginSessionEnd(loginId: string, logoutTime: Date, sessionDuration: number): Promise<void>;
-  
+
   // Device restriction operations
   checkDeviceAccountLimit(deviceFingerprint: string): Promise<{ allowed: boolean; currentCount: number; maxAllowed: number }>;
   incrementDeviceAccountCount(deviceFingerprint: string): Promise<void>;
   decrementDeviceAccountCount(deviceFingerprint: string): Promise<void>;
-  
+
   // Bot limit operations
   checkUserBotLimit(userId: string): Promise<{ allowed: boolean; currentCount: number; maxAllowed: number }>;
   incrementUserBotCount(userId: string): Promise<void>;
   decrementUserBotCount(userId: string): Promise<void>;
-  
+
   // Developer info operations
   getDeveloperInfo(): Promise<DeveloperInfo | undefined>;
   setDeveloperInfo(developerInfo: InsertDeveloperInfo): Promise<DeveloperInfo>;
   updateDeveloperInfo(id: string, updates: Partial<DeveloperInfo>): Promise<void>;
-  
+
   // Branch name availability
   checkBranchNameAvailability(branchName: string, userId?: string): Promise<boolean>;
-  
+
   // Enhanced chat operations for message count and read tracking
   getUserUnreadMessageCount(userId: string): Promise<number>;
   markMessageAsRead(userId: string, messageId: string): Promise<void>;
   markAllMessagesAsRead(userId: string): Promise<void>;
   deleteMessagesOlderThan(days: number, reason: string): Promise<number>;
-  
+
   // Device restriction and cookie-based blocking
   createDeviceRestriction(deviceFingerprint: string, cookieValue: string): Promise<DeviceRestriction>;
   getDeviceRestriction(deviceFingerprint: string): Promise<DeviceRestriction | undefined>;
   updateDeviceRestrictionCookie(deviceFingerprint: string, cookieValue: string): Promise<void>;
   checkDeviceAccountCreationLimit(deviceFingerprint: string, cookieValue: string): Promise<{ allowed: boolean; reason?: string }>;
   addAccountToDevice(deviceFingerprint: string, userId: string): Promise<void>;
-  
+
   // User activity and cleanup operations
   updateUserActivity(userId: string): Promise<void>;
   getInactiveUsers(months: number): Promise<User[]>;
   deleteInactiveUsers(months: number): Promise<number>;
-  
+
   // Group chat message cleanup (for future group chat functionality)
   deleteGroupChatMessagesOlderThan(days: number): Promise<number>;
-  
+
   // Voucher operations
   createVoucherCode(voucher: InsertVoucherCode): Promise<VoucherCode>;
   getVoucherByCode(code: string): Promise<VoucherCode | undefined>;
@@ -349,7 +349,7 @@ export class MongoStorage implements IStorage {
         console.warn(`Invalid ObjectId format: ${id}`);
         return undefined;
       }
-      
+
       const user = await this.usersCollection.findOne({ _id: new ObjectId(id) });
       return user || undefined;
     } catch (error) {
@@ -390,8 +390,8 @@ export class MongoStorage implements IStorage {
   async linkGitHubAccount(userId: string, githubData: { githubId: string; githubUsername: string; githubProfileUrl: string }): Promise<void> {
     await this.usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { 
-        $set: { 
+      {
+        $set: {
           githubId: githubData.githubId,
           githubUsername: githubData.githubUsername,
           githubProfileUrl: githubData.githubProfileUrl,
@@ -404,8 +404,8 @@ export class MongoStorage implements IStorage {
   async unlinkGitHubAccount(userId: string): Promise<void> {
     await this.usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { 
-        $unset: { 
+      {
+        $unset: {
           githubId: "",
           githubUsername: "",
           githubProfileUrl: ""
@@ -430,8 +430,8 @@ export class MongoStorage implements IStorage {
   async setPasswordResetToken(email: string, token: string, expiry: Date): Promise<void> {
     await this.usersCollection.updateOne(
       { email },
-      { 
-        $set: { 
+      {
+        $set: {
           resetPasswordToken: token,
           resetPasswordExpiry: expiry,
           updatedAt: new Date()
@@ -443,12 +443,12 @@ export class MongoStorage implements IStorage {
   async resetPassword(userId: string, newPassword: string): Promise<void> {
     await this.usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { 
-        $set: { 
+      {
+        $set: {
           password: newPassword,
           updatedAt: new Date()
         },
-        $unset: { 
+        $unset: {
           resetPasswordToken: "",
           resetPasswordExpiry: ""
         }
@@ -459,8 +459,8 @@ export class MongoStorage implements IStorage {
   async updateVerificationToken(email: string, token: string, expiry: Date): Promise<void> {
     await this.usersCollection.updateOne(
       { email },
-      { 
-        $set: { 
+      {
+        $set: {
           verificationToken: token,
           verificationTokenExpiry: expiry,
           updatedAt: new Date()
@@ -471,14 +471,14 @@ export class MongoStorage implements IStorage {
 
   async createLocalUser(userData: any): Promise<any> {
     const now = new Date();
-    
+
     // Generate unique referral code for new user
     const referralCode = await this.generateReferralCode();
-    
+
     // Get default coin balance from admin settings
     const defaultCoinsSetting = await this.getAppSetting('default_coin_balance');
     const defaultCoins = parseInt(defaultCoinsSetting?.value) || 20; // Fallback to 20 coins if not set by admin
-    
+
     const newUser = {
       ...userData,
       coinBalance: defaultCoins,
@@ -490,7 +490,7 @@ export class MongoStorage implements IStorage {
     };
 
     const result = await this.usersCollection.insertOne(newUser);
-    
+
     // Handle referral if provided
     if (userData.referralCode && result.insertedId) {
       try {
@@ -499,14 +499,14 @@ export class MongoStorage implements IStorage {
           // Get referral bonus from admin settings
           const referralBonusSetting = await this.getAppSetting('referral_bonus');
           const referralBonus = parseInt(referralBonusSetting?.value) || 10;
-          
+
           await this.createReferral({
             referrerId: referrer._id.toString(),
             referredId: result.insertedId.toString(),
             rewardClaimed: false,
             rewardAmount: referralBonus,
           });
-          
+
           // Award referral bonus
           await this.updateUserBalance(referrer._id.toString(), referralBonus);
           await this.createTransaction({
@@ -527,15 +527,15 @@ export class MongoStorage implements IStorage {
   async verifyUser(userId: string): Promise<void> {
     await this.usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { 
-        $set: { 
+      {
+        $set: {
           isVerified: true,
           emailVerified: true,
-          updatedAt: new Date() 
+          updatedAt: new Date()
         },
-        $unset: { 
-          verificationToken: "", 
-          verificationTokenExpiry: "" 
+        $unset: {
+          verificationToken: "",
+          verificationTokenExpiry: ""
         }
       }
     );
@@ -543,7 +543,7 @@ export class MongoStorage implements IStorage {
 
   async upsertUser(userData: InsertUser, registrationIp?: string): Promise<User> {
     const now = new Date();
-    
+
     // Check if user exists by Google ID, GitHub ID, or email
     let existingUser = null;
     if (userData.googleId) {
@@ -562,31 +562,31 @@ export class MongoStorage implements IStorage {
         ...userData,
         updatedAt: now,
       };
-      
+
       await this.usersCollection.updateOne(
         { _id: existingUser._id },
         { $set: updatedData }
       );
-      
+
       return { ...existingUser, ...updatedData };
     } else {
       // Check for existing accounts from same IP address before creating new user
       if (userData.deviceFingerprint) {
         const existingAccountsFromDevice = await this.getUsersByDeviceFingerprint(userData.deviceFingerprint);
-        
+
         // Get configurable max accounts per device from admin settings (default to 1)
         const maxAccountsSetting = await this.getAppSetting('max_accounts_per_device');
         const maxAccountsPerDevice = maxAccountsSetting?.value || 1;
-        
+
         // Check if any of the existing accounts are active (not banned)
-        const activeAccounts = existingAccountsFromDevice.filter(user => 
+        const activeAccounts = existingAccountsFromDevice.filter(user =>
           user.status !== 'banned' && user.status !== 'restricted'
         );
-        
+
         if (activeAccounts.length >= maxAccountsPerDevice) {
-          throw new Error(`Only 1 account allowed per device. Contact support if you believe this is an error.`);
+          throw new Error(`Only ${maxAccountsPerDevice} account(s) allowed per device. Contact support if you believe this is an error.`);
         }
-        
+
         // Set device fingerprint in user data
         userData.deviceHistory = [userData.deviceFingerprint];
       }
@@ -598,12 +598,12 @@ export class MongoStorage implements IStorage {
       // Get default coin balance from admin settings
       const defaultCoinsSetting = await this.getAppSetting('default_coin_balance');
       const defaultCoins = parseInt(defaultCoinsSetting?.value) || 20; // Fallback to 20 coins if not set by admin
-      
+
       const newUser: Omit<User, '_id'> = {
         ...userData,
         coinBalance: userData.coinBalance || defaultCoins,
-        emailVerified: userData.emailVerified || true,
-        authProvider: userData.authProvider || 'google',
+        emailVerified: userData.emailVerified === undefined ? true : userData.emailVerified, // Default to true for OAuth
+        authProvider: userData.authProvider || (userData.googleId ? 'google' : userData.githubId ? 'github' : 'local'),
         // Set default admin fields
         isAdmin: userData.isAdmin || false,
         role: userData.role || 'user',
@@ -625,14 +625,14 @@ export class MongoStorage implements IStorage {
           // Get referral bonus from admin settings
           const referralBonusSetting = await this.getAppSetting('referral_bonus');
           const referralBonus = parseInt(referralBonusSetting?.value) || 10;
-          
+
           await this.createReferral({
             referrerId: userData.referredById,
             referredId: user._id.toString(),
             rewardClaimed: false,
             rewardAmount: referralBonus,
           });
-          
+
           // Award referral bonus
           await this.updateUserBalance(userData.referredById, referralBonus);
           await this.createTransaction({
@@ -645,7 +645,7 @@ export class MongoStorage implements IStorage {
           console.log("Referral processing failed:", error);
         }
       }
-      
+
       return user;
     }
   }
@@ -704,7 +704,7 @@ export class MongoStorage implements IStorage {
         console.warn(`Invalid ObjectId format: ${id}`);
         return undefined;
       }
-      
+
       const deployment = await this.deploymentsCollection.findOne({ _id: new ObjectId(id) });
       return deployment || undefined;
     } catch (error) {
@@ -721,7 +721,7 @@ export class MongoStorage implements IStorage {
       if (!id || typeof id !== 'string' || id.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(id)) {
         throw new Error(`Invalid ObjectId format: ${id}`);
       }
-      
+
       await this.deploymentsCollection.deleteOne({ _id: new ObjectId(id) });
     } catch (error) {
       console.error(`Error deleting deployment with id ${id}:`, error);
@@ -782,7 +782,7 @@ export class MongoStorage implements IStorage {
 
     await this.usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { 
+      {
         $inc: { coinBalance: amount },
         $set: { updatedAt: new Date() }
       }
@@ -792,13 +792,13 @@ export class MongoStorage implements IStorage {
   async generateReferralCode(): Promise<string> {
     let code: string;
     let exists = true;
-    
+
     do {
       code = randomBytes(4).toString('hex').toUpperCase();
       const existingUser = await this.getUserByReferralCode(code);
       exists = !!existingUser;
     } while (exists);
-    
+
     return code;
   }
 
@@ -880,7 +880,7 @@ export class MongoStorage implements IStorage {
       this.usersCollection.countDocuments({ createdAt: { $gte: thisMonth } }),
       this.usersCollection.countDocuments({ status: { $ne: "banned" } }),
       this.usersCollection.countDocuments({ status: "banned" }),
-      this.transactionsCollection.find({ 
+      this.transactionsCollection.find({
         type: "deployment",
         amount: { $lt: 0 }
       }).toArray()
@@ -899,30 +899,34 @@ export class MongoStorage implements IStorage {
   }
 
   async getAllUsers(limit: number = 50, offset: number = 0): Promise<User[]> {
-    return await this.usersCollection
+    const db = getDb();
+    const users = await db.collection('users')
       .find({})
       .sort({ createdAt: -1 })
-      .skip(offset)
       .limit(limit)
+      .skip(offset)
       .toArray();
+    return users;
   }
 
   async searchUsers(searchTerm: string, limit: number = 50): Promise<User[]> {
-    const searchRegex = new RegExp(searchTerm, 'i'); // Case-insensitive search
-    
-    return await this.usersCollection
+    const db = getDb();
+    const users = await db.collection('users')
       .find({
         $or: [
-          { email: searchRegex },
-          { firstName: searchRegex },
-          { lastName: searchRegex },
-          { username: searchRegex },
-          { referralCode: searchRegex }
+          { email: { $regex: searchTerm, $options: 'i' } },
+          { firstName: { $regex: searchTerm, $options: 'i' } },
+          { lastName: { $regex: searchTerm, $options: 'i' } },
+          { username: { $regex: searchTerm, $options: 'i' } },
+          { referralCode: { $regex: searchTerm, $options: 'i' } },
+          { githubUsername: { $regex: searchTerm, $options: 'i' } },
+          { googleId: { $regex: searchTerm, $options: 'i' } }
         ]
       })
       .sort({ createdAt: -1 })
       .limit(limit)
       .toArray();
+    return users;
   }
 
   async updateUserStatus(userId: string, status: string, restrictions?: string[]): Promise<void> {
@@ -930,7 +934,7 @@ export class MongoStorage implements IStorage {
       status,
       updatedAt: new Date()
     };
-    
+
     if (restrictions) {
       updateData.restrictions = restrictions;
     }
@@ -961,7 +965,7 @@ export class MongoStorage implements IStorage {
 
   async updateUserCoins(userId: string, amount: number, reason: string, adminId: string): Promise<void> {
     await this.updateUserBalance(userId, amount);
-    
+
     await this.createTransaction({
       userId,
       type: "admin_adjustment",
@@ -974,8 +978,8 @@ export class MongoStorage implements IStorage {
   async updateUserClaimDate(userId: string, claimDate: Date): Promise<void> {
     await this.usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { 
-        $set: { 
+      {
+        $set: {
           lastClaimDate: claimDate,
           updatedAt: new Date()
         }
@@ -985,7 +989,7 @@ export class MongoStorage implements IStorage {
 
   async promoteToAdmin(userId: string, adminId: string): Promise<void> {
     await this.updateUserRole(userId, "admin");
-    
+
     await this.createAdminNotification({
       type: "user_promotion",
       title: "User Promoted to Admin",
@@ -997,7 +1001,7 @@ export class MongoStorage implements IStorage {
 
   async demoteFromAdmin(userId: string, adminId: string): Promise<void> {
     await this.updateUserRole(userId, "user");
-    
+
     await this.createAdminNotification({
       type: "admin_demotion",
       title: "Admin Demoted to User",
@@ -1026,7 +1030,7 @@ export class MongoStorage implements IStorage {
 
   async getUsersByDeviceFingerprint(fingerprint: string): Promise<User[]> {
     return await this.usersCollection
-      .find({ 
+      .find({
         $or: [
           { deviceFingerprint: fingerprint },
           { deviceHistory: { $in: [fingerprint] } }
@@ -1050,8 +1054,8 @@ export class MongoStorage implements IStorage {
 
     await this.usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { 
-        $set: { 
+      {
+        $set: {
           deviceFingerprint: fingerprint,
           deviceHistory,
           updatedAt: new Date()
@@ -1066,8 +1070,8 @@ export class MongoStorage implements IStorage {
         type: "duplicate_device",
         title: "Multiple Accounts from Same Device",
         message: `${usersWithSameDevice.length} accounts detected from the same device`,
-        data: { 
-          deviceFingerprint: fingerprint, 
+        data: {
+          deviceFingerprint: fingerprint,
           userIds: usersWithSameDevice.map(u => u._id.toString()),
           userEmails: usersWithSameDevice.map(u => u.email)
         },
@@ -1079,8 +1083,8 @@ export class MongoStorage implements IStorage {
   async updateUserGitHubForkStatus(userId: string, forkedRepo: string, followedMrfr8nk: boolean): Promise<void> {
     await this.usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { 
-        $set: { 
+      {
+        $set: {
           githubForkedRepo: forkedRepo,
           githubFollowedMrfr8nk: followedMrfr8nk,
           updatedAt: new Date()
@@ -1131,8 +1135,8 @@ export class MongoStorage implements IStorage {
       // Update existing setting
       await this.appSettingsCollection.updateOne(
         { key: setting.key },
-        { 
-          $set: { 
+        {
+          $set: {
             value: setting.value,
             description: setting.description,
             updatedBy: setting.updatedBy ? new ObjectId(setting.updatedBy) : undefined,
@@ -1140,9 +1144,9 @@ export class MongoStorage implements IStorage {
           }
         }
       );
-      
-      return { 
-        ...existingSetting, 
+
+      return {
+        ...existingSetting,
         value: setting.value,
         description: setting.description,
         updatedBy: setting.updatedBy ? new ObjectId(setting.updatedBy) : undefined,
@@ -1193,7 +1197,7 @@ export class MongoStorage implements IStorage {
 
   async setMaintenanceMode(enabled: boolean, adminId: string, message?: string): Promise<void> {
     const now = new Date();
-    
+
     // Set maintenance mode status
     await this.setAppSetting({
       key: 'maintenance_mode',
@@ -1216,8 +1220,8 @@ export class MongoStorage implements IStorage {
     await this.createAdminNotification({
       type: 'maintenance_mode',
       title: enabled ? 'Maintenance Mode Enabled' : 'Maintenance Mode Disabled',
-      message: enabled 
-        ? `Site has been put into maintenance mode${message ? `: ${message}` : ''}` 
+      message: enabled
+        ? `Site has been put into maintenance mode${message ? `: ${message}` : ''}`
         : 'Site maintenance mode has been disabled. Site is now operational.',
       data: { enabled, message, adminId },
       read: false
@@ -1234,29 +1238,29 @@ export class MongoStorage implements IStorage {
 
     // Delete user's deployments
     await this.deploymentsCollection.deleteMany({ userId: new ObjectId(userId) });
-    
+
     // Delete user's transactions
     await this.transactionsCollection.deleteMany({ userId: new ObjectId(userId) });
-    
+
     // Delete user's referrals (both as referrer and referred)
-    await this.referralsCollection.deleteMany({ 
+    await this.referralsCollection.deleteMany({
       $or: [
         { referrerId: new ObjectId(userId) },
         { referredId: new ObjectId(userId) }
       ]
     });
-    
+
     // Delete the user
     await this.usersCollection.deleteOne({ _id: new ObjectId(userId) });
-    
+
     // Create admin notification
     await this.createAdminNotification({
       type: 'user_deleted',
       title: 'User Deleted',
       message: `User ${user.email} has been permanently deleted by admin`,
-      data: { 
-        deletedUserId: userId, 
-        deletedBy: adminId, 
+      data: {
+        deletedUserId: userId,
+        deletedBy: adminId,
         userEmail: user.email,
         deletedAt: new Date().toISOString()
       },
@@ -1270,12 +1274,12 @@ export class MongoStorage implements IStorage {
   async updateDeploymentChargeDate(id: string, lastChargeDate: Date, nextChargeDate: Date): Promise<void> {
     await this.deploymentsCollection.updateOne(
       { _id: new ObjectId(id) },
-      { 
-        $set: { 
-          lastChargeDate, 
+      {
+        $set: {
+          lastChargeDate,
           nextChargeDate,
-          updatedAt: new Date() 
-        } 
+          updatedAt: new Date()
+        }
       }
     );
   }
@@ -1314,11 +1318,11 @@ export class MongoStorage implements IStorage {
   async updateDeploymentVariable(id: string, value: string): Promise<void> {
     await this.deploymentVariablesCollection.updateOne(
       { _id: new ObjectId(id) },
-      { 
-        $set: { 
-          value, 
-          updatedAt: new Date() 
-        } 
+      {
+        $set: {
+          value,
+          updatedAt: new Date()
+        }
       }
     );
   }
@@ -1328,10 +1332,10 @@ export class MongoStorage implements IStorage {
   }
 
   async upsertDeploymentVariable(
-    deploymentId: string, 
-    key: string, 
-    value: string, 
-    description?: string, 
+    deploymentId: string,
+    key: string,
+    value: string,
+    description?: string,
     isRequired: boolean = true
   ): Promise<DeploymentVariable> {
     const existingVariable = await this.deploymentVariablesCollection.findOne({
@@ -1373,7 +1377,7 @@ export class MongoStorage implements IStorage {
         if (user.coinBalance < dailyCharge) {
           // Delete the deployment permanently when user has zero balance
           await this.deleteDeployment(deployment._id.toString());
-          
+
           // Create transaction record for failed charge and deletion
           await this.createTransaction({
             userId: deployment.userId.toString(),
@@ -1382,14 +1386,14 @@ export class MongoStorage implements IStorage {
             description: `Deployment deleted permanently: ${deployment.name} (insufficient funds - user balance: ${user.coinBalance}, required: ${dailyCharge})`,
             relatedId: deployment._id.toString()
           });
-          
+
           console.log(`Deleted deployment ${deployment.name} permanently due to insufficient funds (balance: ${user.coinBalance}, required: ${dailyCharge})`);
           continue;
         }
 
         // Deduct daily maintenance charge from user
         await this.updateUserBalance(deployment.userId.toString(), -dailyCharge);
-        
+
         // Create transaction record
         await this.createTransaction({
           userId: deployment.userId.toString(),
@@ -1416,12 +1420,12 @@ export class MongoStorage implements IStorage {
   // Chat operations
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
     const now = new Date();
-    
+
     // Extract tags from message content
     const tagRegex = /@(issue|request|query)\b/gi;
     const tags: string[] = [];
     let messageContent = message.message;
-    
+
     // Find all tags in the message
     const matches = messageContent.match(tagRegex);
     if (matches) {
@@ -1429,9 +1433,9 @@ export class MongoStorage implements IStorage {
         tags.push(match.toLowerCase());
       });
     }
-    
+
     const isTagged = tags.length > 0;
-    
+
     const chatMessage: ChatMessage = {
       _id: new ObjectId(),
       userId: new ObjectId(message.userId),
@@ -1454,7 +1458,7 @@ export class MongoStorage implements IStorage {
     };
 
     await this.chatMessagesCollection.insertOne(chatMessage);
-    
+
     // Create admin notification for tagged messages
     if (isTagged && !message.isAdmin) {
       const tagString = tags.join(', ');
@@ -1472,7 +1476,7 @@ export class MongoStorage implements IStorage {
         read: false
       });
     }
-    
+
     return chatMessage;
   }
 
@@ -1556,7 +1560,7 @@ export class MongoStorage implements IStorage {
       ...updates,
       updatedAt: new Date()
     };
-    
+
     await this.githubAccountsCollection.updateOne(
       { _id: new ObjectId(id) },
       { $set: updateData }
@@ -1575,11 +1579,11 @@ export class MongoStorage implements IStorage {
 
   async getBestGitHubAccount(): Promise<GitHubAccount | null> {
     const activeAccounts = await this.getActiveGitHubAccounts();
-    
+
     if (activeAccounts.length === 0) {
       return null;
     }
-    
+
     // Try to find an account with available capacity by checking GitHub API
     for (const account of activeAccounts) {
       try {
@@ -1593,11 +1597,11 @@ export class MongoStorage implements IStorage {
             }
           }
         );
-        
+
         if (response.ok) {
           const data = await response.json();
           const runningWorkflows = data.total_count || 0;
-          
+
           // If this account has fewer than 5 running workflows, use it
           if (runningWorkflows < 5) {
             await this.updateGitHubAccountUsage(account._id.toString());
@@ -1609,26 +1613,26 @@ export class MongoStorage implements IStorage {
         // Continue to next account if there's an error
       }
     }
-    
+
     // If all accounts are busy, return the least recently used one
     const leastRecentlyUsed = activeAccounts.sort((a, b) => {
       const dateA = a.lastUsed?.getTime() || 0;
       const dateB = b.lastUsed?.getTime() || 0;
       return dateA - dateB;
     })[0];
-    
+
     if (leastRecentlyUsed) {
       await this.updateGitHubAccountUsage(leastRecentlyUsed._id.toString());
     }
-    
+
     return leastRecentlyUsed;
   }
 
   async updateGitHubAccountUsage(id: string): Promise<void> {
     await this.githubAccountsCollection.updateOne(
       { _id: new ObjectId(id) },
-      { 
-        $set: { 
+      {
+        $set: {
           lastUsed: new Date(),
           updatedAt: new Date()
         }
@@ -1639,8 +1643,8 @@ export class MongoStorage implements IStorage {
   async setGitHubAccountActive(id: string, active: boolean): Promise<void> {
     await this.githubAccountsCollection.updateOne(
       { _id: new ObjectId(id) },
-      { 
-        $set: { 
+      {
+        $set: {
           isActive: active,
           updatedAt: new Date()
         }
@@ -1670,39 +1674,39 @@ export class MongoStorage implements IStorage {
       if (response.ok) {
         // Update lastUsed timestamp when token is successfully validated
         await this.updateGitHubAccountUsage(id);
-        
-        return { 
-          isValid: true, 
+
+        return {
+          isValid: true,
           rateLimitRemaining,
           lastUsed: now.toISOString()
         };
       } else if (response.status === 401) {
-        return { 
-          isValid: false, 
-          error: 'Invalid or expired token', 
+        return {
+          isValid: false,
+          error: 'Invalid or expired token',
           rateLimitRemaining,
           lastUsed: account.lastUsed?.toISOString()
         };
       } else if (response.status === 404) {
-        return { 
-          isValid: false, 
-          error: 'Repository not found or access denied', 
+        return {
+          isValid: false,
+          error: 'Repository not found or access denied',
           rateLimitRemaining,
           lastUsed: account.lastUsed?.toISOString()
         };
       } else {
         const errorText = await response.text().catch(() => 'Unknown error');
-        return { 
-          isValid: false, 
-          error: `GitHub API error: ${response.status} ${errorText}`, 
+        return {
+          isValid: false,
+          error: `GitHub API error: ${response.status} ${errorText}`,
           rateLimitRemaining,
           lastUsed: account.lastUsed?.toISOString()
         };
       }
     } catch (error) {
-      return { 
-        isValid: false, 
-        error: `Network error: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      return {
+        isValid: false,
+        error: `Network error: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
   }
@@ -1747,8 +1751,8 @@ export class MongoStorage implements IStorage {
   async updateRepositoryBranches(id: string, branches: string[]): Promise<void> {
     await this.repositoriesCollection.updateOne(
       { _id: new ObjectId(id) },
-      { 
-        $set: { 
+      {
+        $set: {
           branches,
           updatedAt: new Date()
         }
@@ -1762,29 +1766,29 @@ export class MongoStorage implements IStorage {
 
   async changeUserPassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
     const bcrypt = require('bcryptjs');
-    
+
     // Get user and verify current password
     const user = await this.usersCollection.findOne({ _id: new ObjectId(userId) });
     if (!user) {
       throw new Error('User not found');
     }
-    
+
     if (!user.password) {
       throw new Error('Password change not available for this account type');
     }
-    
+
     // Verify current password
     const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
     if (!isCurrentPasswordValid) {
       throw new Error('Current password is incorrect');
     }
-    
+
     // Hash new password and update
     const hashedNewPassword = await bcrypt.hash(newPassword, 12);
     await this.usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { 
-        $set: { 
+      {
+        $set: {
           password: hashedNewPassword,
           updatedAt: new Date()
         }
@@ -1796,7 +1800,7 @@ export class MongoStorage implements IStorage {
   async banDeviceFingerprint(fingerprint: string, reason: string, bannedBy: string): Promise<void> {
     // Get all users with this device fingerprint
     const affectedUsers = await this.getUsersByDeviceFingerprint(fingerprint);
-    
+
     const now = new Date();
     const bannedDevice: BannedDeviceFingerprint = {
       _id: new ObjectId(),
@@ -1832,23 +1836,23 @@ export class MongoStorage implements IStorage {
 
   async unbanDeviceFingerprint(fingerprint: string): Promise<void> {
     // Find the banned device fingerprint record
-    const bannedDevice = await this.bannedDeviceFingerprintsCollection.findOne({ 
-      deviceFingerprint: fingerprint 
+    const bannedDevice = await this.bannedDeviceFingerprintsCollection.findOne({
+      deviceFingerprint: fingerprint
     });
-    
+
     if (!bannedDevice) {
       return; // Already unbanned or never banned
     }
 
     // Remove the banned device fingerprint record
-    await this.bannedDeviceFingerprintsCollection.deleteOne({ 
-      deviceFingerprint: fingerprint 
+    await this.bannedDeviceFingerprintsCollection.deleteOne({
+      deviceFingerprint: fingerprint
     });
 
     // Unban all users that were banned solely for this device fingerprint
     for (const userId of bannedDevice.affectedUsers) {
       const user = await this.getUser(userId.toString());
-      if (user && user.status === 'banned' && 
+      if (user && user.status === 'banned' &&
           user.restrictions?.includes('device_fingerprint_banned')) {
         // Check if they have any other restrictions
         const otherRestrictions = user.restrictions.filter(r => r !== 'device_fingerprint_banned');
@@ -1893,7 +1897,7 @@ export class MongoStorage implements IStorage {
         console.warn(`Invalid ObjectId format: ${messageId}`);
         return undefined;
       }
-      
+
       const message = await this.chatMessagesCollection.findOne({ _id: new ObjectId(messageId) });
       return message || undefined;
     } catch (error) {
@@ -1925,8 +1929,8 @@ export class MongoStorage implements IStorage {
 
     await this.chatMessagesCollection.updateOne(
       { _id: new ObjectId(messageId) },
-      { 
-        $set: { 
+      {
+        $set: {
           message: content,
           isEdited: true,
           editHistory: editHistory,
@@ -1956,13 +1960,13 @@ export class MongoStorage implements IStorage {
       if (!deploymentId || typeof deploymentId !== 'string' || deploymentId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(deploymentId)) {
         throw new Error(`Invalid ObjectId format: ${deploymentId}`);
       }
-      
+
       const now = new Date();
       await this.deploymentsCollection.updateOne(
         { _id: new ObjectId(deploymentId) },
-        { 
-          $push: { 
-            logs: { 
+        {
+          $push: {
+            logs: {
               $each: logs.map((log: string) => ({ content: log, timestamp: now }))
             }
           },
@@ -1979,10 +1983,10 @@ export class MongoStorage implements IStorage {
 
 
 
-  async updateUserProfile(userId: string, profileData: { 
-    firstName: string; 
-    lastName: string; 
-    username: string; 
+  async updateUserProfile(userId: string, profileData: {
+    firstName: string;
+    lastName: string;
+    username: string;
     bio: string;
     profilePicture?: string;
     socialProfiles?: {
@@ -2046,7 +2050,7 @@ export class MongoStorage implements IStorage {
 
       await this.usersCollection.updateOne(
         { _id: new ObjectId(userId) },
-        { 
+        {
           $set: {
             preferences: preferences,
             updatedAt: new Date()
@@ -2064,13 +2068,13 @@ export class MongoStorage implements IStorage {
       if (!id || typeof id !== 'string' || id.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(id)) {
         throw new Error(`Invalid ObjectId format: ${id}`);
       }
-      
+
       await this.deploymentsCollection.updateOne(
         { _id: new ObjectId(id) },
-        { 
-          $set: { 
-            status, 
-            updatedAt: new Date() 
+        {
+          $set: {
+            status,
+            updatedAt: new Date()
           }
         }
       );
@@ -2138,7 +2142,7 @@ export class MongoStorage implements IStorage {
       // If logs haven't been updated in a while, consider it stalled
       const lastUpdate = deployment.lastLogUpdate || deployment.updatedAt;
       const timeSinceUpdate = Date.now() - new Date(lastUpdate).getTime();
-      
+
       if (timeSinceUpdate > 10 * 60 * 1000) { // 10 minutes
         return { status: 'failed', reason: 'Deployment timed out' };
       }
@@ -2243,8 +2247,8 @@ export class MongoStorage implements IStorage {
   async updateCoinTransferStatus(transferId: string, status: string): Promise<void> {
     await this.coinTransfersCollection.updateOne(
       { _id: new ObjectId(transferId) },
-      { 
-        $set: { 
+      {
+        $set: {
           status,
           updatedAt: new Date()
         }
@@ -2280,7 +2284,7 @@ export class MongoStorage implements IStorage {
       .sort({ updatedAt: -1 })
       .limit(limit)
       .toArray();
-    
+
     // Transform to match BannedUser interface
     return bannedUsers.map(user => ({
       _id: user._id,
@@ -2297,8 +2301,8 @@ export class MongoStorage implements IStorage {
   async removeBannedUser(userId: string): Promise<void> {
     await this.bannedUsersCollection.updateOne(
       { userId: new ObjectId(userId) },
-      { 
-        $set: { 
+      {
+        $set: {
           isActive: false,
           updatedAt: new Date()
         }
@@ -2307,7 +2311,7 @@ export class MongoStorage implements IStorage {
   }
 
   async isBannedUser(userId: string): Promise<boolean> {
-    const banned = await this.bannedUsersCollection.findOne({ 
+    const banned = await this.bannedUsersCollection.findOne({
       userId: new ObjectId(userId),
       isActive: true
     });
@@ -2339,8 +2343,8 @@ export class MongoStorage implements IStorage {
   async updateUserCountry(userId: string, country: string): Promise<void> {
     await this.usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { 
-        $set: { 
+      {
+        $set: {
           country,
           updatedAt: new Date()
         }
@@ -2357,8 +2361,8 @@ export class MongoStorage implements IStorage {
   async updateUsername(userId: string, username: string): Promise<void> {
     await this.usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { 
-        $set: { 
+      {
+        $set: {
           username,
           updatedAt: new Date()
         }
@@ -2369,8 +2373,8 @@ export class MongoStorage implements IStorage {
   async updateUserLastLogin(userId: string, ipAddress: string): Promise<void> {
     await this.usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { 
-        $set: { 
+      {
+        $set: {
           lastLogin: new Date(),
           lastLoginIp: ipAddress,
           updatedAt: new Date()
@@ -2413,8 +2417,8 @@ export class MongoStorage implements IStorage {
   async updateLoginSessionEnd(loginId: string, logoutTime: Date, sessionDuration: number): Promise<void> {
     await this.loginHistoryCollection.updateOne(
       { _id: new ObjectId(loginId) },
-      { 
-        $set: { 
+      {
+        $set: {
           logoutTime,
           sessionDuration
         }
@@ -2424,12 +2428,12 @@ export class MongoStorage implements IStorage {
 
   // Device restriction operations
   async checkDeviceAccountLimit(deviceFingerprint: string): Promise<{ allowed: boolean; currentCount: number; maxAllowed: number }> {
-    const currentCount = await this.usersCollection.countDocuments({ 
+    const currentCount = await this.usersCollection.countDocuments({
       deviceFingerprint,
       status: { $ne: 'banned' }
     });
     const maxAllowed = 1; // Default limit of 1 account per device
-    
+
     return {
       allowed: currentCount < maxAllowed,
       currentCount,
@@ -2440,7 +2444,7 @@ export class MongoStorage implements IStorage {
   async incrementDeviceAccountCount(deviceFingerprint: string): Promise<void> {
     await this.usersCollection.updateMany(
       { deviceFingerprint },
-      { 
+      {
         $inc: { deviceAccountCount: 1 },
         $set: { updatedAt: new Date() }
       }
@@ -2450,7 +2454,7 @@ export class MongoStorage implements IStorage {
   async decrementDeviceAccountCount(deviceFingerprint: string): Promise<void> {
     await this.usersCollection.updateMany(
       { deviceFingerprint },
-      { 
+      {
         $inc: { deviceAccountCount: -1 },
         $set: { updatedAt: new Date() }
       }
@@ -2462,7 +2466,7 @@ export class MongoStorage implements IStorage {
     const user = await this.usersCollection.findOne({ _id: new ObjectId(userId) });
     const currentCount = user?.currentBotCount || 0;
     const maxAllowed = user?.maxBots || 10;
-    
+
     return {
       allowed: currentCount < maxAllowed,
       currentCount,
@@ -2473,7 +2477,7 @@ export class MongoStorage implements IStorage {
   async incrementUserBotCount(userId: string): Promise<void> {
     await this.usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { 
+      {
         $inc: { currentBotCount: 1 },
         $set: { updatedAt: new Date() }
       }
@@ -2483,7 +2487,7 @@ export class MongoStorage implements IStorage {
   async decrementUserBotCount(userId: string): Promise<void> {
     await this.usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { 
+      {
         $inc: { currentBotCount: -1 },
         $set: { updatedAt: new Date() }
       }
@@ -2520,8 +2524,8 @@ export class MongoStorage implements IStorage {
   async updateDeveloperInfo(id: string, updates: Partial<DeveloperInfo>): Promise<void> {
     await this.developerInfoCollection.updateOne(
       { _id: new ObjectId(id) },
-      { 
-        $set: { 
+      {
+        $set: {
           ...updates,
           updatedAt: new Date()
         }
@@ -2535,7 +2539,7 @@ export class MongoStorage implements IStorage {
     if (userId) {
       query.userId = { $ne: new ObjectId(userId) };
     }
-    
+
     const existingDeployment = await this.deploymentsCollection.findOne(query);
     return !existingDeployment;
   }
@@ -2554,7 +2558,7 @@ export class MongoStorage implements IStorage {
       // Get the last message the user read
       const lastRead = await this.userMessageReadsCollection
         .findOne({ userId: new ObjectId(userId) }, { sort: { readAt: -1 } });
-      
+
       if (!lastRead) {
         // If user has never read any message, count all messages
         return await this.chatMessagesCollection.countDocuments({});
@@ -2579,7 +2583,7 @@ export class MongoStorage implements IStorage {
   async markMessageAsRead(userId: string, messageId: string): Promise<void> {
     try {
       await this.userMessageReadsCollection.updateOne(
-        { 
+        {
           userId: new ObjectId(userId),
           messageId: new ObjectId(messageId)
         },
@@ -2602,7 +2606,7 @@ export class MongoStorage implements IStorage {
       // Get the latest message
       const latestMessage = await this.chatMessagesCollection
         .findOne({}, { sort: { createdAt: -1 } });
-      
+
       if (latestMessage) {
         await this.markMessageAsRead(userId, latestMessage._id.toString());
       }
@@ -2622,7 +2626,7 @@ export class MongoStorage implements IStorage {
 
       // Also cleanup related read records
       await this.userMessageReadsCollection.deleteMany({
-        messageId: { 
+        messageId: {
           $in: await this.chatMessagesCollection
             .find({ createdAt: { $lt: cutoffDate } })
             .map(msg => msg._id)
@@ -2665,8 +2669,8 @@ export class MongoStorage implements IStorage {
   async updateDeviceRestrictionCookie(deviceFingerprint: string, cookieValue: string): Promise<void> {
     await this.deviceRestrictionsCollection.updateOne(
       { deviceFingerprint },
-      { 
-        $set: { 
+      {
+        $set: {
           cookieValue,
           lastActivity: new Date(),
           updatedAt: new Date()
@@ -2678,7 +2682,7 @@ export class MongoStorage implements IStorage {
   async checkDeviceAccountCreationLimit(deviceFingerprint: string, cookieValue: string): Promise<{ allowed: boolean; reason?: string }> {
     try {
       let deviceRestriction = await this.getDeviceRestriction(deviceFingerprint);
-      
+
       if (!deviceRestriction) {
         // Create new device restriction record
         deviceRestriction = await this.createDeviceRestriction(deviceFingerprint, cookieValue);
@@ -2712,9 +2716,9 @@ export class MongoStorage implements IStorage {
   async addAccountToDevice(deviceFingerprint: string, userId: string): Promise<void> {
     await this.deviceRestrictionsCollection.updateOne(
       { deviceFingerprint },
-      { 
+      {
         $addToSet: { accountsCreated: new ObjectId(userId) },
-        $set: { 
+        $set: {
           lastActivity: new Date(),
           updatedAt: new Date()
         }
@@ -2726,8 +2730,8 @@ export class MongoStorage implements IStorage {
   async updateUserActivity(userId: string): Promise<void> {
     await this.usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { 
-        $set: { 
+      {
+        $set: {
           lastActivity: new Date(),
           updatedAt: new Date()
         }
@@ -2742,7 +2746,7 @@ export class MongoStorage implements IStorage {
     return await this.usersCollection.find({
       $or: [
         { lastActivity: { $lt: cutoffDate } },
-        { 
+        {
           lastActivity: { $exists: false },
           lastLogin: { $lt: cutoffDate }
         },
@@ -2758,16 +2762,16 @@ export class MongoStorage implements IStorage {
 
   async deleteInactiveUsers(months: number): Promise<number> {
     const inactiveUsers = await this.getInactiveUsers(months);
-    
+
     if (inactiveUsers.length === 0) {
       return 0;
     }
 
     const userIds = inactiveUsers.map(user => user._id);
-    
+
     // Delete user data
     await this.usersCollection.deleteMany({ _id: { $in: userIds } });
-    
+
     // Delete related data
     await this.deploymentsCollection.deleteMany({ userId: { $in: userIds } });
     await this.transactionsCollection.deleteMany({ userId: { $in: userIds } });
@@ -2775,7 +2779,7 @@ export class MongoStorage implements IStorage {
     await this.chatRestrictionsCollection.deleteMany({ userId: { $in: userIds } });
     await this.loginHistoryCollection.deleteMany({ userId: { $in: userIds } });
     await this.userMessageReadsCollection.deleteMany({ userId: { $in: userIds } });
-    
+
     console.log(`Deleted ${inactiveUsers.length} inactive users (inactive for ${months} months)`);
     return inactiveUsers.length;
   }
@@ -2831,7 +2835,7 @@ export class MongoStorage implements IStorage {
     try {
       // Find the voucher
       const voucher = await this.voucherCodesCollection.findOne({ code });
-      
+
       if (!voucher) {
         return { success: false, message: "Invalid voucher code. Please check and try again." };
       }
@@ -2884,10 +2888,10 @@ export class MongoStorage implements IStorage {
         createdAt: new Date()
       });
 
-      return { 
-        success: true, 
-        message: `Success! You have received ${voucher.coinAmount} coins from voucher code "${code}".`, 
-        coinAmount: voucher.coinAmount 
+      return {
+        success: true,
+        message: `Success! You have received ${voucher.coinAmount} coins from voucher code "${code}".`,
+        coinAmount: voucher.coinAmount
       };
     } catch (error) {
       console.error("Error redeeming voucher:", error);
@@ -2898,8 +2902,8 @@ export class MongoStorage implements IStorage {
   async updateVoucherStatus(id: string, isActive: boolean): Promise<void> {
     await this.voucherCodesCollection.updateOne(
       { _id: new ObjectId(id) },
-      { 
-        $set: { 
+      {
+        $set: {
           isActive,
           updatedAt: new Date()
         }
@@ -2930,7 +2934,7 @@ export class MongoStorage implements IStorage {
     const db = getDb();
     const stats = await db.stats();
     const collections = await db.listCollections().toArray();
-    
+
     let storageSize = {
       users: 0,
       deployments: 0,

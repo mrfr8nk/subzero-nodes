@@ -41,8 +41,10 @@ import {
   Search,
   Calendar,
   CheckCircle,
-  MessageCircle
+  MessageCircle,
+  Mail
 } from "lucide-react";
+import { SiGoogle, SiGithub } from "react-icons/si";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -1346,6 +1348,16 @@ export default function AdminDashboard() {
                             <div className="text-sm text-muted-foreground" data-testid={`text-user-email-${user._id}`}>
                               {user.email}
                             </div>
+                            {(user as any).authProvider && (
+                              <div className="flex items-center gap-1 mt-1">
+                                <Badge variant="outline" className="text-xs">
+                                  {(user as any).authProvider === 'google' && <SiGoogle className="w-3 h-3 mr-1 text-red-500" />}
+                                  {(user as any).authProvider === 'github' && <SiGithub className="w-3 h-3 mr-1" />}
+                                  {(user as any).authProvider === 'local' && <Mail className="w-3 h-3 mr-1" />}
+                                  {(user as any).authProvider || 'local'}
+                                </Badge>
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>

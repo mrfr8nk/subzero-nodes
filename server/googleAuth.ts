@@ -135,6 +135,7 @@ export async function setupAuth(app: Express) {
         authProvider: 'google' as const,
         emailVerified: true,
         coinBalance: existingUser?.coinBalance ?? 100,
+        username: existingUser?.username || profile.emails?.[0]?.value?.split('@')[0] || '',
         // Required fields for InsertUser type
         status: 'active' as const,
         role: 'user' as const,
