@@ -1987,8 +1987,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Wait for fork to be ready
           await new Promise(resolve => setTimeout(resolve, 5000));
 
-          // Update user's fork status in DB (if needed, this logic might be elsewhere)
-          // await storage.updateUserGitHubForkStatus(userId, `${REPO_OWNER}/${REPO_NAME}`, true);
+          // Automatically enable GitHub Actions on the newly forked repository
+          console.log('Enabling GitHub Actions on forked repository...');
+          try {
+            const enableActionsResponse = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/permissions`, {
+              method: 'PUT',
+              headers: {
+                'Authorization': `token ${GITHUB_TOKEN}`,
+                'Accept': 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28'
+              },
+              body: JSON.stringify({
+                enabled: true,
+                allowed_actions: 'all'
+              })
+            });
+
+            if (enableActionsResponse.ok || enableActionsResponse.status === 204) {
+              console.log('✓ GitHub Actions automatically enabled on forked repository');
+            } else {
+              const errorText = await enableActionsResponse.text();
+              console.warn(`Warning: Could not auto-enable GitHub Actions on fork (${enableActionsResponse.status}):`, errorText);
+            }
+          } catch (actionsError) {
+            console.warn('Warning: Could not auto-enable GitHub Actions on fork:', actionsError);
+          }
         }
 
         // Check if branch already exists
