@@ -33,10 +33,16 @@ export default function Dashboard() {
   // Show GitHub setup modal on first visit if setup is not complete
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
+      // If user has completed setup, don't show modal
+      if (user.hasCompletedGitHubSetup) {
+        setShowGitHubSetup(false);
+        return;
+      }
+
       const hasSeenSetupModal = localStorage.getItem('hasSeenGitHubSetupModal');
       
       // If user hasn't completed setup and hasn't seen the modal yet, show it
-      if (!user.hasCompletedGitHubSetup && !hasSeenSetupModal) {
+      if (!hasSeenSetupModal) {
         setShowGitHubSetup(true);
         localStorage.setItem('hasSeenGitHubSetupModal', 'true');
       }
@@ -302,7 +308,7 @@ export default function Dashboard() {
 
       {/* GitHub Setup Modal - Only show on first visit if setup not complete */}
       <GitHubSetupModal
-        isOpen={showGitHubSetup}
+        isOpen={showGitHubSetup && !user?.hasCompletedGitHubSetup}
         onClose={() => setShowGitHubSetup(false)}
         onComplete={() => {
           setShowGitHubSetup(false);

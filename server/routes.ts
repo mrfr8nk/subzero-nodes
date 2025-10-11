@@ -143,9 +143,17 @@ async function monitorWorkflowStatus(branchName: string) {
         if (isAppActive) {
           try {
             const deployment = await storage.getDeploymentByBranchName(branchName);
-            if (deployment && deployment.status !== 'active') {
+            if (deployment && deployment.status === 'deploying') {
               await storage.updateDeploymentStatus(deployment._id.toString(), 'active');
-              console.log(`App detected as active for branch ${branchName}, status updated to active`);
+              console.log(`✓ Bot activity detected! Deployment status updated from deploying to active for branch ${branchName}`);
+              
+              // Broadcast status update to clients
+              broadcastToClients('deployment_active', {
+                branch: branchName,
+                deploymentId: deployment._id.toString(),
+                status: 'active',
+                message: 'Bot is now deployed and running'
+              });
             }
           } catch (error) {
             console.error(`Error updating deployment status for ${branchName}:`, error);

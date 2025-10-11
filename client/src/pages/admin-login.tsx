@@ -22,12 +22,20 @@ export default function AdminLogin() {
       return await apiRequest('/api/admin/login', 'POST', loginData);
     },
     onSuccess: async () => {
-      // Invalidate the auth user query to refresh the user state
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      // Refetch the user to ensure the state is updated
-      await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
-      // Navigate to admin dashboard
-      setLocation('/admin/dashboard');
+      try {
+        // Invalidate and refetch user data
+        await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
+        
+        // Wait a bit for auth state to update
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Navigate to admin dashboard
+        window.location.href = '/admin/dashboard';
+      } catch (error) {
+        console.error('Error during admin login redirect:', error);
+        setLocation('/admin/dashboard');
+      }
     },
     onError: (error: any) => {
       console.error('Admin login failed:', error);

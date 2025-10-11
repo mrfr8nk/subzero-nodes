@@ -243,7 +243,13 @@ export default function Deployments() {
                   </div>
                   <div className="flex gap-2 justify-end">
                     <Button 
-                      onClick={() => setSelectedDeploymentId(deployment._id)}
+                      onClick={() => {
+                        if (deployment.githubOwner && deployment.githubRepo && deployment.branchName) {
+                          window.open(`https://github.com/${deployment.githubOwner}/${deployment.githubRepo}/actions?query=branch%3A${deployment.branchName}`, '_blank');
+                        } else {
+                          setSelectedDeploymentId(deployment._id);
+                        }
+                      }}
                       variant="outline"
                       className="border-blue-600 text-blue-600 hover:bg-blue-50"
                       data-testid={`button-view-workflow-${deployment._id}`}
