@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, ExternalLink, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { RefreshCw, ExternalLink, Clock, CheckCircle, XCircle, AlertCircle, GitBranch } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 interface DeploymentLogsModalProps {
@@ -50,6 +50,16 @@ export default function DeploymentLogsModal({
     queryKey: [`/api/deployments/${deploymentId}/logs`],
     enabled: isOpen && !!deploymentId,
     refetchInterval: 15000, // Refetch every 15 seconds for better performance
+  });
+
+  // Fetch deployment details to get branch information
+  const { data: deploymentDetails } = useQuery<{
+    branchName?: string;
+    status?: string;
+    name?: string;
+  }>({
+    queryKey: [`/api/deployments/${deploymentId}`],
+    enabled: isOpen && !!deploymentId,
   });
 
   // Fetch specific run logs when a run is selected
@@ -119,11 +129,24 @@ export default function DeploymentLogsModal({
       <DialogContent className="max-w-6xl max-h-[90vh] p-0">
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="flex items-center justify-between">
-            <div>
-              <span>Deployment Logs: {deploymentName}</span>
-              <Badge variant="outline" className="ml-2">
-                {isAdmin ? 'Admin View' : 'User View'}
-              </Badge>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span>Deployment Logs: {deploymentName}</span>
+                <Badge variant="outline">
+                  {isAdmin ? 'Admin View' : 'User View'}
+                </Badge>
+              </div>
+              {deploymentDetails?.branchName && (
+                <div className="flex items-center gap-2 text-sm font-normal text-muted-foreground">
+                  <GitBranch className="w-4 h-4" />
+                  <span>Branch: <span className="font-mono font-semibold text-foreground">{deploymentDetails.branchName}</span></span>
+                  {deploymentDetails.status && (
+                    <Badge variant={deploymentDetails.status === 'active' ? 'default' : 'secondary'} className="ml-2">
+                      {deploymentDetails.status === 'active' ? 'Deployed & Running' : deploymentDetails.status.charAt(0).toUpperCase() + deploymentDetails.status.slice(1)}
+                    </Badge>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex items-center space-x-2">
               <Button
@@ -139,7 +162,7 @@ export default function DeploymentLogsModal({
                 Refresh
               </Button>
               <Badge variant="secondary" className="text-xs">
-                Auto-refresh: 10s
+                Auto-refresh: 15s
               </Badge>
             </div>
           </DialogTitle>

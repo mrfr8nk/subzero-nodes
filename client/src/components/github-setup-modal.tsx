@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +31,13 @@ export default function GitHubSetupModal({ isOpen, onClose, onComplete }: GitHub
     queryKey: ["/api/github/connection-status"],
     enabled: isOpen,
   });
+
+  // Auto-close modal if user has already completed setup
+  useEffect(() => {
+    if (isOpen && !isLoading && user?.hasCompletedGitHubSetup) {
+      onClose();
+    }
+  }, [isOpen, isLoading, user?.hasCompletedGitHubSetup, onClose]);
 
   const forkRepoMutation = useMutation({
     mutationFn: async () => {

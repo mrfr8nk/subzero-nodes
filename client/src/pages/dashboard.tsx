@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -7,11 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MessageSquare, Coins, Users, Rocket, Plus, Wallet, Share, Eye, Settings } from "lucide-react";
 import { useLocation } from "wouter";
+import GitHubSetupModal from "@/components/github-setup-modal";
 
 export default function Dashboard() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [showGitHubSetup, setShowGitHubSetup] = useState(false);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -27,6 +29,19 @@ export default function Dashboard() {
       return;
     }
   }, [isAuthenticated, isLoading, toast, setLocation]);
+
+  // Show GitHub setup modal on first visit if setup is not complete
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user) {
+      const hasSeenSetupModal = localStorage.getItem('hasSeenGitHubSetupModal');
+      
+      // If user hasn't completed setup and hasn't seen the modal yet, show it
+      if (!user.hasCompletedGitHubSetup && !hasSeenSetupModal) {
+        setShowGitHubSetup(true);
+        localStorage.setItem('hasSeenGitHubSetupModal', 'true');
+      }
+    }
+  }, [isAuthenticated, isLoading, user]);
 
   const { data: stats, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/dashboard/stats"],
@@ -284,6 +299,15 @@ export default function Dashboard() {
           </Card>
         </div>
       </div>
+
+      {/* GitHub Setup Modal - Only show on first visit if setup not complete */}
+      <GitHubSetupModal
+        isOpen={showGitHubSetup}
+        onClose={() => setShowGitHubSetup(false)}
+        onComplete={() => {
+          setShowGitHubSetup(false);
+        }}
+      />
     </div>
   );
 }

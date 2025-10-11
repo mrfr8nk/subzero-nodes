@@ -266,7 +266,8 @@ function detectAppStartInLogs(logsData: any[]): boolean {
     'Bot is online',
     'Connected successfully',
     'Ready to serve',
-    'Application started'
+    'Application started',
+    'Bot activity detected' // Added to detect the workflow log message
   ];
 
   for (const logEntry of logsData) {

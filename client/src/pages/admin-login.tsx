@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff, Shield } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function AdminLogin() {
   const [, setLocation] = useLocation();
@@ -21,7 +21,12 @@ export default function AdminLogin() {
     mutationFn: async (loginData: { email: string; password: string }) => {
       return await apiRequest('/api/admin/login', 'POST', loginData);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Invalidate the auth user query to refresh the user state
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      // Refetch the user to ensure the state is updated
+      await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
+      // Navigate to admin dashboard
       setLocation('/admin/dashboard');
     },
     onError: (error: any) => {
